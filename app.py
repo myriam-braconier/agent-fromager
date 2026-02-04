@@ -364,7 +364,17 @@ class AgentFromagerHF:
         }
     }
     
-    # ===== AJOUTE LA MÉTHODE ICI =====
+    # vérification connexion internet dans ta classe AgentFromagerHF
+    def test_internet(self):
+        """Test si Internet fonctionne"""
+        try:
+            import requests
+            response = requests.get("https://httpbin.org/get", timeout=10)
+            return f"✅ Internet fonctionne !\n\nStatus: {response.status_code}\nURL testée: https://httpbin.org/get"
+        except Exception as  e:
+            return f"❌ Erreur d'accès Internet:\n{str(e)}"
+    
+    # =====  MÉTHODE de validationICI =====
     def _validate_combination(self, lait: str, type_pate: str, aromates: list = None) -> tuple:
         """
         Valide une combinaison lait/pâte/aromates
@@ -1361,18 +1371,6 @@ Adaptations suggérées selon vos contraintes.
         
         return summary
     
-# Ajoute cette méthode dans ta classe AgentFromagerHF
-def test_internet(self):
-    """Test si Internet fonctionne"""
-    try:
-        import requests
-        response = requests.get("https://httpbin.org/get", timeout=10)
-        return f"✅ Internet fonctionne !\n\nStatus: {response.status_code}\nURL testée: https://httpbin.org/get"
-    except Exception as e:
-        return f"❌ Erreur d'accès Internet:\n{str(e)}"    
-    
-
-
 # Initialiser l'agent
 agent = AgentFromagerHF()
 
