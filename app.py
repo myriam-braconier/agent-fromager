@@ -773,67 +773,6 @@ def _add_constraints_note(self, constraints):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Adaptations suggérées selon vos contraintes.
 """
-    
-def get_knowledge_summary(self):
-        """Retourne un résumé de la base de connaissances"""
-        summary = "📚 BASE DE CONNAISSANCES FROMAGE\n\n"
-        summary += "🧀 TYPES DE PÂTE :\n"
-        summary += "="*70 + "\n\n"
-        
-        for name, info in self.knowledge_base['types_pate'].items():
-            summary += f"• {name.upper()}\n"
-            summary += f"  {info['description']}\n"
-            summary += f"  Exemples : {info['exemples']}\n"
-            summary += f"  Durée : {info['duree']} | Difficulté : {info['difficulte']}\n\n"
-        
-        summary += "\n" + "="*70 + "\n"
-        summary += "🥛 INGRÉDIENTS ESSENTIELS :\n"
-        summary += "="*70 + "\n\n"
-        
-        for category, items in self.knowledge_base['ingredients_base'].items():
-            summary += f"\n• {category.upper()} :\n"
-            for item in items:
-                summary += f"  - {item}\n"
-        
-        summary += "\n" + "="*70 + "\n"
-        summary += "💡 CONSEILS GÉNÉRAUX :\n"
-        summary += "="*70 + "\n\n"
-        summary += "✓ Hygiène irréprochable : stériliser tout le matériel\n"
-        summary += "✓ Température précise : ±2°C peut changer le résultat\n"
-        summary += "✓ Patience : un bon fromage ne se précipite pas\n"
-        summary += "✓ Tenir un carnet : noter températures et durées\n"
-        summary += "✓ Commencer simple : fromage frais avant pâtes pressées\n\n"
-        
-        summary += "\n" + "="*70 + "\n"
-        summary += "🌶️ ÉPICES ET AROMATES :\n"
-        summary += "="*70 + "\n\n"
-        
-        if 'epices_et_aromates' in self.knowledge_base:
-            for category, items in self.knowledge_base['epices_et_aromates'].items():
-                summary += f"• {category.upper()} :\n"
-                for item in items[:5]:  # Limiter à 5 pour ne pas surcharger
-                    summary += f"  - {item}\n"
-                if len(items) > 5:
-                    summary += f"  ... et {len(items)-5} autres\n"
-                summary += "\n"
-        
-        summary += "\n" + "="*70 + "\n"
-        summary += "📐 DOSAGES RECOMMANDÉS :\n"
-        summary += "="*70 + "\n\n"
-        
-        if 'dosages_recommandes' in self.knowledge_base:
-            for ingredient, dosage in self.knowledge_base['dosages_recommandes'].items():
-                summary += f"• {ingredient} : {dosage}\n"
-        
-        summary += "\n" + "="*70 + "\n"
-        summary += "🎨 ASSOCIATIONS CLASSIQUES :\n"
-        summary += "="*70 + "\n\n"
-        
-        if 'associations_classiques' in self.knowledge_base:
-            for fromage, assoc in self.knowledge_base['associations_classiques'].items():
-                summary += f"• {fromage} : {assoc}\n"
-        
-        return summary
 
 def get_knowledge_summary(self):
         """Retourne un résumé de la base de connaissances"""
