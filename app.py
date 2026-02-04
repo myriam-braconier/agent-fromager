@@ -899,8 +899,10 @@ Adaptations suggérées selon vos contraintes.
 """
     
     def get_knowledge_summary(self):
-        """Retourne un résumé de la base de connaissances"""
-        summary = "📚 BASE DE CONNAISSANCES FROMAGE\n\n"
+        """Retourne un résumé complet de la base de connaissances"""
+        summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
+        
+        # Types de pâte
         summary += "🧀 TYPES DE PÂTE :\n"
         summary += "="*70 + "\n\n"
         
@@ -910,6 +912,7 @@ Adaptations suggérées selon vos contraintes.
             summary += f"  Exemples : {info['exemples']}\n"
             summary += f"  Durée : {info['duree']} | Difficulté : {info['difficulte']}\n\n"
         
+        # Ingrédients de base
         summary += "\n" + "="*70 + "\n"
         summary += "🥛 INGRÉDIENTS ESSENTIELS :\n"
         summary += "="*70 + "\n\n"
@@ -919,14 +922,160 @@ Adaptations suggérées selon vos contraintes.
             for item in items:
                 summary += f"  - {item}\n"
         
+        # Épices et aromates
+        if 'epices_et_aromates' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🌶️ ÉPICES ET AROMATES :\n"
+            summary += "="*70 + "\n\n"
+            
+            for category, items in self.knowledge_base['epices_et_aromates'].items():
+                summary += f"• {category.upper()} :\n"
+                for item in items[:5]:
+                    summary += f"  - {item}\n"
+                if len(items) > 5:
+                    summary += f"  ... et {len(items)-5} autres\n"
+                summary += "\n"
+        
+        # Techniques d'aromatisation
+        if 'techniques_aromatisation' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🎨 TECHNIQUES D'AROMATISATION :\n"
+            summary += "="*70 + "\n\n"
+            
+            for tech, desc in self.knowledge_base['techniques_aromatisation'].items():
+                summary += f"• {tech} :\n  {desc}\n\n"
+        
+        # Dosages recommandés
+        if 'dosages_recommandes' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "📐 DOSAGES RECOMMANDÉS :\n"
+            summary += "="*70 + "\n\n"
+            
+            for ingredient, dosage in self.knowledge_base['dosages_recommandes'].items():
+                summary += f"• {ingredient} : {dosage}\n"
+        
+        # Associations classiques
+        if 'associations_classiques' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🎯 ASSOCIATIONS CLASSIQUES :\n"
+            summary += "="*70 + "\n\n"
+            
+            for fromage, assoc in self.knowledge_base['associations_classiques'].items():
+                summary += f"• {fromage} : {assoc}\n"
+        
+        # Températures d'affinage
+        if 'temperatures_affinage' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🌡️ TEMPÉRATURES D'AFFINAGE :\n"
+            summary += "="*70 + "\n\n"
+            
+            for fromage_type, temp in self.knowledge_base['temperatures_affinage'].items():
+                summary += f"• {fromage_type} : {temp}\n"
+        
+        # Problèmes courants
+        if 'problemes_courants' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🚨 PROBLÈMES COURANTS ET SOLUTIONS :\n"
+            summary += "="*70 + "\n\n"
+            
+            for probleme, solution in list(self.knowledge_base['problemes_courants'].items())[:8]:
+                summary += f"❌ {probleme}\n"
+                summary += f"   ✅ {solution}\n\n"
+            
+            remaining = len(self.knowledge_base['problemes_courants']) - 8
+            if remaining > 0:
+                summary += f"... et {remaining} autres problèmes documentés\n"
+        
+        # Conservation
+        if 'conservation' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "📦 CONSERVATION :\n"
+            summary += "="*70 + "\n\n"
+            
+            for fromage_type, duree in self.knowledge_base['conservation'].items():
+                summary += f"• {fromage_type} : {duree}\n"
+        
+        # Accords vins
+        if 'accords_vins' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🍷 ACCORDS VINS :\n"
+            summary += "="*70 + "\n\n"
+            
+            for fromage_type, vin in list(self.knowledge_base['accords_vins'].items())[:12]:
+                summary += f"• {fromage_type} → {vin}\n"
+            
+            remaining = len(self.knowledge_base['accords_vins']) - 12
+            if remaining > 0:
+                summary += f"\n... et {remaining} autres accords\n"
+        
+        # Accords mets
+        if 'accords_mets' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🍽️ ACCORDS METS :\n"
+            summary += "="*70 + "\n\n"
+            
+            for fromage_type, mets in self.knowledge_base['accords_mets'].items():
+                summary += f"• {fromage_type} : {mets}\n"
+        
+        # Matériel indispensable
+        if 'materiel_indispensable' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🛠️ MATÉRIEL RECOMMANDÉ :\n"
+            summary += "="*70 + "\n\n"
+            
+            for niveau, items in self.knowledge_base['materiel_indispensable'].items():
+                summary += f"\n📌 {niveau.upper()} :\n"
+                for item in items:
+                    summary += f"  - {item}\n"
+        
+        # Fournisseurs recommandés
+        if 'fournisseurs_recommandes' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "🏪 FOURNISSEURS RECOMMANDÉS :\n"
+            summary += "="*70 + "\n\n"
+            
+            for cat, fournisseurs in self.knowledge_base['fournisseurs_recommandes'].items():
+                summary += f"• {cat} : {fournisseurs}\n"
+        
+        # Calendrier fromager
+        if 'calendrier_fromager' in self.knowledge_base:
+            summary += "\n" + "="*70 + "\n"
+            summary += "📅 CALENDRIER FROMAGER :\n"
+            summary += "="*70 + "\n\n"
+            
+            for saison, conseil in self.knowledge_base['calendrier_fromager'].items():
+                summary += f"• {saison} :\n  {conseil}\n\n"
+        
+        # Conseils généraux
         summary += "\n" + "="*70 + "\n"
-        summary += "💡 CONSEILS GÉNÉRAUX :\n"
+        summary += "💡 CONSEILS GÉNÉRAUX DU MAÎTRE FROMAGER :\n"
         summary += "="*70 + "\n\n"
-        summary += "✓ Hygiène irréprochable : stériliser tout le matériel\n"
-        summary += "✓ Température précise : ±2°C peut changer le résultat\n"
-        summary += "✓ Patience : un bon fromage ne se précipite pas\n"
-        summary += "✓ Tenir un carnet : noter températures et durées\n"
-        summary += "✓ Commencer simple : fromage frais avant pâtes pressées\n\n"
+        summary += "✨ Hygiène irréprochable : stériliser tout le matériel à l'eau bouillante\n"
+        summary += "✨ Température précise : ±2°C peut totalement changer le résultat\n"
+        summary += "✨ Patience : un bon fromage ne se précipite pas, respecter les temps\n"
+        summary += "✨ Qualité du lait : préférer lait cru ou pasteurisé (JAMAIS UHT)\n"
+        summary += "✨ Tenir un carnet : noter températures, durées et résultats\n"
+        summary += "✨ Commencer simple : fromage frais avant pâtes pressées\n"
+        summary += "✨ Cave d'affinage DIY : Une glacière + bol d'eau + hygromètre suffit\n"
+        summary += "✨ Le petit-lait est précieux : pain, ricotta, plantes\n\n"
+        
+        # Statistiques
+        summary += "="*70 + "\n"
+        summary += "📊 STATISTIQUES DE LA BASE DE CONNAISSANCES :\n"
+        summary += "="*70 + "\n"
+        summary += f"• Types de pâte documentés : {len(self.knowledge_base.get('types_pate', {}))}\n"
+        summary += f"• Catégories d'ingrédients : {len(self.knowledge_base.get('ingredients_base', {}))}\n"
+        if 'epices_et_aromates' in self.knowledge_base:
+            summary += f"• Catégories d'épices : {len(self.knowledge_base['epices_et_aromates'])}\n"
+            total_epices = sum(len(items) for items in self.knowledge_base['epices_et_aromates'].values())
+            summary += f"• Total épices/aromates : {total_epices}\n"
+        summary += f"• Températures d'affinage : {len(self.knowledge_base.get('temperatures_affinage', {}))}\n"
+        summary += f"• Problèmes documentés : {len(self.knowledge_base.get('problemes_courants', {}))}\n"
+        summary += f"• Infos conservation : {len(self.knowledge_base.get('conservation', {}))}\n"
+        summary += f"• Accords vins : {len(self.knowledge_base.get('accords_vins', {}))}\n"
+        summary += f"• Accords mets : {len(self.knowledge_base.get('accords_mets', {}))}\n"
+        summary += f"• Techniques d'aromatisation : {len(self.knowledge_base.get('techniques_aromatisation', {}))}\n"
+        summary += "\n🎉 Base de connaissances très complète pour devenir maître fromager !\n"
         
         return summary
 
