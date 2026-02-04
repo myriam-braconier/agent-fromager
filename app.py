@@ -364,6 +364,133 @@ class AgentFromagerHF:
         }
     }
     
+    def _download_history_from_hf(self):
+        """Télécharge l'historique depuis HF Dataset"""
+    if not self.api:
+        print("⚠️  Pas de token HF - historique local uniquement")
+        return
+    
+    try:
+        downloaded_path = hf_hub_download(
+            repo_id=self.hf_repo,
+            filename=self.recipes_file,
+            repo_type="dataset",
+            token=self.hf_token
+        )
+        
+        with open(downloaded_path, 'r', encoding='utf-8') as src:
+            history = json.load(src)
+        
+        with open(self.recipes_file, 'w', encoding='utf-8') as dst:
+            json.dump(history, dst, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Historique chargé : {len(history)} recettes")
+        
+    except Exception as e:
+        print(f"ℹ️  Pas d'historique existant: {e}")
+        with open(self.recipes_file, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+
+def _upload_history_to_hf(self):
+    """Upload l'historique vers HF Dataset"""
+    if not self.api:
+        print("⚠️  Pas de token HF - sauvegarde locale uniquement")
+        return False
+    
+    try:
+        self.api.upload_file(
+            path_or_fileobj=self.recipes_file,
+            path_in_repo=self.recipes_file,
+            repo_id=self.hf_repo,
+            repo_type="dataset",
+            commit_message=f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        )
+        print("✅ Historique synchronisé avec HF")
+        return True
+    except Exception as e:
+        print(f"❌ Erreur upload HF: {e}")
+        return False
+
+def _load_history(self):
+    """Charge l'historique depuis le fichier local"""
+    if os.path.exists(self.recipes_file):
+        try:
+            with open(self.recipes_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
+    """Sauvegarde une recette dans l'historique"""
+    try:
+        history = self._load_history()
+        
+        entry = {
+            'id': len(history) + 1,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'ingredients': ingredients if isinstance(ingredients, str) else ', '.join(ingredients),
+            'cheese_type': cheese_type,
+            'constraints': constraints,
+            'recipe': recipe
+        }
+        
+        history.append(entry)
+        
+        # Sauvegarder localement
+        with open(self.recipes_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+        
+        # Upload vers HF
+        sync_success = self._upload_history_to_hf()
+        
+        if sync_success:
+            print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
+        else:
+            print(f"⚠️  Recette #{entry['id']} sauvegardée localement")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erreur sauvegarde: {e}")
+        return False
+
+def get_history_display(self):
+    """Retourne l'historique formaté pour affichage"""
+    try:
+        history = self._load_history()
+        
+        if not history:
+            return "📭 Aucune recette sauvegardée pour le moment."
+        
+        display = f"📚 **{len(history)} recette(s) sauvegardée(s)**\n\n"
+        display += "---\n\n"
+        
+        for entry in reversed(history[-10:]):  # 10 dernières recettes
+            display += f"**#{entry['id']}** | 📅 {entry['timestamp']}\n"
+            display += f"🧀 Type: {entry['cheese_type']}\n"
+            ing = entry['ingredients']
+            if isinstance(ing, list):
+                ing = ', '.join(ing)
+            display += f"🥛 Ingrédients: {ing[:50]}...\n"
+            if entry.get('constraints'):
+                display += f"⚙️ Contraintes: {entry['constraints']}\n"
+            display += "\n---\n\n"
+        
+        return display
+    except Exception as e:
+        return f"❌ Erreur lecture historique: {e}"
+
+def clear_history(self):
+    """Efface tout l'historique"""
+    try:
+        with open(self.recipes_file, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+        self._upload_history_to_hf()
+        return "🗑️ Historique effacé avec succès."
+    except Exception as e:
+        return f"❌ Erreur: {e}"
+    
     # vérification connexion internet dans ta classe AgentFromagerHF
     def test_internet(self):
         """Test si Internet fonctionne"""
