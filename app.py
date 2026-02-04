@@ -213,6 +213,120 @@ class AgentFromagerHF:
             'Chèvre': 'Pain grillé, miel, salade verte, betterave',
             'Fromages forts': 'Pain de seigle, oignon confit, pomme de terre'
         },
+        'regles_compatibilite': {
+            'lait_x_type_pate': {
+                'description': 'Associations valides entre types de lait et types de pâte',
+                'combinaisons_valides': [
+                    {
+                        'lait': 'vache',
+                        'types_pate_compatibles': ['Fromage frais', 'Pâte molle', 'Pâte pressée non cuite', 
+                                                   'Pâte pressée cuite', 'Pâte persillée'],
+                        'exemples': ['camembert', 'brie', 'comté', 'roquefort']
+                    },
+                    {
+                        'lait': 'chevre',
+                        'types_pate_compatibles': ['Fromage frais', 'Pâte pressée non cuite'],
+                        'types_pate_incompatibles': ['Pâte molle'],
+                        'raison': 'Le lait de chèvre donne naturellement une croûte cendrée/naturelle, pas de croûte fleurie',
+                        'exemples': ['crottin de Chavignol', 'sainte-maure', 'tomme de chèvre']
+                    },
+                    {
+                        'lait': 'brebis',
+                        'types_pate_compatibles': ['Fromage frais', 'Pâte pressée non cuite', 'Pâte pressée cuite', 'Pâte persillée'],
+                        'types_pate_incompatibles': ['Pâte molle'],
+                        'raison': 'La brebis est traditionnellement utilisée pour fromages pressés ou bleus, pas pour croûtes fleuries',
+                        'exemples': ['roquefort', 'ossau-iraty', 'manchego', 'pecorino']
+                    },
+                    {
+                        'lait': 'bufflonne',
+                        'types_pate_compatibles': ['Fromage frais'],
+                        'types_pate_incompatibles': ['Pâte molle', 'Pâte pressée cuite'],
+                        'raison': 'Lait très riche utilisé principalement pour fromages frais italiens',
+                        'exemples': ['mozzarella di bufala', 'burrata']
+                    }
+                ]
+            },
+            
+            'lait_x_aromates': {
+                'description': 'Associations classiques et harmonieuses',
+                'affinites': [
+                    {
+                        'lait': 'chevre',
+                        'aromates_recommandes': ['herbes de Provence', 'miel', 'lavande', 'thym', 'cendre'],
+                        'aromates_deconseilles': ['curry fort', 'cumin intense'],
+                        'raison': 'Le chèvre a un goût délicat qui peut être écrasé par épices trop fortes'
+                    },
+                    {
+                        'lait': 'brebis',
+                        'aromates_recommandes': ['piment d\'Espelette', 'romarin', 'olives', 'tomates séchées'],
+                        'aromates_deconseilles': [],
+                        'raison': 'Goût prononcé de brebis supporte bien épices méditerranéennes fortes'
+                    },
+                    {
+                        'lait': 'vache',
+                        'aromates_recommandes': ['ail', 'fines herbes', 'poivre', 'noix', 'cumin'],
+                        'aromates_deconseilles': [],
+                        'raison': 'Neutre, s\'accommode de presque tout'
+                    }
+                ]
+            },
+            
+            'type_pate_x_aromates': {
+                'Fromage frais': {
+                    'aromates_compatibles': ['herbes fraîches', 'ail frais', 'ciboulette', 'aneth', 'menthe'],
+                    'aromates_incompatibles': ['épices chaudes fortes', 'curry', 'piment de Cayenne'],
+                    'raison': 'Goût délicat, consommation rapide : herbes fraîches idéales'
+                },
+                'Pâte molle': {
+                    'aromates_compatibles': ['herbes séchées', 'poivre', 'ail confit'],
+                    'aromates_incompatibles': ['herbes fraîches'],
+                    'raison': 'Affinage humide : herbes fraîches peuvent pourrir, préférer séchées'
+                },
+                'Pâte pressée non cuite': {
+                    'aromates_compatibles': ['cumin', 'fenugrec', 'noix', 'fruits secs', 'épices en grains'],
+                    'aromates_incompatibles': ['herbes fraîches délicates'],
+                    'raison': 'Longue conservation : épices robustes et séchées résistent mieux'
+                },
+                'Pâte pressée cuite': {
+                    'aromates_compatibles': ['cumin', 'noix', 'fruits secs'],
+                    'aromates_incompatibles': ['herbes fraîches'],
+                    'raison': 'Très long affinage : seules épices robustes survivent'
+                },
+                'Pâte persillée': {
+                    'aromates_compatibles': ['noix', 'miel', 'fruits secs'],
+                    'aromates_incompatibles': ['herbes fortes', 'épices puissantes'],
+                    'raison': 'Goût déjà très prononcé : accompagnements doux uniquement'
+                }
+            },
+            
+            'exclusions_absolues': [
+                {
+                    'combinaison': 'lait:brebis + type_pate:Pâte molle',
+                    'raison': 'Incompatibilité traditionnelle et technique. La brebis ne développe pas bien le Penicillium camemberti',
+                    'severite': 'haute',
+                    'alternatives': ['Pâte pressée non cuite', 'Pâte persillée']
+                },
+                {
+                    'combinaison': 'lait:chevre + type_pate:Pâte molle',
+                    'raison': 'Chèvre développe naturellement croûte cendrée, pas fleurie comme camembert',
+                    'severite': 'haute',
+                    'alternatives': ['Fromage frais', 'Pâte pressée non cuite']
+                },
+                {
+                    'combinaison': 'type_pate:Fromage frais + aromate:herbes séchées fortes',
+                    'raison': 'Déséquilibre gustatif - fromage frais trop délicat',
+                    'severite': 'moyenne',
+                    'alternatives': ['Herbes fraîches', 'herbes séchées douces']
+                },
+                {
+                    'combinaison': 'affinage:long + aromate:herbes fraîches',
+                    'raison': 'Risque sanitaire - les herbes fraîches moisissent pendant affinage humide',
+                    'severite': 'haute',
+                    'alternatives': ['Herbes séchées', 'aromates après affinage']
+                }
+            ]
+        },
+
         'materiel_indispensable': {
             'Pour débuter': [
                 'Thermomètre de cuisson (précision ±1°C) - 10-15€',
@@ -249,6 +363,31 @@ class AgentFromagerHF:
             'Hiver (Déc-Fév)': 'Fromages d\'affinage, pâtes pressées. Cave naturellement fraîche'
         }
     }
+    
+    # ===== AJOUTE LA MÉTHODE ICI =====
+    def _validate_combination(self, lait: str, type_pate: str, aromates: list = None) -> tuple:
+        """
+        Valide une combinaison lait/pâte/aromates
+        Returns: (bool, str) - (est_valide, raison)
+        """
+        rules = self.knowledge['regles_compatibilite']
+        
+        # Vérifier les exclusions absolues
+        for exclusion in rules['exclusions_absolues']:
+            combo = exclusion['combinaison']
+            if f'lait:{lait}' in combo and f'type_pate:{type_pate}' in combo:
+                alternatives = ', '.join(exclusion.get('alternatives', []))
+                message = f"❌ {exclusion['raison']}\n\nAlternatives suggérées : {alternatives}"
+                return False, message
+        
+        # Vérifier compatibilité lait/pâte
+        for combo in rules['lait_x_type_pate']['combinaisons_valides']:
+            if combo['lait'] == lait.lower():
+                if type_pate in combo.get('types_pate_incompatibles', []):
+                    message = f"❌ {combo['raison']}\n\nFromages {lait} compatibles : {', '.join(combo['types_pate_compatibles'])}"
+                    return False, message
+        
+        return True, "✅ Combinaison valide"   
     
     def _download_history_from_hf(self):
         """Télécharge l'historique depuis HF Dataset"""
@@ -436,22 +575,44 @@ class AgentFromagerHF:
         
         return True, "✅ Ingrédients parfaits pour faire du fromage !"
     
-    def generate_recipe(self, ingredients, cheese_type, constraints):
-        """Génère une recette de fromage détaillée"""
+def generate_recipe(self, user_request: str) -> str:
+    """Génère une recette de fromage selon la demande"""
+    try:
+        # Parse la demande avec le LLM
+        prompt = self._build_prompt(user_request)
+        response = ollama.chat(
+            model=self.model_name,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
         
-        valid, message = self.validate_ingredients(ingredients)
-        if not valid:
-            return message
+        suggestion = response['message']['content']
         
-        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+        # AJOUTE LA VALIDATION ICI
+        # Extraire lait et type_pate de la suggestion (simple parsing)
+        lait = None
+        type_pate = None
         
-        cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
+        # Parsing basique - à améliorer
+        for lait_type in ['vache', 'chèvre', 'brebis', 'bufflonne']:
+            if lait_type in suggestion.lower():
+                lait = lait_type
+                break
         
-        recipe = self._generate_detailed_recipe(ingredients_list, cheese_type_clean, constraints)
+        for pate_type in self.knowledge['types_pate'].keys():
+            if pate_type.lower() in suggestion.lower():
+                type_pate = pate_type
+                break
         
-        self._save_to_history(ingredients_list, cheese_type_clean, constraints, recipe)
+        # Valider si on a trouvé lait et type_pate
+        if lait and type_pate:
+            is_valid, reason = self._validate_combination(lait, type_pate)
+            if not is_valid:
+                return f"**Attention : Combinaison invalide détectée**\n\n{reason}\n\nVoulez-vous que je propose une alternative ?"
         
-        return recipe
+        return suggestion
+        
+    except Exception as e:
+        return f"Erreur lors de la génération: {str(e)}"
     
     def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
         """Génère une recette enrichie avec la base de connaissances"""
