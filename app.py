@@ -1580,235 +1580,226 @@ Adaptations suggérées selon vos contraintes.
 agent = AgentFromagerHF()
 
 def create_interface():
-    """Crée l'interface Gradio"""
+    """Interface avec génération simultanée"""
     
-    with gr.Blocks(title="🧀 Agent Fromager", theme=gr.themes.Monochrome()) as demo:
+    fromage_theme = gr.themes.Soft(
+        primary_hue="amber",
+        secondary_hue="orange",
+        neutral_hue="stone"
+    )
+    
+    # CSS (ton code existant)
+    custom_css = """
+    ... (ton CSS)
+    """
+    
+    with gr.Blocks(title="🧀 Agent Fromager", theme=fromage_theme, css=custom_css) as demo:
         
         gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
-        ### Créez vos fromages artisanaux avec l'IA
-        
-        Entrez vos ingrédients et laissez l'intelligence artificielle vous guider pas à pas.
+        ### Créez vos fromages avec l'IA + Recherche web automatique
         """)
         
-        with gr.Tabs():
-            # TAB 1 : Création de recette AMÉLIORÉE
-            with gr.Tab("🎨 Créer une recette"):
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        ingredients_input = gr.Textbox(
-                            label="🥛 Ingrédients disponibles",
-                            placeholder="Ex: lait de chèvre, présure, sel de mer, herbes de Provence",
-                            lines=3,
-                            info="Séparez les ingrédients par des virgules"
-                        )
-                        
-                        cheese_type_input = gr.Dropdown(
-                            choices=[
-                                "Laissez l'IA choisir",
-                                "Fromage frais",
-                                "Pâte molle",
-                                "Pâte pressée non cuite",
-                                "Pâte pressée cuite",
-                                "Pâte persillée"
-                            ],
-                            label="🧀 Type de fromage souhaité",
-                            value="Laissez l'IA choisir"
-                        )
-                        
-                        constraints_input = gr.Textbox(
-                            label="⚙️ Contraintes (optionnel)",
-                            placeholder="Ex: végétarien, rapide, sans lactose...",
-                            lines=2
-                        )
-                        
-                        # ===== MICRO-CHOIX =====
-                        gr.Markdown("### 🎛️ Micro-choix (personnalisation avancée)")
-                        
-                        with gr.Row():
-                            creativity_slider = gr.Slider(
-                                minimum=0,
-                                maximum=3,
-                                value=0,
-                                step=1,
-                                label="🎨 Niveau de créativité",
-                                info="0=Classique, 1=Suggestions, 2=Fusion, 3=Expérimental"
-                            )
-                            
-                            texture_choice = gr.Radio(
-                                choices=["Très crémeux", "Équilibré", "Très ferme"],
-                                value="Équilibré",
-                                label="🧈 Texture souhaitée"
-                            )
-                        
-                        with gr.Row():
-                            affinage_slider = gr.Slider(
-                                minimum=0,
-                                maximum=12,
-                                value=4,
-                                step=1,
-                                label="⏱️ Durée d'affinage (semaines)",
-                                info="0=Frais, 4=Moyen, 12=Long"
-                            )
-                            
-                            spice_choice = gr.Radio(
-                                choices=["Neutre", "Modéré", "Intense"],
-                                value="Neutre",
-                                label="🌶️ Intensité épices"
-                            )
-                        
-                        generate_btn = gr.Button(
-                            "✨ Générer la recette",
-                            variant="primary",
-                            size="lg"
-                        )
-                    
-                    with gr.Column(scale=1):
-                        gr.Markdown("""
-                        ### 💡 Conseils
-                        
-                        **Ingrédients minimums :**
-                        - Lait (vache, chèvre, brebis...)
-                        - Coagulant (présure ou citron)
-                        - Sel
-                        
-                        **Mode créatif :**
-                        - **0** : Recette classique
-                        - **1** : + suggestions simples
-                        - **2** : + variations fusion
-                        - **3** : + expérimental !
-                        
-                        **Micro-choix :**
-                        Personnalisez texture, épices et affinage pour une recette unique !
-                        """)
-                
-                recipe_output = gr.Textbox(
-                    label="📖 Votre recette complète",
-                    lines=30,
-                    max_lines=50
+        # ===== ZONE DE SAISIE COMMUNE EN HAUT =====
+        with gr.Row():
+            with gr.Column(scale=2):
+                ingredients_input = gr.Textbox(
+                    label="🥛 Ingrédients disponibles",
+                    placeholder="Ex: lait de chèvre, présure, sel, herbes",
+                    lines=3
                 )
                 
-                # Connecter le bouton avec les nouveaux paramètres
-                generate_btn.click(
-                    fn=agent.generate_recipe_creative,
-                    inputs=[
-                        ingredients_input, 
-                        cheese_type_input, 
-                        constraints_input,
-                        creativity_slider,
-                        texture_choice,
-                        affinage_slider,
-                        spice_choice
+                cheese_type_input = gr.Dropdown(
+                    choices=[
+                        "Laissez l'IA choisir",
+                        "Fromage frais",
+                        "Pâte molle",
+                        "Pâte pressée non cuite",
+                        "Pâte pressée cuite",
+                        "Pâte persillée"
                     ],
-                    outputs=recipe_output
+                    label="🧀 Type de fromage",
+                    value="Laissez l'IA choisir"
+                )
+                
+                constraints_input = gr.Textbox(
+                    label="⚙️ Contraintes",
+                    placeholder="Ex: végétarien, rapide...",
+                    lines=2
+                )
+                
+                # Micro-choix
+                gr.Markdown("### 🎛️ Micro-choix")
+                
+                with gr.Row():
+                    creativity_slider = gr.Slider(0, 3, value=0, step=1, label="🎨 Créativité")
+                    texture_choice = gr.Radio(
+                        ["Très crémeux", "Équilibré", "Très ferme"],
+                        value="Équilibré",
+                        label="🧈 Texture"
+                    )
+                
+                with gr.Row():
+                    affinage_slider = gr.Slider(0, 12, value=4, step=1, label="⏱️ Affinage (semaines)")
+                    spice_choice = gr.Radio(
+                        ["Neutre", "Modéré", "Intense"],
+                        value="Neutre",
+                        label="🌶️ Épices"
+                    )
+                
+                # ===== BOUTON UNIQUE QUI FAIT TOUT =====
+                generate_all_btn = gr.Button(
+                    "✨ Générer la recette + Recherche web", 
+                    variant="primary", 
+                    size="lg"
+                )
+                
+                gr.Markdown("⏳ *La génération + recherche web prend 10-15 secondes...*")
+            
+            with gr.Column(scale=1):
+                gr.Markdown("""
+                ### 💡 Comment ça marche ?
+                
+                1️⃣ Entrez vos ingrédients
+                2️⃣ Ajustez les micro-choix
+                3️⃣ Cliquez sur "Générer"
+                
+                **Résultat :**
+                - Onglet 1 : Votre recette personnalisée
+                - Onglet 2 : 6 recettes similaires du web
+                
+                **Tout se remplit automatiquement !**
+                """)
+        
+        # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
+        with gr.Tabs():
+            # ONGLET 1 : Recette générée
+            with gr.Tab("📖 Ma Recette"):
+                recipe_output = gr.Textbox(
+                    label="Votre recette complète",
+                    lines=30,
+                    max_lines=50,
+                    placeholder="Votre recette apparaîtra ici après génération..."
                 )
             
-            # TAB 2 : Base de connaissances (inchangé)
+            # ONGLET 2 : Recherche web
+            with gr.Tab("🌐 Recettes Web (6)"):
+                search_status = gr.HTML(label="Statut", value="")
+                web_results = gr.HTML(
+                    label="Résultats",
+                    value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>"
+                )
+            
+            # ONGLET 3 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
                 knowledge_output = gr.Textbox(
-                    label="Documentation fromage",
+                    label="Documentation",
                     value=agent.get_knowledge_summary(),
-                    lines=40,
-                    max_lines=60
+                    lines=40
                 )
             
-            # TAB 3 : Historique
+            # ONGLET 4 : Historique
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
-                gr.Markdown("💾 Persistance garantie avec Hugging Face Datasets")
-                
                 with gr.Row():
-                    refresh_btn = gr.Button("🔄 Actualiser", variant="secondary")
-                    sync_btn = gr.Button("☁️ Synchroniser depuis HF", variant="secondary")
-                    clear_btn = gr.Button("🗑️ Effacer tout", variant="stop")
-                
+                    refresh_btn = gr.Button("🔄 Actualiser")
+                    clear_btn = gr.Button("🗑️ Effacer")
                 history_display = gr.Textbox(
                     label="",
                     value=agent.get_history_display(),
-                    lines=30,
-                    max_lines=50
+                    lines=30
                 )
-                
-                gr.Markdown("---")
-                
-                with gr.Row():
-                    recipe_id_input = gr.Number(
-                        label="🔍 Numéro de la recette",
-                        value=1,
-                        precision=0
-                    )
-                    load_recipe_btn = gr.Button("📖 Charger la recette", variant="primary")
-                
-                loaded_recipe = gr.Textbox(
-                    label="📖 Recette complète",
-                    lines=30,
-                    max_lines=50
-                )
-                
-                refresh_btn.click(
-                    fn=agent.get_history_display,
-                    outputs=history_display
-                )
-                
-                sync_btn.click(
-                    fn=agent.sync_from_hf,
-                    outputs=history_display
-                )
-                
-                clear_btn.click(
-                    fn=agent.clear_history,
-                    outputs=history_display
-                )
-                
-                load_recipe_btn.click(
-                    fn=agent.get_recipe_by_id,
-                    inputs=recipe_id_input,
-                    outputs=loaded_recipe
-                )
+                refresh_btn.click(fn=agent.get_history_display, outputs=history_display)
+                clear_btn.click(fn=agent.clear_history, outputs=history_display)
             
-            # TAB 4 : À propos
-            with gr.Tab("ℹ️ À propos"):
-                gr.Markdown("""
-                ## 🧀 Agent Fromager Intelligent
-                
-                ### Créé par Myriam avec ❤️
-                
-                **Fonctionnalités :**
-                - ✅ Recettes détaillées étape par étape
-                - ✅ Base de connaissances fromagère
-                - ✅ Historique persistant avec HF Datasets
-                - ✅ Adaptation aux contraintes
-                
-                **Version :** 2.0  
-                **Dernière mise à jour :** Février 2025
-                
-                ---
-                
-                💬 **Feedback ?** N'hésitez pas à laisser un commentaire !
-                """)
-            # TAB 5
+            # ONGLET 5 : Test
             with gr.Tab("🧪 Test Internet"):
-                gr.Markdown("""
-            ### Vérification de l'accès Internet
-    
-            Avec `allow_web_connections: true` dans le README.md, 
-            ce Space devrait pouvoir accéder au web.
-            """)
-    
-            test_btn = gr.Button("🔍 Tester l'accès Internet maintenant", variant="primary", size="lg")
-            test_output = gr.Textbox(label="Résultat du test", lines=5)
-    
-            test_btn.click(fn=agent.test_internet, outputs=test_output)
+                test_btn = gr.Button("🔍 Tester")
+                test_output = gr.Textbox(lines=5)
+                test_btn.click(fn=agent.test_internet, outputs=test_output)
         
+        # ===== FONCTION QUI GÉNÈRE LES DEUX EN PARALLÈLE =====
+        def generate_all(ingredients, cheese_type, constraints, 
+                        creativity, texture, affinage, spice):
+            """Génère recette locale + recherche web simultanément"""
+            
+            # 1. Générer la recette locale
+            recipe = agent.generate_recipe_creative(
+                ingredients, cheese_type, constraints,
+                creativity, texture, affinage, spice
+            )
+            
+            # 2. Rechercher sur le web
+            status_html = """
+            <div class="search-status">
+                🔍 Recherche en cours...
+            </div>
+            """
+            
+            web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
+            
+            if not web_recipes:
+                return recipe, """
+                <div class="search-status">
+                    ✅ Recherche terminée
+                </div>
+                """, """
+                <div class="no-recipes">
+                    😔 Aucune recette trouvée sur le web pour ces critères.
+                </div>
+                """
+            
+            # Construire les cartes HTML
+            cards_html = f"""
+            <div class="search-status">
+                ✅ {len(web_recipes)} recettes trouvées sur le web
+            </div>
+            """
+            
+            for i, web_recipe in enumerate(web_recipes, 1):
+                cards_html += f"""
+                <div class="recipe-card">
+                    <div class="recipe-title">
+                        {i}. {web_recipe['title']}
+                    </div>
+                    <div class="recipe-source">
+                        📍 Source : {web_recipe['source']}
+                    </div>
+                    <div class="recipe-description">
+                        {web_recipe['description']}
+                    </div>
+                    <a href="{web_recipe['url']}" target="_blank" class="recipe-link">
+                        🔗 Voir la recette complète
+                    </a>
+                </div>
+                """
+            
+            return recipe, "", cards_html
+        
+        # ===== CONNECTER LE BOUTON =====
+        generate_all_btn.click(
+            fn=generate_all,
+            inputs=[
+                ingredients_input,
+                cheese_type_input,
+                constraints_input,
+                creativity_slider,
+                texture_choice,
+                affinage_slider,
+                spice_choice
+            ],
+            outputs=[recipe_output, search_status, web_results]
+        )
         
         gr.Markdown("""
         ---
         <center>
-        Fait avec 🧀 et 🤖 | Hugging Face Spaces | volubyl | 2026
+        Fait avec 🧀 et 🤖 | Hugging Face Spaces | 2025
         </center>
         """)
     
     return demo
+
 
 if __name__ == "__main__":
     interface = create_interface()
