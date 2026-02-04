@@ -1592,7 +1592,126 @@ def create_interface():
         """)
         
         with gr.Tabs():
-            # TAB 1 : Création de recette
+            # TAB 1 : Création de recette AMÉLIORÉE
+            with gr.Tab("🎨 Créer une recette"):
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        ingredients_input = gr.Textbox(
+                            label="🥛 Ingrédients disponibles",
+                            placeholder="Ex: lait de chèvre, présure, sel de mer, herbes de Provence",
+                            lines=3,
+                            info="Séparez les ingrédients par des virgules"
+                        )
+                        
+                        cheese_type_input = gr.Dropdown(
+                            choices=[
+                                "Laissez l'IA choisir",
+                                "Fromage frais",
+                                "Pâte molle",
+                                "Pâte pressée non cuite",
+                                "Pâte pressée cuite",
+                                "Pâte persillée"
+                            ],
+                            label="🧀 Type de fromage souhaité",
+                            value="Laissez l'IA choisir"
+                        )
+                        
+                        constraints_input = gr.Textbox(
+                            label="⚙️ Contraintes (optionnel)",
+                            placeholder="Ex: végétarien, rapide, sans lactose...",
+                            lines=2
+                        )
+                        
+                        # ===== MICRO-CHOIX =====
+                        gr.Markdown("### 🎛️ Micro-choix (personnalisation avancée)")
+                        
+                        with gr.Row():
+                            creativity_slider = gr.Slider(
+                                minimum=0,
+                                maximum=3,
+                                value=0,
+                                step=1,
+                                label="🎨 Niveau de créativité",
+                                info="0=Classique, 1=Suggestions, 2=Fusion, 3=Expérimental"
+                            )
+                            
+                            texture_choice = gr.Radio(
+                                choices=["Très crémeux", "Équilibré", "Très ferme"],
+                                value="Équilibré",
+                                label="🧈 Texture souhaitée"
+                            )
+                        
+                        with gr.Row():
+                            affinage_slider = gr.Slider(
+                                minimum=0,
+                                maximum=12,
+                                value=4,
+                                step=1,
+                                label="⏱️ Durée d'affinage (semaines)",
+                                info="0=Frais, 4=Moyen, 12=Long"
+                            )
+                            
+                            spice_choice = gr.Radio(
+                                choices=["Neutre", "Modéré", "Intense"],
+                                value="Neutre",
+                                label="🌶️ Intensité épices"
+                            )
+                        
+                        generate_btn = gr.Button(
+                            "✨ Générer la recette",
+                            variant="primary",
+                            size="lg"
+                        )
+                    
+                    with gr.Column(scale=1):
+                        gr.Markdown("""
+                        ### 💡 Conseils
+                        
+                        **Ingrédients minimums :**
+                        - Lait (vache, chèvre, brebis...)
+                        - Coagulant (présure ou citron)
+                        - Sel
+                        
+                        **Mode créatif :**
+                        - **0** : Recette classique
+                        - **1** : + suggestions simples
+                        - **2** : + variations fusion
+                        - **3** : + expérimental !
+                        
+                        **Micro-choix :**
+                        Personnalisez texture, épices et affinage pour une recette unique !
+                        """)
+                
+                recipe_output = gr.Textbox(
+                    label="📖 Votre recette complète",
+                    lines=30,
+                    max_lines=50
+                )
+                
+                # Connecter le bouton avec les nouveaux paramètres
+                generate_btn.click(
+                    fn=agent.generate_recipe_creative,
+                    inputs=[
+                        ingredients_input, 
+                        cheese_type_input, 
+                        constraints_input,
+                        creativity_slider,
+                        texture_choice,
+                        affinage_slider,
+                        spice_choice
+                    ],
+                    outputs=recipe_output
+                )
+            
+            # TAB 2 : Base de connaissances (inchangé)
+            with gr.Tab("📚 Base de connaissances"):
+                knowledge_output = gr.Textbox(
+                    label="Documentation fromage",
+                    value=agent.get_knowledge_summary(),
+                    lines=40,
+                    max_lines=60
+                )
+            # TAB 4 : Création de recette
             with gr.Tab("🎨 Créer une recette"):
                 with gr.Row():
                     with gr.Column(scale=2):
@@ -1655,16 +1774,7 @@ def create_interface():
                     outputs=recipe_output
                 )
             
-            # TAB 2 : Base de connaissances
-            with gr.Tab("📚 Base de connaissances"):
-                knowledge_output = gr.Textbox(
-                    label="Documentation fromage",
-                    value=agent.get_knowledge_summary(),
-                    lines=40,
-                    max_lines=60
-                )
-            
-            # TAB 3 : Historique
+            # TAB 5 : Historique
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
                 gr.Markdown("💾 Persistance garantie avec Hugging Face Datasets")
@@ -1718,7 +1828,7 @@ def create_interface():
                     outputs=loaded_recipe
                 )
             
-            # TAB 4 : À propos
+            # TAB 6 : À propos
             with gr.Tab("ℹ️ À propos"):
                 gr.Markdown("""
                 ## 🧀 Agent Fromager Intelligent
@@ -1738,7 +1848,7 @@ def create_interface():
                 
                 💬 **Feedback ?** N'hésitez pas à laisser un commentaire !
                 """)
-        
+            # TAB 7
             with gr.Tab("🧪 Test Internet"):
                 gr.Markdown("""
             ### Vérification de l'accès Internet
