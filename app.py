@@ -835,7 +835,7 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 ✨ **Goûter régulièrement** : Le fromage évolue, trouver votre stade préféré"""
     
     def _generate_creative_name(self, cheese_type, ingredients):
-    """Génère un nom créatif pour le fromage"""
+        """Génère un nom créatif pour le fromage"""
     ingredients_str = ' '.join(ingredients).lower()
 
     # Briques génériques
@@ -863,8 +863,8 @@ en molécules aromatiques. Plus long = goût plus prononcé.
     else:
         base = base_general
         qualifier = ["Maison", "Artisanale", "Fromagère"]
-
-    return f"{self.rng.choice(base)} {self.rng.choice(qualifier)} {self.rng.choice(style_general)}"
+        
+        return f"{self.rng.choice(base)} {self.rng.choice(qualifier)} {self.rng.choice(style_general)}"
     
     def _format_user_ingredients(self, ingredients):
         """Formate joliment les ingrédients utilisateur"""
