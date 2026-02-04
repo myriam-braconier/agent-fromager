@@ -17,9 +17,9 @@ class AgentFromagerHF:
         # Charger l'historique depuis HF au démarrage
         self._download_history_from_hf()
     
-def _init_knowledge(self):
-    """Base de connaissances fromage intégrée"""
-    return {
+    def _init_knowledge(self):
+        """Base de connaissances fromage intégrée"""
+        return {
         'types_pate': {
             'Fromage frais': {
                 'description': 'Non affiné, humide, à consommer rapidement',
