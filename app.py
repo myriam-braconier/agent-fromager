@@ -478,7 +478,7 @@ agent = AgentFromagerHF()
 def create_interface():
     """Crée l'interface Gradio"""
     
-    with gr.Blocks(theme=gr.themes.Soft(), title="🧀 Agent Fromager") as demo:
+    with gr.Blocks(title="🧀 Agent Fromager") as demo:
         
         gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
@@ -548,8 +548,7 @@ def create_interface():
                 recipe_output = gr.Textbox(
                     label="📖 Votre recette complète",
                     lines=30,
-                    max_lines=50,
-                    show_copy_button=True
+                    max_lines=50
                 )
                 
                 generate_btn.click(
@@ -620,4 +619,4 @@ def create_interface():
 # Lancement
 if __name__ == "__main__":
     interface = create_interface()
-    interface.launch()
+    interface.launch(share=False)
