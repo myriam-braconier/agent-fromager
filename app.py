@@ -17,142 +17,236 @@ class AgentFromagerHF:
         # Charger l'historique depuis HF au démarrage
         self._download_history_from_hf()
     
-    def _init_knowledge(self):
-        """Base de connaissances fromage intégrée"""
-        return {
-            'types_pate': {
-                'Fromage frais': {
-                    'description': 'Non affiné, humide, à consommer rapidement',
-                    'exemples': 'Fromage blanc, faisselle, ricotta, cottage cheese',
-                    'duree': '0-3 jours',
-                    'difficulte': 'Facile - Idéal débutants'
-                },
-                'Pâte molle': {
-                    'description': 'Croûte fleurie ou lavée, texture crémeuse',
-                    'exemples': 'Camembert, brie, munster, reblochon',
-                    'duree': '2-8 semaines',
-                    'difficulte': 'Moyenne - Nécessite une cave'
-                },
-                'Pâte pressée non cuite': {
-                    'description': 'Pressée sans cuisson, texture ferme',
-                    'exemples': 'Cantal, saint-nectaire, morbier, tomme',
-                    'duree': '1-6 mois',
-                    'difficulte': 'Moyenne - Matériel spécifique'
-                },
-                'Pâte pressée cuite': {
-                    'description': 'Caillé chauffé puis pressé, longue conservation',
-                    'exemples': 'Comté, gruyère, beaufort, parmesan',
-                    'duree': '3-36 mois',
-                    'difficulte': 'Difficile - Expertise requise'
-                },
-                'Pâte persillée': {
-                    'description': 'Avec moisissures bleues, goût prononcé',
-                    'exemples': 'Roquefort, bleu d\'Auvergne, gorgonzola, stilton',
-                    'duree': '2-6 mois',
-                    'difficulte': 'Difficile - Contrôle précis'
-                }
+def _init_knowledge(self):
+    """Base de connaissances fromage intégrée"""
+    return {
+        'types_pate': {
+            'Fromage frais': {
+                'description': 'Non affiné, humide, à consommer rapidement',
+                'exemples': 'Fromage blanc, faisselle, ricotta, cottage cheese',
+                'duree': '0-3 jours',
+                'difficulte': 'Facile - Idéal débutants'
             },
-            'ingredients_base': {
-                'Lait': ['Vache (doux)', 'Chèvre (acidulé)', 'Brebis (riche)', 'Bufflonne (crémeux)', 'Mélange'],
-                'Coagulant': ['Présure animale', 'Présure végétale', 'Jus de citron', 'Vinaigre blanc'],
-                'Ferments': ['Lactiques (yaourt)', 'Mésophiles (température ambiante)', 'Thermophiles (haute température)'],
-                'Sel': ['Sel fin', 'Gros sel', 'Sel de mer', 'Saumure (eau + sel)'],
-                'Affinage': ['Penicillium roqueforti (bleu)', 'Geotrichum (croûte)', 'Herbes', 'Cendres'],
-                'epices_et_aromates': {
-                'Herbes fraîches': [
-                    'Basilic (doux, fromages frais)',
-                    'Ciboulette (léger, fromages de chèvre)',
-                    'Thym (robuste, tommes)',
-                    'Romarin (puissant, pâtes pressées)',
-                    'Persil (neutre, universel)',
-                    'Aneth (anisé, fromages nordiques)',
-                    'Menthe (rafraîchissant, fromages méditerranéens)',
-                    'Coriandre (exotique, fromages épicés)'
-                ],
-                'Herbes séchées': [
-                    'Herbes de Provence (mélange classique)',
-                    'Origan (italien, fromages à pizza)',
-                    'Sarriette (poivrée, fromages de montagne)',
-                    'Estragon (anisé, fromages frais)',
-                    'Laurier (dans saumure)',
-                    'Sauge (forte, pâtes dures)'
-                ],
-                'Épices chaudes': [
-                    'Poivre noir (concassé ou moulu)',
-                    'Poivre rouge (Espelette, piment doux)',
-                    'Paprika (fumé ou doux)',
-                    'Cumin (terreux, fromages orientaux)',
-                    'Curry (mélange, fromages fusion)',
-                    'Piment de Cayenne (fort, avec modération)',
-                    'Ras el hanout (complexe, fromages marocains)'
-                ],
-                'Épices douces': [
-                    'Nigelle (sésame noir, fromages levantins)',
-                    'Graines de fenouil (anisées)',
-                    'Graines de carvi (pain, fromages nordiques)',
-                    'Fenugrec (sirop d\'érable, rare)',
-                    'Coriandre en graines (agrumes)'
-                ],
-                'Fleurs et pollen': [
-                    'Lavande (Provence, délicat)',
-                    'Safran (luxueux, fromages d\'exception)',
-                    'Pétales de rose (persan, subtil)',
-                    'Bleuet (visuel, doux)',
-                    'Pollen de fleurs (sauvage)'
-                ],
-                'Aromates spéciaux': [
-                    'Ail frais (haché ou confit)',
-                    'Échalote (finement ciselée)',
-                    'Oignon rouge (mariné)',
-                    'Gingembre (frais râpé, fusion)',
-                    'Citronnelle (asiatique, rare)',
-                    'Zeste d\'agrumes (citron, orange, bergamote)'
-                ],
-                'Cendres et croûtes': [
-                    'Cendres végétales (charbon de bois alimentaire)',
-                    'Cendres de sarment de vigne',
-                    'Charbon actif alimentaire (noir intense)',
-                    'Foin séché (affinage sur foin)',
-                    'Paille (affinage traditionnel)'
-                ],
-                'Accompagnements dans la pâte': [
-                    'Noix concassées (texture)',
-                    'Noisettes (doux, chèvre)',
-                    'Pistaches (vert, raffiné)',
-                    'Fruits secs (abricots, figues)',
-                    'Olives (noires ou vertes)',
-                    'Tomates séchées (umami)',
-                    'Truffe (luxe absolu)',
-                    'Champignons séchés (boisé)'
-                ]
+            'Pâte molle': {
+                'description': 'Croûte fleurie ou lavée, texture crémeuse',
+                'exemples': 'Camembert, brie, munster, reblochon',
+                'duree': '2-8 semaines',
+                'difficulte': 'Moyenne - Nécessite une cave'
             },
-            'techniques_aromatisation': {
-                'Incorporation dans le caillé': 'Ajouter les épices au moment du moulage pour distribution homogène',
-                'Enrobage externe': 'Rouler le fromage dans les épices après salage',
-                'Affinage aromatisé': 'Placer herbes/épices dans la cave d\'affinage',
-                'Saumure parfumée': 'Infuser la saumure avec aromates',
-                'Huile aromatisée': 'Badigeonner la croûte d\'huile aux herbes',
-                'Couche intermédiaire': 'Saupoudrer entre deux couches de caillé'
+            'Pâte pressée non cuite': {
+                'description': 'Pressée sans cuisson, texture ferme',
+                'exemples': 'Cantal, saint-nectaire, morbier, tomme',
+                'duree': '1-6 mois',
+                'difficulte': 'Moyenne - Matériel spécifique'
             },
-            'dosages_recommandes': {
-                'Herbes fraîches': '2-3 cuillères à soupe pour 1kg de fromage',
-                'Herbes séchées': '1-2 cuillères à soupe pour 1kg',
-                'Épices moulues': '1-2 cuillères à café pour 1kg',
-                'Épices en grains': '1 cuillère à soupe concassée pour 1kg',
-                'Ail/gingembre': '1-2 gousses/morceaux pour 1kg',
-                'Zestes': '1 agrume entier pour 1kg',
-                'Cendres': 'Fine couche sur la croûte'
+            'Pâte pressée cuite': {
+                'description': 'Caillé chauffé puis pressé, longue conservation',
+                'exemples': 'Comté, gruyère, beaufort, parmesan',
+                'duree': '3-36 mois',
+                'difficulte': 'Difficile - Expertise requise'
             },
-            'associations_classiques': {
-                'Fromage de chèvre': 'Herbes de Provence, miel, lavande',
-                'Brebis': 'Piment d\'Espelette, romarin, olives',
-                'Pâte molle': 'Ail, fines herbes, poivre',
-                'Pâte pressée': 'Cumin, fenugrec, noix',
-                'Fromage frais': 'Ciboulette, aneth, menthe fraîche',
-                'Bleu': 'Noix, figues, porto (pas dans le fromage)'
+            'Pâte persillée': {
+                'description': 'Avec moisissures bleues, goût prononcé',
+                'exemples': 'Roquefort, bleu d\'Auvergne, gorgonzola, stilton',
+                'duree': '2-6 mois',
+                'difficulte': 'Difficile - Contrôle précis'
             }
-            }
+        },
+        'ingredients_base': {
+            'Lait': ['Vache (doux)', 'Chèvre (acidulé)', 'Brebis (riche)', 'Bufflonne (crémeux)', 'Mélange'],
+            'Coagulant': ['Présure animale', 'Présure végétale', 'Jus de citron', 'Vinaigre blanc'],
+            'Ferments': ['Lactiques (yaourt)', 'Mésophiles (température ambiante)', 'Thermophiles (haute température)'],
+            'Sel': ['Sel fin', 'Gros sel', 'Sel de mer', 'Saumure (eau + sel)'],
+            'Affinage': ['Penicillium roqueforti (bleu)', 'Geotrichum (croûte)', 'Herbes', 'Cendres']
+        },
+        'epices_et_aromates': {
+            'Herbes fraîches': [
+                'Basilic (doux, fromages frais)',
+                'Ciboulette (léger, fromages de chèvre)',
+                'Thym (robuste, tommes)',
+                'Romarin (puissant, pâtes pressées)',
+                'Persil (neutre, universel)',
+                'Aneth (anisé, fromages nordiques)',
+                'Menthe (rafraîchissant, fromages méditerranéens)',
+                'Coriandre (exotique, fromages épicés)'
+            ],
+            'Herbes séchées': [
+                'Herbes de Provence (mélange classique)',
+                'Origan (italien, fromages à pizza)',
+                'Sarriette (poivrée, fromages de montagne)',
+                'Estragon (anisé, fromages frais)',
+                'Laurier (dans saumure)',
+                'Sauge (forte, pâtes dures)'
+            ],
+            'Épices chaudes': [
+                'Poivre noir (concassé ou moulu)',
+                'Poivre rouge (Espelette, piment doux)',
+                'Paprika (fumé ou doux)',
+                'Cumin (terreux, fromages orientaux)',
+                'Curry (mélange, fromages fusion)',
+                'Piment de Cayenne (fort, avec modération)',
+                'Ras el hanout (complexe, fromages marocains)'
+            ],
+            'Épices douces': [
+                'Nigelle (sésame noir, fromages levantins)',
+                'Graines de fenouil (anisées)',
+                'Graines de carvi (pain, fromages nordiques)',
+                'Fenugrec (sirop d\'érable, rare)',
+                'Coriandre en graines (agrumes)'
+            ],
+            'Fleurs et pollen': [
+                'Lavande (Provence, délicat)',
+                'Safran (luxueux, fromages d\'exception)',
+                'Pétales de rose (persan, subtil)',
+                'Bleuet (visuel, doux)',
+                'Pollen de fleurs (sauvage)'
+            ],
+            'Aromates spéciaux': [
+                'Ail frais (haché ou confit)',
+                'Échalote (finement ciselée)',
+                'Oignon rouge (mariné)',
+                'Gingembre (frais râpé, fusion)',
+                'Citronnelle (asiatique, rare)',
+                'Zeste d\'agrumes (citron, orange, bergamote)'
+            ],
+            'Cendres et croûtes': [
+                'Cendres végétales (charbon de bois alimentaire)',
+                'Cendres de sarment de vigne',
+                'Charbon actif alimentaire (noir intense)',
+                'Foin séché (affinage sur foin)',
+                'Paille (affinage traditionnel)'
+            ],
+            'Accompagnements dans la pâte': [
+                'Noix concassées (texture)',
+                'Noisettes (doux, chèvre)',
+                'Pistaches (vert, raffiné)',
+                'Fruits secs (abricots, figues)',
+                'Olives (noires ou vertes)',
+                'Tomates séchées (umami)',
+                'Truffe (luxe absolu)',
+                'Champignons séchés (boisé)'
+            ]
+        },
+        'techniques_aromatisation': {
+            'Incorporation dans le caillé': 'Ajouter les épices au moment du moulage pour distribution homogène',
+            'Enrobage externe': 'Rouler le fromage dans les épices après salage',
+            'Affinage aromatisé': 'Placer herbes/épices dans la cave d\'affinage',
+            'Saumure parfumée': 'Infuser la saumure avec aromates',
+            'Huile aromatisée': 'Badigeonner la croûte d\'huile aux herbes',
+            'Couche intermédiaire': 'Saupoudrer entre deux couches de caillé'
+        },
+        'dosages_recommandes': {
+            'Herbes fraîches': '2-3 cuillères à soupe pour 1kg de fromage',
+            'Herbes séchées': '1-2 cuillères à soupe pour 1kg',
+            'Épices moulues': '1-2 cuillères à café pour 1kg',
+            'Épices en grains': '1 cuillère à soupe concassée pour 1kg',
+            'Ail/gingembre': '1-2 gousses/morceaux pour 1kg',
+            'Zestes': '1 agrume entier pour 1kg',
+            'Cendres': 'Fine couche sur la croûte'
+        },
+        'associations_classiques': {
+            'Fromage de chèvre': 'Herbes de Provence, miel, lavande',
+            'Brebis': 'Piment d\'Espelette, romarin, olives',
+            'Pâte molle': 'Ail, fines herbes, poivre',
+            'Pâte pressée': 'Cumin, fenugrec, noix',
+            'Fromage frais': 'Ciboulette, aneth, menthe fraîche',
+            'Bleu': 'Noix, figues, porto (pas dans le fromage)'
+        },
+        'temperatures_affinage': {
+            'Fromage frais': '4-6°C (réfrigérateur)',
+            'Pâte molle croûte fleurie': '10-12°C, 90-95% humidité',
+            'Pâte molle croûte lavée': '12-14°C, 90-95% humidité',
+            'Pâte pressée non cuite': '12-14°C, 85-90% humidité',
+            'Pâte pressée cuite': '14-18°C, 85-90% humidité',
+            'Pâte persillée': '8-10°C, 95% humidité',
+            'Chèvre': '10-12°C, 80-85% humidité'
+        },
+        'problemes_courants': {
+            'Caillé trop dur': 'Trop de présure ou température trop haute. Solution : Réduire la dose de présure de 20%',
+            'Pas de caillage': 'Lait UHT (stérilisé) ou présure périmée. Solution : Utiliser du lait cru ou pasteurisé',
+            'Caillé trop mou': 'Pas assez de présure ou temps insuffisant. Solution : Attendre 15-30 min de plus',
+            'Fromage trop acide': 'Fermentation trop longue ou trop chaud. Solution : Réduire température ou temps d\'affinage',
+            'Fromage trop salé': 'Excès de sel ou salage trop long. Solution : Utiliser 1,5% du poids au lieu de 2%',
+            'Moisissures indésirables': 'Humidité excessive ou mauvaise hygiène. Solution : Nettoyer la cave, réduire humidité',
+            'Croûte craquelée': 'Air trop sec. Solution : Augmenter humidité à 85-90%',
+            'Fromage trop sec': 'Égouttage excessif. Solution : Réduire temps d\'égouttage de moitié',
+            'Texture granuleuse': 'Caillage incomplet ou découpe trop brutale. Solution : Attendre caillage complet',
+            'Goût amer': 'Sur-affinage ou contamination bactérienne. Solution : Réduire durée d\'affinage',
+            'Fromage coule': 'Température trop élevée pendant affinage. Solution : Cave à 10-12°C maximum',
+            'Yeux (trous) non désirés': 'Fermentation gazeuse. Solution : Presser davantage pour éliminer l\'air'
+        },
+        'conservation': {
+            'Fromage frais': '3-5 jours au frigo (4°C) dans boîte hermétique',
+            'Pâte molle jeune': '1-2 semaines au frigo dans papier fromagerie',
+            'Pâte molle affinée': '2-3 semaines, sortir 1h avant dégustation',
+            'Pâte pressée non cuite': '1-2 mois au frigo, bien emballer',
+            'Pâte pressée cuite': '3-6 mois au frais (10-12°C), croûte protégée',
+            'Pâte persillée': '3-4 semaines, papier alu pour limiter moisissures',
+            'Chèvre frais': '1 semaine maximum au frigo',
+            'Chèvre affiné': '2-3 semaines en cave ou frigo',
+            'Conseil général': 'Ne jamais congeler (texture détruite), emballer dans papier respirant'
+        },
+        'accords_vins': {
+            'Fromage frais nature': 'Vin blanc sec et vif (Muscadet, Picpoul de Pinet)',
+            'Fromage frais aux herbes': 'Blanc aromatique (Sauvignon, Riesling)',
+            'Chèvre frais': 'Sancerre, Pouilly-Fumé, Sauvignon blanc',
+            'Chèvre sec': 'Blanc minéral (Chablis) ou rouge léger (Pinot Noir)',
+            'Brie, Camembert': 'Champagne, Crémant, ou rouge léger (Beaujolais)',
+            'Munster, Maroilles': 'Blanc puissant (Gewurztraminer) ou bière',
+            'Comté jeune': 'Vin jaune du Jura, Chardonnay',
+            'Comté vieux': 'Vin jaune, Porto Tawny',
+            'Cantal, Salers': 'Rouge charpenté (Cahors, Madiran)',
+            'Roquefort': 'Blanc doux (Sauternes, Monbazillac) ou Porto',
+            'Bleu d\'Auvergne': 'Rouge puissant (Côtes du Rhône) ou blanc moelleux',
+            'Brebis des Pyrénées': 'Rouge du Sud-Ouest (Irouléguy, Madiran)',
+            'Morbier': 'Vin blanc du Jura (Chardonnay)',
+            'Reblochon': 'Blanc de Savoie (Apremont, Chignin)',
+            'Règle d\'or': 'Accord régional : fromage et vin de la même région'
+        },
+        'accords_mets': {
+            'Fromage frais': 'Pain complet, fruits rouges, miel, concombre',
+            'Pâte molle': 'Baguette fraîche, pommes, raisins, confiture de figues',
+            'Pâte pressée': 'Pain de campagne, noix, cornichons, charcuterie',
+            'Pâte persillée': 'Pain aux noix, poire, miel de châtaignier, céleri',
+            'Chèvre': 'Pain grillé, miel, salade verte, betterave',
+            'Fromages forts': 'Pain de seigle, oignon confit, pomme de terre'
+        },
+        'materiel_indispensable': {
+            'Pour débuter': [
+                'Thermomètre de cuisson (précision ±1°C) - 10-15€',
+                'Grande casserole inox 3-5L - 20-30€',
+                'Moule à fromage perforé 500g - 5-10€',
+                'Étamine/mousseline (toile à fromage) - 5€',
+                'Louche et couteau long - 10€'
+            ],
+            'Pour progresser': [
+                'Hygromètre pour cave (mesure humidité) - 15-20€',
+                'Presse à fromage - 50-100€',
+                'Set de moules variés - 30-50€',
+                'pH-mètre - 30-50€',
+                'Claie d\'affinage en bois - 20-40€'
+            ],
+            'Pour expert': [
+                'Cave d\'affinage électrique - 300-800€',
+                'Trancheuse à caillé professionnelle - 100€',
+                'Balance de précision 0.1g - 30€',
+                'Kit de cultures spécifiques - 50€/an'
+            ]
+        },
+        'fournisseurs_recommandes': {
+            'Présure et ferments': 'Tom Press, Ferments-et-vous.com, Fromage-maison.com',
+            'Matériel': 'Tom Press (FR), Fromag\'Home, Le Parfait',
+            'Moules': 'Amazon, Tom Press, magasins cuisine spécialisés',
+            'Lait cru': 'Producteurs locaux, AMAP, marchés fermiers',
+            'Livres': '"Fromages et laitages naturels faits maison" de Marie-Claire Frédéric'
+        },
+        'calendrier_fromager': {
+            'Printemps (Mars-Mai)': 'Saison idéale pour chèvre (lait riche). Fromages frais, chèvre frais',
+            'Été (Juin-Août)': 'Éviter pâtes molles (chaleur). Privilégier fromages frais, ricotta',
+            'Automne (Sept-Nov)': 'Excellente période pour tous types. Lancer affinage pour Noël',
+            'Hiver (Déc-Fév)': 'Fromages d\'affinage, pâtes pressées. Cave naturellement fraîche'
         }
+    }
     
     def _download_history_from_hf(self):
         """Télécharge l'historique depuis HF Dataset"""
