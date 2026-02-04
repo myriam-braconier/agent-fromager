@@ -1007,8 +1007,28 @@ en molécules aromatiques. Plus long = goût plus prononcé.
                 'concept': 'Enrobage sucré-salé original',
                 'ingredients': ['Noix concassées', 'Miel de montagne', 'Thym'],
             '   technique': 'Enrober le fromage de noix et miel avant l\'affinage final'
+        },
+        'Pâte pressée cuite': {
+            'title': 'Comté aux herbes de montagne',
+            'concept': 'Fromage alpin aromatisé',
+            'ingredients': ['Génépi', 'Fleurs de foin', 'Ail des ours'],
+            'technique': 'Affiner sur une litière d\'herbes séchées'
+        },
+        'Pâte persillée': {
+            'title': 'Bleu au miel et noix',
+            'concept': 'Association sucrée-salée gourmande',
+            'ingredients': ['Miel de châtaignier', 'Noix fraîches'],
+            'technique': 'Servir avec un filet de miel et des noix concassées'
         }
     }
+      # Variation par défaut si type non trouvé
+        default = {
+        'title': 'Variation classique',
+        'concept': 'Fromage aromatisé aux herbes',
+        'ingredients': ['Herbes de Provence', 'Ail séché'],
+        'technique': 'Mélanger les herbes dans le caillé avant moulage'
+        }
+    
     
         return variations.get(cheese_type, variations['Fromage frais'])
 
