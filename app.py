@@ -428,7 +428,7 @@ en molécules aromatiques complexes. Plus long = goût plus prononcé.
         
         return '\n'.join(advice)
     
- def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
+def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
     """Sauvegarde dans l'historique avec meilleure gestion"""
     try:
         history = []
