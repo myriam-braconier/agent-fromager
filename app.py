@@ -1582,7 +1582,7 @@ agent = AgentFromagerHF()
 def create_interface():
     """Crée l'interface Gradio"""
     
-    with gr.Blocks(title="🧀 Agent Fromager") as demo:
+    with gr.Blocks(title="🧀 Agent Fromager", them=gr.Monochrome()) as demo:
         
         gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
@@ -1711,70 +1711,8 @@ def create_interface():
                     lines=40,
                     max_lines=60
                 )
-            # TAB 4 : Création de recette
-            with gr.Tab("🎨 Créer une recette"):
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        ingredients_input = gr.Textbox(
-                            label="🥛 Ingrédients disponibles",
-                            placeholder="Ex: lait de chèvre, présure, sel de mer, herbes de Provence",
-                            lines=3,
-                            info="Séparez les ingrédients par des virgules"
-                        )
-                        
-                        cheese_type_input = gr.Dropdown(
-                            choices=[
-                                "Laissez l'IA choisir",
-                                "Fromage frais",
-                                "Pâte molle",
-                                "Pâte pressée non cuite",
-                                "Pâte pressée cuite",
-                                "Pâte persillée"
-                            ],
-                            label="🧀 Type de fromage souhaité",
-                            value="Laissez l'IA choisir"
-                        )
-                        
-                        constraints_input = gr.Textbox(
-                            label="⚙️ Contraintes (optionnel)",
-                            placeholder="Ex: végétarien, rapide, sans lactose...",
-                            lines=2
-                        )
-                        
-                        generate_btn = gr.Button(
-                            "✨ Générer la recette",
-                            variant="primary",
-                            size="lg"
-                        )
-                    
-                    with gr.Column(scale=1):
-                        gr.Markdown("""
-                        ### 💡 Conseils
-                        
-                        **Ingrédients minimums :**
-                        - Lait (vache, chèvre, brebis...)
-                        - Coagulant (présure ou citron)
-                        - Sel
-                        
-                        **Types recommandés :**
-                        - 🟢 Facile : Fromage frais
-                        - 🟡 Moyen : Pâte molle
-                        - 🔴 Difficile : Pâte persillée
-                        """)
-                
-                recipe_output = gr.Textbox(
-                    label="📖 Votre recette complète",
-                    lines=30,
-                    max_lines=50
-                )
-                
-                generate_btn.click(
-                    fn=agent.generate_recipe,
-                    inputs=[ingredients_input, cheese_type_input, constraints_input],
-                    outputs=recipe_output
-                )
             
-            # TAB 5 : Historique
+            # TAB 3 : Historique
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
                 gr.Markdown("💾 Persistance garantie avec Hugging Face Datasets")
@@ -1828,7 +1766,7 @@ def create_interface():
                     outputs=loaded_recipe
                 )
             
-            # TAB 6 : À propos
+            # TAB 4 : À propos
             with gr.Tab("ℹ️ À propos"):
                 gr.Markdown("""
                 ## 🧀 Agent Fromager Intelligent
@@ -1848,7 +1786,7 @@ def create_interface():
                 
                 💬 **Feedback ?** N'hésitez pas à laisser un commentaire !
                 """)
-            # TAB 7
+            # TAB 5
             with gr.Tab("🧪 Test Internet"):
                 gr.Markdown("""
             ### Vérification de l'accès Internet
@@ -1866,7 +1804,7 @@ def create_interface():
         gr.Markdown("""
         ---
         <center>
-        Fait avec 🧀 et 🤖 | Hugging Face Spaces | 2025
+        Fait avec 🧀 et 🤖 | Hugging Face Spaces | volubyl | 2026
         </center>
         """)
     
