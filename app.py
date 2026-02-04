@@ -550,6 +550,31 @@ def clear_history(self):
                 summary += f"  - {item}\n"
         
         return summary
+        
+def get_knowledge_summary(self):
+        """Retourne un résumé de la base de connaissances"""
+        summary = "📚 BASE DE CONNAISSANCES FROMAGE\n\n"
+        
+        summary += "🧀 TYPES DE PÂTE :\n"
+        summary += "="*70 + "\n\n"
+        
+        for name, info in self.knowledge_base['types_pate'].items():
+            summary += f"• {name.upper()}\n"
+            summary += f"  {info['description']}\n"
+            summary += f"  Exemples : {info['exemples']}\n"
+            summary += f"  Durée : {info['duree']} | {info['difficulte']}\n\n"
+        
+        summary += "\n" + "="*70 + "\n"
+        summary += "🥛 INGRÉDIENTS ESSENTIELS :\n"
+        summary += "="*70 + "\n\n"
+        
+        for category, items in self.knowledge_base['ingredients_base'].items():
+            summary += f"• {category} :\n"
+            for item in items:
+                summary += f"  - {item}\n"
+            summary += "\n"
+        
+        return summary
 
 # Initialiser l'agent
 agent = AgentFromagerHF()
