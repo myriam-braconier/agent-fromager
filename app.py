@@ -834,37 +834,37 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 
 ✨ **Goûter régulièrement** : Le fromage évolue, trouver votre stade préféré"""
     
-def _generate_creative_name(self, cheese_type, ingredients):
-    """Génère un nom créatif pour le fromage"""
-    ingredients_str = ' '.join(ingredients).lower()
+    def _generate_creative_name(self, cheese_type, ingredients):
+        """Génère un nom créatif pour le fromage"""
+        ingredients_str = ' '.join(ingredients).lower()
 
-    # Briques génériques
-    base_general = ["Trésor", "Délice", "Nuage", "Essence", "Secret", "Velours"]
-    style_general = ["Lacté", "Artisan", "Fondant", "Crémeux", "Rustique"]
+        # Briques génériques
+        base_general = ["Trésor", "Délice", "Nuage", "Essence", "Secret", "Velours"]
+        style_general = ["Lacté", "Artisan", "Fondant", "Crémeux", "Rustique"]
 
-    if 'chèvre' in ingredients_str:
+        if 'chèvre' in ingredients_str:
         base = ["Chèvre", "Caprice", "Blanc"]
         qualifier = ["des Prés", "Lacté", "Frais"]
-    elif 'brebis' in ingredients_str:
+        elif 'brebis' in ingredients_str:
         base = ["Brebis", "Douceur", "Trésor"]
         qualifier = ["Pastorale", "de Bergère", "Montagnard"]
-    elif 'herbe' in ingredients_str or 'épice' in ingredients_str:
+        elif 'herbe' in ingredients_str or 'épice' in ingredients_str:
         base = ["Jardin", "Bouquet", "Pré"]
         qualifier = ["Fromager", "Lacté", "Fleuri"]
-    elif 'frais' in cheese_type.lower():
+        elif 'frais' in cheese_type.lower():
         base = ["Blanc", "Nuage", "Fraîcheur"]
         qualifier = ["Matinale", "Lactée", "Pure"]
-    elif 'molle' in cheese_type.lower():
+        elif 'molle' in cheese_type.lower():
         base = ["Velours", "Crème", "Délice"]
         qualifier = ["de Cave", "d'Artisan", "Fondant"]
-    elif 'pressée' in cheese_type.lower():
+        elif 'pressée' in cheese_type.lower():
         base = ["Roc", "Meule", "Pierre"]
         qualifier = ["du Terroir", "Tradition", "Lactée"]
-    else:
+        else:
         base = base_general
         qualifier = ["Maison", "Artisanale", "Fromagère"]
 
-    return (
+        return (
         f"{self.rng.choice(base)} "
         f"{self.rng.choice(qualifier)} "
         f"{self.rng.choice(style_general)}"
