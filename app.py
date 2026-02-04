@@ -1004,21 +1004,19 @@ def create_interface():
                     outputs=recipe_output
                 )
             
-            # TAB 2 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
-                with gr.Row():
-                    knowledge_btn = gr.Button("📖 Charger la documentation", variant="primary")
+                gr.Markdown("""
+                # 🧀 Documentation Fromagère
     
-                knowledge_output = gr.Textbox(
-                    label="🧀 Base de connaissances fromagère",
-                    lines=40, max_lines=60,
-                    placeholder="Cliquez sur 'Charger la documentation' pour afficher la base complète..."
-    )
+                **Votre base de connaissances est intégrée dans les recettes !**
     
-                knowledge_btn.click(
-                    fn=lambda: agent.get_knowledge_summary(),  # ← CORRECT : lambda: agent...
-                    outputs=knowledge_output
-    )
+                - Toutes les infos techniques sont dans chaque recette générée
+                - Consultez l'onglet Historique pour vos créations
+                - Les contraintes sont automatiquement adaptées
+    
+                💡 Cliquez "Créer une recette" pour commencer ! 🧀
+                """)
+
 
 
             
