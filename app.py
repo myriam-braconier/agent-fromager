@@ -451,7 +451,178 @@ class AgentFromagerHF:
         
         return recipe
     
-    def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
+def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
+        """Génère une recette enrichie avec la base de connaissances"""
+        
+        # Déterminer le type si "artisanal"
+        if cheese_type == "Fromage artisanal":
+            cheese_type = self._determine_type(ingredients)
+        
+        # Récupérer toutes les infos de la base
+        type_info = self._get_type_info(cheese_type)
+        temp_affinage = self._get_temperature_affinage(cheese_type)
+        conservation_info = self._get_conservation_info(cheese_type)
+        accord_vin = self._get_accord_vin(cheese_type)
+        accord_mets = self._get_accord_mets(cheese_type)
+        epices_suggestions = self._suggest_epices(ingredients, cheese_type)
+        problemes_a_eviter = self._get_problemes_pertinents(cheese_type)
+        materiel = self._get_materiel_debutant()
+        
+        # Générer nom créatif
+        cheese_name = self._generate_creative_name(cheese_type, ingredients)
+        
+        # Construire la recette enrichie
+        recipe = f"""
+╔══════════════════════════════════════════════════════════════╗
+║                    🧀 {cheese_name.upper()}                     
+╚══════════════════════════════════════════════════════════════╝
+
+📋 TYPE DE FROMAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{cheese_type}
+{type_info['description']}
+Exemples similaires : {type_info['exemples']}
+Difficulté : {type_info['difficulte']}
+Durée totale : {type_info['duree']}
+
+
+🥛 INGRÉDIENTS (Pour environ 500g de fromage)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- 2 litres de lait entier pasteurisé
+  (préférer lait cru de producteur local si possible)
+- 2ml de présure liquide (ou 1/4 comprimé)
+  Alternative : 60ml de jus de citron frais
+- 10g de sel de mer fin ou gros sel
+- Ferments lactiques (optionnel mais recommandé)
+
+**Vos ingrédients spécifiques :**
+{self._format_user_ingredients(ingredients)}
+
+{epices_suggestions}
+
+
+🔧 MATÉRIEL NÉCESSAIRE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{materiel}
+
+
+📝 ÉTAPES DE FABRICATION DÉTAILLÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 1 : PRÉPARATION DU LAIT (20 minutes)
+──────────────────────────────────────────
+1. **Stérilisation** : Laver tout le matériel à l'eau bouillante
+2. **Chauffage** : Verser le lait dans la casserole propre
+3. **Température** : Chauffer doucement à 32°C (±1°C)
+   ⚠️ NE JAMAIS dépasser 35°C au risque de tuer les ferments
+4. **Stabilisation** : Maintenir 32°C pendant 10 minutes
+5. **Ferments** (optionnel) : Ajouter et mélanger 1 minute
+
+
+PHASE 2 : CAILLAGE (45-90 minutes)
+────────────────────────────────────
+6. **Ajout présure** : Diluer la présure dans 50ml d'eau froide
+7. **Incorporation** : Verser en mélangeant délicatement 30 secondes
+8. **Repos** : Couvrir et laisser reposer SANS BOUGER
+   - Avec présure : 45-60 minutes
+   - Avec citron : 20-30 minutes (plus rapide mais moins stable)
+9. **Test de caillage** : Le caillé doit se briser net comme du tofu
+   Si encore liquide → Attendre 15 minutes de plus
+
+
+PHASE 3 : DÉCOUPAGE ET BRASSAGE (15 minutes)
+─────────────────────────────────────────────
+10. **Découpage** : Couper le caillé en cubes de 1cm
+    Faire un quadrillage vertical puis horizontal
+11. **Repos** : Laisser reposer 5 minutes (petit-lait sort)
+12. **Brassage** : Mélanger TRÈS doucement 10 minutes
+    Le caillé raffermit sans se désintégrer
+
+
+PHASE 4 : MOULAGE ET ÉGOUTTAGE ({self._get_egouttage_time(cheese_type)})
+───────────────────────────────────────
+13. **Préparation** : Disposer l'étamine dans le moule perforé
+14. **Transfert** : Verser le caillé à la louche (garder le petit-lait!)
+15. **Égouttage naturel** : Laisser égoutter
+    - Fromage frais : 2-4 heures à température ambiante
+    - Autres types : 12-24 heures au frais (12°C)
+16. **Retournement** : Retourner toutes les 4 heures
+
+
+PHASE 5 : SALAGE
+───────────────────────────────────────
+17. **Démoulage** : Démouler délicatement sur une surface propre
+18. **Salage** : Frotter toutes les faces avec le sel
+    Quantité : 2% du poids du fromage (environ 10g pour 500g)
+19. **Alternative saumure** : Immerger 2-4h dans eau salée (300g/L)
+
+
+PHASE 6 : AFFINAGE
+───────────────────────────────────────
+20. **Conditions d'affinage** :
+    {temp_affinage}
+21. **Durée d'affinage** : {type_info['duree']}
+22. **Soins** : {self._get_soins_affinage(cheese_type)}
+
+
+⚠️ PROBLÈMES COURANTS ET SOLUTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{problemes_a_eviter}
+
+
+📦 CONSERVATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{conservation_info}
+
+
+🍷 DÉGUSTATION ET ACCORDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Moment idéal** : {self._get_tasting_time(cheese_type)}
+**Température de service** : 18-20°C (sortir 1h avant)
+
+**Accords vins** : {accord_vin}
+**Accords mets** : {accord_mets}
+
+**Suggestion de présentation** :
+Servir sur une planche en bois avec pain frais, quelques noix,
+un peu de miel et des fruits de saison
+
+
+🎨 VARIANTES CRÉATIVES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{self._get_variantes(cheese_type, ingredients)}
+
+
+💡 CONSEILS DU MAÎTRE FROMAGER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{self._get_conseils_fromager()}
+
+✨ **Le petit-lait est précieux !**
+   Ne le jetez pas :
+   - Faire du pain (remplace l'eau)
+   - Ricotta (rechauffer à 90°C, récupérer les flocons)
+   - Arroser les plantes (riche en nutriments)
+   - Base de smoothies protéinés
+
+
+📚 SCIENCE DU FROMAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Le caillage** : La présure (enzyme) coupe les protéines du lait
+(caséines) qui s'agglomèrent en réseau 3D emprisonnant eau et graisses.
+
+**L'affinage** : Bactéries et levures transforment protéines et graisses
+en molécules aromatiques. Plus long = goût plus prononcé.
+
+
+{self._add_constraints_note(constraints)}
+
+╔══════════════════════════════════════════════════════════════╗
+║  Recette générée le {datetime.now().strftime('%d/%m/%Y à %H:%M')}           
+║  Bonne fabrication ! 🧀                                       
+║  Patience et hygiène sont les clés de la réussite            
+╚══════════════════════════════════════════════════════════════╝
+"""
+        return recipe
         """Génère une recette détaillée basée sur templates"""
         
         if cheese_type == "Fromage artisanal":
@@ -591,8 +762,8 @@ Accords : Pain au levain, fruits frais, vin rouge
 ╚══════════════════════════════════════════════════════════════╝
 """
         return recipe
-    
-    def _add_constraints_note(self, constraints):
+
+def _add_constraints_note(self, constraints):
         """Ajoute une note sur les contraintes"""
         if not constraints or constraints.strip() == "":
             return ""
@@ -603,7 +774,7 @@ Accords : Pain au levain, fruits frais, vin rouge
 Adaptations suggérées selon vos contraintes.
 """
     
-    def get_knowledge_summary(self):
+def get_knowledge_summary(self):
         """Retourne un résumé de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE\n\n"
         summary += "🧀 TYPES DE PÂTE :\n"
