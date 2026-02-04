@@ -843,26 +843,26 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         style_general = ["Lacté", "Artisan", "Fondant", "Crémeux", "Rustique"]
 
         if 'chèvre' in ingredients_str:
-        base = ["Chèvre", "Caprice", "Blanc"]
-        qualifier = ["des Prés", "Lacté", "Frais"]
+            base = ["Chèvre", "Caprice", "Blanc"]
+            qualifier = ["des Prés", "Lacté", "Frais"]
         elif 'brebis' in ingredients_str:
-        base = ["Brebis", "Douceur", "Trésor"]
-        qualifier = ["Pastorale", "de Bergère", "Montagnard"]
+            base = ["Brebis", "Douceur", "Trésor"]
+            qualifier = ["Pastorale", "de Bergère", "Montagnard"]
         elif 'herbe' in ingredients_str or 'épice' in ingredients_str:
-        base = ["Jardin", "Bouquet", "Pré"]
-        qualifier = ["Fromager", "Lacté", "Fleuri"]
+            base = ["Jardin", "Bouquet", "Pré"]
+            qualifier = ["Fromager", "Lacté", "Fleuri"]
         elif 'frais' in cheese_type.lower():
-        base = ["Blanc", "Nuage", "Fraîcheur"]
-        qualifier = ["Matinale", "Lactée", "Pure"]
+            base = ["Blanc", "Nuage", "Fraîcheur"]
+            qualifier = ["Matinale", "Lactée", "Pure"]
         elif 'molle' in cheese_type.lower():
-        base = ["Velours", "Crème", "Délice"]
-        qualifier = ["de Cave", "d'Artisan", "Fondant"]
+            base = ["Velours", "Crème", "Délice"]
+            qualifier = ["de Cave", "d'Artisan", "Fondant"]
         elif 'pressée' in cheese_type.lower():
-        base = ["Roc", "Meule", "Pierre"]
-        qualifier = ["du Terroir", "Tradition", "Lactée"]
+            base = ["Roc", "Meule", "Pierre"]
+            qualifier = ["du Terroir", "Tradition", "Lactée"]
         else:
-        base = base_general
-        qualifier = ["Maison", "Artisanale", "Fromagère"]
+            base = base_general
+            qualifier = ["Maison", "Artisanale", "Fromagère"]
 
         return (
         f"{self.rng.choice(base)} "
