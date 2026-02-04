@@ -575,44 +575,106 @@ class AgentFromagerHF:
         
         return True, "✅ Ingrédients parfaits pour faire du fromage !"
     
-def generate_recipe(self, user_request: str) -> str:
-    """Génère une recette de fromage selon la demande"""
-    try:
-        # Parse la demande avec le LLM
-        prompt = self._build_prompt(user_request)
-        response = ollama.chat(
-            model=self.model_name,
-            messages=[{'role': 'user', 'content': prompt}]
-        )
+    def _extract_lait_from_text(self, text: str) -> str:
+        """Extrait le type de lait d'un texte"""
+        if not text:
+            return None
         
-        suggestion = response['message']['content']
+        text_lower = text.lower()
         
-        # AJOUTE LA VALIDATION ICI
-        # Extraire lait et type_pate de la suggestion (simple parsing)
-        lait = None
-        type_pate = None
+        lait_patterns = {
+            'vache': ['vache', 'bovin', 'cow', 'lait de vache'],
+            'chevre': ['chèvre', 'chevre', 'caprin', 'goat', 'lait de chèvre', 'lait de chevre'],
+            'brebis': ['brebis', 'mouton', 'ovin', 'sheep', 'lait de brebis'],
+            'bufflonne': ['bufflonne', 'buffle', 'buffalo', 'lait de bufflonne']
+        }
         
-        # Parsing basique - à améliorer
-        for lait_type in ['vache', 'chèvre', 'brebis', 'bufflonne']:
-            if lait_type in suggestion.lower():
-                lait = lait_type
-                break
+        # Priorité aux patterns les plus spécifiques
+        for lait_type, patterns in lait_patterns.items():
+            for pattern in patterns:
+                if pattern in text_lower:
+                    return lait_type
         
-        for pate_type in self.knowledge['types_pate'].keys():
-            if pate_type.lower() in suggestion.lower():
-                type_pate = pate_type
-                break
+        return None
+    
+    def _validate_combination(self, lait: str, type_pate: str) -> tuple:
+        """
+        Valide une combinaison lait/pâte
+        Returns: (bool, str) - (est_valide, message)
+        """
+        if not lait or not type_pate:
+            return True, "OK"
         
-        # Valider si on a trouvé lait et type_pate
-        if lait and type_pate:
-            is_valid, reason = self._validate_combination(lait, type_pate)
+        rules = self.knowledge_base['regles_compatibilite']
+        lait_lower = lait.lower()
+        
+        # Vérifier les exclusions absolues
+        for exclusion in rules['exclusions_absolues']:
+            combo = exclusion['combinaison']
+            if f'lait:{lait_lower}' in combo and f'type_pate:{type_pate}' in combo:
+                alternatives = ', '.join(exclusion.get('alternatives', []))
+                message = f"{exclusion['raison']}\n\n**Alternatives :** {alternatives}"
+                return False, message
+        
+        # Vérifier compatibilité lait/pâte
+        for combo in rules['lait_x_type_pate']['combinaisons_valides']:
+            if combo['lait'] == lait_lower:
+                if type_pate in combo.get('types_pate_incompatibles', []):
+                    compatible = ', '.join(combo['types_pate_compatibles'])
+                    message = f"{combo['raison']}\n\n**Types compatibles avec le lait de {lait} :** {compatible}"
+                    return False, message
+        
+        return True, "✅ Combinaison valide"
+    
+    def _suggest_alternatives(self, lait: str, type_pate: str) -> str:
+        """Suggère des alternatives compatibles"""
+        rules = self.knowledge_base['regles_compatibilite']
+        
+        # Trouver les types compatibles pour ce lait
+        for combo in rules['lait_x_type_pate']['combinaisons_valides']:
+            if combo['lait'] == lait.lower():
+                compatibles = combo['types_pate_compatibles']
+                exemples = combo.get('exemples', [])
+                
+                result = f"**Pour du lait de {lait}, voici les types compatibles :**\n\n"
+                for i, pate in enumerate(compatibles, 1):
+                    result += f"{i}. {pate}\n"
+                
+                if exemples:
+                    result += f"\n**Exemples :** {', '.join(exemples)}"
+                
+                return result
+        
+        return "Veuillez choisir une autre combinaison lait/type de pâte."
+    
+    def generate_recipe(self, ingredients, cheese_type, constraints):
+        """Génère une recette de fromage détaillée avec validation"""
+        
+        # Validation des ingrédients
+        valid, message = self.validate_ingredients(ingredients)
+        if not valid:
+            return message
+        
+        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+        cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
+        
+        # ===== VALIDATION DE LA COMPATIBILITÉ LAIT/PÂTE =====
+        lait = self._extract_lait_from_text(ingredients)
+        
+        # Si un type de pâte spécifique est choisi, valider la compatibilité
+        if lait and cheese_type_clean != "Fromage artisanal":
+            is_valid, reason = self._validate_combination(lait, cheese_type_clean)
             if not is_valid:
-                return f"**Attention : Combinaison invalide détectée**\n\n{reason}\n\nVoulez-vous que je propose une alternative ?"
+                alternatives = self._suggest_alternatives(lait, cheese_type_clean)
+                return f"**❌ Combinaison invalide détectée**\n\n{reason}\n\n**💡 Alternatives suggérées :**\n{alternatives}\n\nModifiez votre type de fromage pour continuer."
         
-        return suggestion
+        # Générer la recette
+        recipe = self._generate_detailed_recipe(ingredients_list, cheese_type_clean, constraints)
         
-    except Exception as e:
-        return f"Erreur lors de la génération: {str(e)}"
+        # Sauvegarder dans l'historique
+        self._save_to_history(ingredients_list, cheese_type_clean, constraints, recipe)
+        
+        return recipe
     
     def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
         """Génère une recette enrichie avec la base de connaissances"""
