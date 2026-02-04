@@ -873,6 +873,214 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 ╚══════════════════════════════════════════════════════════════╝
 """
         return recipe
+   
+    def generate_recipe_creative(self, ingredients, cheese_type, constraints, 
+                            creativity_level, texture_preference, 
+                            affinage_duration, spice_intensity):
+        """Génère une recette avec mode créatif et micro-choix"""
+    
+        # Validation de base
+        valid, message = self.validate_ingredients(ingredients)
+        if not valid:
+            return message
+    
+        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+        cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
+    
+        # Validation compatibilité lait/pâte
+        lait = self._extract_lait_from_text(ingredients)
+        if lait and cheese_type_clean != "Fromage artisanal":
+            is_valid, reason = self._validate_combination(lait, cheese_type_clean)
+        if not is_valid:
+            alternatives = self._suggest_alternatives(lait, cheese_type_clean)
+            return f"❌ Combinaison invalide\n\n{reason}\n\n{alternatives}"
+    
+        # ===== APPLIQUER LES MICRO-CHOIX =====
+        # Adapter selon les préférences
+        modified_ingredients = self._apply_micro_choices(
+            ingredients_list, 
+            texture_preference,
+            spice_intensity,
+            affinage_duration
+    )
+    
+        # Générer recette de base
+        recipe = self._generate_detailed_recipe(
+            modified_ingredients, 
+            cheese_type_clean, 
+            constraints
+    )
+    
+        # ===== MODE CRÉATIF =====
+        if creativity_level > 0:
+            recipe = self._add_creative_variations(
+                recipe, 
+                creativity_level,
+                cheese_type_clean,
+                lait
+        )
+    
+        # Sauvegarder
+        self._save_to_history(modified_ingredients, cheese_type_clean, constraints, recipe)
+    
+        return recipe
+
+    def _apply_micro_choices(self, ingredients, texture, spice_intensity, affinage):
+        """Applique les micro-choix aux ingrédients"""
+        modified = ingredients.copy()
+    
+        #  Texture : ajuster ferments/présure
+        if texture == "Très crémeux":
+            modified.append("crème fraîche (30ml)")
+        elif texture == "Très ferme":
+            modified.append("présure supplémentaire (+20%)")
+    
+        # Épices : ajouter selon intensité
+        if spice_intensity == "Intense":
+            spices = self.rng.choice([
+                "poivre noir concassé (2 c.à.c)",
+                "piment d'Espelette (1 c.à.c)",
+                "ail confit (3 gousses)"
+            ])
+            modified.append(spices)
+        
+        elif spice_intensity == "Modéré":
+            spices = self.rng.choice([
+                "herbes de Provence (1 c.à.s)",
+                "thym séché (1 c.à.c)",
+                "basilic frais (quelques feuilles)"
+            ])
+            modified.append(spices)
+    
+        return modified
+
+    def _add_creative_variations(self, recipe, creativity_level, cheese_type, lait):
+        """Ajoute des variations créatives selon le niveau"""
+    
+        creative_section = "\n\n" + "="*70 + "\n"
+        creative_section += "🎨 VARIATIONS CRÉATIVES\n"
+        creative_section += "="*70 + "\n\n"
+    
+        variations = []
+    
+        # Niveau 1 : Suggestions simples
+        if creativity_level >= 1:
+            variations.append(self._get_simple_variation(cheese_type, lait))
+    
+        # Niveau 2 : Variations fusion
+        if creativity_level >= 2:
+            variations.append(self._get_fusion_variation(cheese_type, lait))
+    
+        # Niveau 3 : Expérimental
+        if creativity_level >= 3:
+            variations.append(self._get_experimental_variation(cheese_type, lait))
+    
+        for i, var in enumerate(variations, 1):
+            creative_section += f"### Variation {i} : {var['title']}\n\n"
+            creative_section += f"**Concept :** {var['concept']}\n\n"
+            creative_section += f"**Ingrédients supplémentaires :**\n"
+            for ing in var['ingredients']:
+                creative_section += f"- {ing}\n"
+            creative_section += f"\n**Technique :** {var['technique']}\n\n"
+            creative_section += "---\n\n"
+    
+        return recipe + creative_section
+
+    def _get_simple_variation(self, cheese_type, lait):
+        """Variation simple : herbes et épices"""
+    
+        variations = {
+            'Fromage frais': {
+                'title': 'Fromage frais aux fleurs',
+                'concept': 'Ajout de fleurs comestibles pour un fromage élégant',
+                'ingredients': ['Pétales de rose séchés', 'Lavande culinaire', 'Bleuet'],
+                'technique': 'Incorporer les fleurs lors du moulage, parsemer sur le dessus'
+        },
+            'Pâte molle': {
+                'title': 'Pâte molle truffée',
+                'concept': 'Infusion de truffe pour un fromage luxueux',
+                'ingredients': ['Huile de truffe (5ml)', 'Copeaux de truffe'],
+                'technique': 'Badigeonner la croûte avec l\'huile de truffe pendant l\'affinage'
+        },
+            'Pâte pressée non cuite': {
+                'title': 'Tomme aux noix et miel',
+                'concept': 'Enrobage sucré-salé original',
+                'ingredients': ['Noix concassées', 'Miel de montagne', 'Thym'],
+            '   technique': 'Enrober le fromage de noix et miel avant l\'affinage final'
+        }
+    }
+    
+        return variations.get(cheese_type, variations['Fromage frais'])
+
+    def _get_fusion_variation(self, cheese_type, lait):
+        """Variation fusion : inspiration internationale"""
+    
+        fusions = [
+            {
+                'title': 'Inspiration méditerranéenne',
+                'concept': 'Fromage aux saveurs du sud',
+                'ingredients': ['Tomates séchées', 'Olives noires', 'Origan', 'Huile d\'olive'],
+                'technique': 'Incorporer dans le caillé avant moulage'
+            },
+            {
+                'title': 'Inspiration japonaise',
+                'concept': 'Fromage au yuzu et sésame noir',
+                'ingredients': ['Zeste de yuzu', 'Graines de sésame noir', 'Algue nori émincée'],
+                'technique': 'Enrober le fromage de sésame et ajouter le yuzu en surface'
+            },
+            {
+                'title': 'Inspiration indienne',
+                'concept': 'Fromage aux épices chaudes',
+                'ingredients': ['Curry doux', 'Gingembre frais râpé', 'Coriandre', 'Curcuma'],
+                'technique': 'Mélanger les épices au sel de salage'
+            },
+            {
+                'title': 'Inspiration mexicaine',
+                'concept': 'Fromage piquant et fumé',
+                'ingredients': ['Piment chipotle', 'Coriandre fraîche', 'Lime'],
+                'technique': 'Incorporer le piment fumé dans le caillé'
+            }
+        ]   
+    
+        return self.rng.choice(fusions)
+
+    def _get_experimental_variation(self, cheese_type, lait):
+        """Variation expérimentale : très créatif"""
+    
+        experiments = [
+        {
+            'title': 'Fromage lacto-fermenté aux légumes',
+            'concept': 'Double fermentation avec légumes crus',
+            'ingredients': ['Carottes râpées', 'Betterave', 'Gingembre', 'Kombucha'],
+            'technique': 'Ajouter les légumes lacto-fermentés pendant l\'égouttage'
+        },
+        {
+            'title': 'Fromage aux algues et spiruline',
+            'concept': 'Superfood fromager, riche en protéines',
+            'ingredients': ['Spiruline en poudre', 'Wakame', 'Graines de chia'],
+            'technique': 'Mélanger dans le lait avant caillage pour couleur verte'
+        },
+        {
+            'title': 'Fromage au café et cacao',
+            'concept': 'Dessert fromager original',
+            'ingredients': ['Café espresso', 'Poudre de cacao', 'Vanille', 'Miel'],
+            'technique': 'Infuser le lait avec café/cacao avant emprésurage'
+        },
+        {
+            'title': 'Fromage fumé aux bois exotiques',
+            'concept': 'Fumage à froid avec bois spéciaux',
+            'ingredients': ['Copeaux de hêtre', 'Copeaux de pommier', 'Romarin séché'],
+            'technique': 'Fumer à froid pendant 2-3 heures après séchage'
+        },
+        {
+            'title': 'Fromage au thé matcha',
+            'concept': 'Fusion franco-japonaise délicate',
+            'ingredients': ['Thé matcha premium', 'Gingembre confit', 'Sésame blanc'],
+            'technique': 'Infuser le lait avec matcha, parsemer de sésame'
+        }
+    ]
+    
+        return self.rng.choice(experiments)   
     
     def _determine_type(self, ingredients):
         """Détermine le type selon les ingrédients en respectant les compatibilités"""
@@ -1109,8 +1317,9 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         ingredients_str = ' '.join(ingredients).lower()
 
         # Briques génériques
-        base_general = ["Trésor", "Délice", "Nuage", "Essence", "Secret", "Velours"]
-        style_general = ["Lacté", "Artisan", "Fondant", "Crémeux", "Rustique"]
+        base = ["Velours", "Délice", "Nuage", "Trésor", "Secret", "Essence"]
+        lieu = ["de Cave", "du Terroir", "des Prés", "Lacté", "Artisan"]
+        style = ["Fondant", "Rustique", "Crémeux", "Affiné", "Doux"]
 
         if 'chèvre' in ingredients_str:
             base = ["Chèvre", "Caprice", "Blanc"]
@@ -1131,14 +1340,10 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             base = ["Roc", "Meule", "Pierre"]
             qualifier = ["du Terroir", "Tradition", "Lactée"]
         else:
-            base = base_general
+            base = base
             qualifier = ["Maison", "Artisanale", "Fromagère"]
 
-        return (
-        f"{self.rng.choice(base)} "
-        f"{self.rng.choice(qualifier)} "
-        f"{self.rng.choice(style_general)}"
-    )
+        return f"{self.rng.choice(base)} {self.rng.choice(lieu)} {self.rng.choice(style)}"
 
     
     def _format_user_ingredients(self, ingredients):
