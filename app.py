@@ -58,6 +58,99 @@ class AgentFromagerHF:
                 'Ferments': ['Lactiques (yaourt)', 'Mésophiles (température ambiante)', 'Thermophiles (haute température)'],
                 'Sel': ['Sel fin', 'Gros sel', 'Sel de mer', 'Saumure (eau + sel)'],
                 'Affinage': ['Penicillium roqueforti (bleu)', 'Geotrichum (croûte)', 'Herbes', 'Cendres']
+                'epices_et_aromates': {
+                'Herbes fraîches': [
+                    'Basilic (doux, fromages frais)',
+                    'Ciboulette (léger, fromages de chèvre)',
+                    'Thym (robuste, tommes)',
+                    'Romarin (puissant, pâtes pressées)',
+                    'Persil (neutre, universel)',
+                    'Aneth (anisé, fromages nordiques)',
+                    'Menthe (rafraîchissant, fromages méditerranéens)',
+                    'Coriandre (exotique, fromages épicés)'
+                ],
+                'Herbes séchées': [
+                    'Herbes de Provence (mélange classique)',
+                    'Origan (italien, fromages à pizza)',
+                    'Sarriette (poivrée, fromages de montagne)',
+                    'Estragon (anisé, fromages frais)',
+                    'Laurier (dans saumure)',
+                    'Sauge (forte, pâtes dures)'
+                ],
+                'Épices chaudes': [
+                    'Poivre noir (concassé ou moulu)',
+                    'Poivre rouge (Espelette, piment doux)',
+                    'Paprika (fumé ou doux)',
+                    'Cumin (terreux, fromages orientaux)',
+                    'Curry (mélange, fromages fusion)',
+                    'Piment de Cayenne (fort, avec modération)',
+                    'Ras el hanout (complexe, fromages marocains)'
+                ],
+                'Épices douces': [
+                    'Nigelle (sésame noir, fromages levantins)',
+                    'Graines de fenouil (anisées)',
+                    'Graines de carvi (pain, fromages nordiques)',
+                    'Fenugrec (sirop d\'érable, rare)',
+                    'Coriandre en graines (agrumes)'
+                ],
+                'Fleurs et pollen': [
+                    'Lavande (Provence, délicat)',
+                    'Safran (luxueux, fromages d\'exception)',
+                    'Pétales de rose (persan, subtil)',
+                    'Bleuet (visuel, doux)',
+                    'Pollen de fleurs (sauvage)'
+                ],
+                'Aromates spéciaux': [
+                    'Ail frais (haché ou confit)',
+                    'Échalote (finement ciselée)',
+                    'Oignon rouge (mariné)',
+                    'Gingembre (frais râpé, fusion)',
+                    'Citronnelle (asiatique, rare)',
+                    'Zeste d\'agrumes (citron, orange, bergamote)'
+                ],
+                'Cendres et croûtes': [
+                    'Cendres végétales (charbon de bois alimentaire)',
+                    'Cendres de sarment de vigne',
+                    'Charbon actif alimentaire (noir intense)',
+                    'Foin séché (affinage sur foin)',
+                    'Paille (affinage traditionnel)'
+                ],
+                'Accompagnements dans la pâte': [
+                    'Noix concassées (texture)',
+                    'Noisettes (doux, chèvre)',
+                    'Pistaches (vert, raffiné)',
+                    'Fruits secs (abricots, figues)',
+                    'Olives (noires ou vertes)',
+                    'Tomates séchées (umami)',
+                    'Truffe (luxe absolu)',
+                    'Champignons séchés (boisé)'
+                ]
+            },
+            'techniques_aromatisation': {
+                'Incorporation dans le caillé': 'Ajouter les épices au moment du moulage pour distribution homogène',
+                'Enrobage externe': 'Rouler le fromage dans les épices après salage',
+                'Affinage aromatisé': 'Placer herbes/épices dans la cave d\'affinage',
+                'Saumure parfumée': 'Infuser la saumure avec aromates',
+                'Huile aromatisée': 'Badigeonner la croûte d\'huile aux herbes',
+                'Couche intermédiaire': 'Saupoudrer entre deux couches de caillé'
+            },
+            'dosages_recommandes': {
+                'Herbes fraîches': '2-3 cuillères à soupe pour 1kg de fromage',
+                'Herbes séchées': '1-2 cuillères à soupe pour 1kg',
+                'Épices moulues': '1-2 cuillères à café pour 1kg',
+                'Épices en grains': '1 cuillère à soupe concassée pour 1kg',
+                'Ail/gingembre': '1-2 gousses/morceaux pour 1kg',
+                'Zestes': '1 agrume entier pour 1kg',
+                'Cendres': 'Fine couche sur la croûte'
+            },
+            'associations_classiques': {
+                'Fromage de chèvre': 'Herbes de Provence, miel, lavande',
+                'Brebis': 'Piment d\'Espelette, romarin, olives',
+                'Pâte molle': 'Ail, fines herbes, poivre',
+                'Pâte pressée': 'Cumin, fenugrec, noix',
+                'Fromage frais': 'Ciboulette, aneth, menthe fraîche',
+                'Bleu': 'Noix, figues, porto (pas dans le fromage)'
+            }
             }
         }
     
@@ -277,6 +370,26 @@ class AgentFromagerHF:
                 cheese_type = "Pâte molle"
         
         type_info = None
+        # Suggestions d'épices selon le type
+        epices_suggestions = ""
+        if 'epices_et_aromates' in self.knowledge_base:
+            epices_suggestions = "\n\n💡 SUGGESTIONS D'AROMATES :\n"
+            
+            # Détecter si des épices sont dans les ingrédients
+            ingredients_str = ' '.join(ingredients).lower()
+            has_herbs = any(h in ingredients_str for h in ['herbe', 'thym', 'romarin', 'basilic'])
+            has_spices = any(s in ingredients_str for s in ['épice', 'poivre', 'piment', 'cumin'])
+            
+            if has_herbs or has_spices:
+                epices_suggestions += "Vous avez des aromates ! Voici comment les utiliser :\n"
+                if 'techniques_aromatisation' in self.knowledge_base:
+                    for tech, desc in list(self.knowledge_base['techniques_aromatisation'].items())[:3]:
+                        epices_suggestions += f"- {tech} : {desc}\n"
+            else:
+                epices_suggestions += "Idées pour aromatiser votre fromage :\n"
+                if 'associations_classiques' in self.knowledge_base:
+                    for fromage_type, suggestion in list(self.knowledge_base['associations_classiques'].items())[:3]:
+                        epices_suggestions += f"- {fromage_type} : {suggestion}\n"
         for key, value in self.knowledge_base['types_pate'].items():
             if key.lower() in cheese_type.lower():
                 type_info = value
@@ -425,6 +538,35 @@ Adaptations suggérées selon vos contraintes.
         summary += "✓ Patience : un bon fromage ne se précipite pas\n"
         summary += "✓ Tenir un carnet : noter températures et durées\n"
         summary += "✓ Commencer simple : fromage frais avant pâtes pressées\n\n"
+        
+        summary += "\n" + "="*70 + "\n"
+        summary += "🌶️ ÉPICES ET AROMATES :\n"
+        summary += "="*70 + "\n\n"
+        
+        if 'epices_et_aromates' in self.knowledge_base:
+            for category, items in self.knowledge_base['epices_et_aromates'].items():
+                summary += f"• {category.upper()} :\n"
+                for item in items[:5]:  # Limiter à 5 pour ne pas surcharger
+                    summary += f"  - {item}\n"
+                if len(items) > 5:
+                    summary += f"  ... et {len(items)-5} autres\n"
+                summary += "\n"
+        
+        summary += "\n" + "="*70 + "\n"
+        summary += "📐 DOSAGES RECOMMANDÉS :\n"
+        summary += "="*70 + "\n\n"
+        
+        if 'dosages_recommandes' in self.knowledge_base:
+            for ingredient, dosage in self.knowledge_base['dosages_recommandes'].items():
+                summary += f"• {ingredient} : {dosage}\n"
+        
+        summary += "\n" + "="*70 + "\n"
+        summary += "🎨 ASSOCIATIONS CLASSIQUES :\n"
+        summary += "="*70 + "\n\n"
+        
+        if 'associations_classiques' in self.knowledge_base:
+            for fromage, assoc in self.knowledge_base['associations_classiques'].items():
+                summary += f"• {fromage} : {assoc}\n"
         
         return summary
 
