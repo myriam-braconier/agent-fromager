@@ -976,13 +976,22 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             variations.append(self._get_experimental_variation(cheese_type, lait))
     
         for i, var in enumerate(variations, 1):
-            creative_section += f"### Variation {i} : {var['title']}\n\n"
-            creative_section += f"**Concept :** {var['concept']}\n\n"
+            # Utiliser .get() avec valeur par défaut pour éviter KeyError
+            creative_section += f"### Variation {i} : {var.get('title', 'Variation créative')}\n\n"
+            creative_section += f"**Concept :** {var.get('concept', 'Création originale')}\n\n"
+        
+        # Ingrédients
+        ingredients = var.get('ingredients', [])
+        if ingredients:
             creative_section += f"**Ingrédients supplémentaires :**\n"
-            for ing in var['ingredients']:
+            for ing in ingredients:
                 creative_section += f"- {ing}\n"
-            creative_section += f"\n**Technique :** {var['technique']}\n\n"
-            creative_section += "---\n\n"
+            creative_section += "\n"
+        
+        # Technique - AVEC .get() pour éviter l'erreur
+        technique = var.get('technique', 'Incorporer selon votre méthode habituelle')
+        creative_section += f"**Technique :** {technique}\n\n"
+        creative_section += "---\n\n"
     
         return recipe + creative_section
 
