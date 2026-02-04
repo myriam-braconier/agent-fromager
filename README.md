@@ -2,7 +2,7 @@
 title: Agent Fromager Intelligent
 emoji: 🧀
 colorFrom: yellow
-colorTo: orange
+colorTo: yellow
 sdk: gradio
 sdk_version: 4.0.0
 app_file: app.py
