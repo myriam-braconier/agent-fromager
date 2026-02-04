@@ -1360,6 +1360,17 @@ Adaptations suggérées selon vos contraintes.
         summary += "\n🎉 Base de connaissances très complète pour devenir maître fromager !\n"
         
         return summary
+    
+# Ajoute cette méthode dans ta classe AgentFromagerHF
+def test_internet(self):
+    """Test si Internet fonctionne"""
+    try:
+        import requests
+        response = requests.get("https://httpbin.org/get", timeout=10)
+        return f"✅ Internet fonctionne !\n\nStatus: {response.status_code}\nURL testée: https://httpbin.org/get"
+    except Exception as e:
+        return f"❌ Erreur d'accès Internet:\n{str(e)}"    
+    
 
 
 # Initialiser l'agent
@@ -1524,6 +1535,20 @@ def create_interface():
                 
                 💬 **Feedback ?** N'hésitez pas à laisser un commentaire !
                 """)
+        
+            with gr.Tab("🧪 Test Internet"):
+                gr.Markdown("""
+            ### Vérification de l'accès Internet
+    
+            Avec `allow_web_connections: true` dans le README.md, 
+            ce Space devrait pouvoir accéder au web.
+            """)
+    
+            test_btn = gr.Button("🔍 Tester l'accès Internet maintenant", variant="primary", size="lg")
+            test_output = gr.Textbox(label="Résultat du test", lines=5)
+    
+            test_btn.click(fn=agent.test_internet, outputs=test_output)
+        
         
         gr.Markdown("""
         ---
