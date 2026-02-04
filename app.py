@@ -1006,12 +1006,21 @@ def create_interface():
             
             # TAB 2 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
-                knowledge_output = gr.Textbox(
-                    label="Documentation fromage",
-                    value=agent.get_knowledge_summary(),
-                    lines=40,
-                    max_lines=60
-                )
+                with gr.Row():
+                    knowledge_btn = gr.Button("📖 Charger la documentation", variant="primary")
+                    refresh_kb_btn = gr.Button("🔄 Actualiser", variant="secondary")
+    
+            knowledge_output = gr.Textbox(
+                label="🧀 Base de connaissances fromagère",
+                lines=40, max_lines=60,
+                placeholder="Cliquez sur 'Charger la documentation' pour afficher la base complète..."
+    )
+    
+            knowledge_btn.click(
+                fn=agent.get_knowledge_summary,
+                outputs=knowledge_output
+    )
+
             
             # TAB 3 : Historique
             with gr.Tab("🕒 Historique"):
