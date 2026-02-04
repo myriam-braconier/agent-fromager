@@ -679,9 +679,24 @@ class AgentFromagerHF:
     def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
         """Génère une recette enrichie avec la base de connaissances"""
         
-        # Déterminer le type si "artisanal"
-        if cheese_type == "Fromage artisanal":
-            cheese_type = self._determine_type(ingredients)
+         # ===== DOUBLE VALIDATION POST-DÉTERMINATION =====
+        # Extraire le lait des ingrédients
+        ingredients_str = ' '.join(ingredients).lower()
+        lait = self._extract_lait_from_text(ingredients_str)
+        
+        # Valider la combinaison finale
+        if lait and cheese_type:
+            is_valid, reason = self._validate_combination(lait, cheese_type)
+            if not is_valid:
+                # Forcer un type compatible
+                rules = self.knowledge_base['regles_compatibilite']
+                for combo in rules['lait_x_type_pate']['combinaisons_valides']:
+                    if combo['lait'] == lait.lower():
+                        compatibles = combo['types_pate_compatibles']
+                        if compatibles:
+                            cheese_type = compatibles[0]  # Utiliser le premier compatible
+                            break
+        
         
         # Récupérer toutes les infos de la base
         type_info = self._get_type_info(cheese_type)
@@ -850,17 +865,39 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         return recipe
     
     def _determine_type(self, ingredients):
-        """Détermine le type selon les ingrédients"""
+        """Détermine le type selon les ingrédients en respectant les compatibilités"""
         ingredients_str = ' '.join(ingredients).lower()
         
+        # Extraire le type de lait
+        lait = self._extract_lait_from_text(ingredients_str)
+        
+        # Détecter des indices sur le type souhaité
         if 'citron' in ingredients_str or 'vinaigre' in ingredients_str:
             return "Fromage frais"
-        elif any(x in ingredients_str for x in ['herbe', 'épice', 'cendr']):
-            return "Pâte molle aromatisée"
         elif 'bleu' in ingredients_str or 'roquefort' in ingredients_str:
             return "Pâte persillée"
-        else:
-            return "Pâte molle"
+        
+        # Sinon, choisir un type compatible avec le lait détecté
+        if lait:
+            rules = self.knowledge_base['regles_compatibilite']
+            for combo in rules['lait_x_type_pate']['combinaisons_valides']:
+                if combo['lait'] == lait.lower():
+                    compatibles = combo['types_pate_compatibles']
+                    
+                    # Logique de choix selon les ingrédients
+                    if any(x in ingredients_str for x in ['herbe', 'épice', 'aromate']):
+                        # Si aromates : privilégier fromage frais ou pressée non cuite
+                        if 'Fromage frais' in compatibles:
+                            return "Fromage frais"
+                        elif 'Pâte pressée non cuite' in compatibles:
+                            return "Pâte pressée non cuite"
+                    
+                    # Par défaut : choisir le premier type compatible (généralement le plus simple)
+                    if compatibles:
+                        return compatibles[0]
+        
+        # Si pas de lait détecté, fromage frais par défaut (le plus simple et universel)
+        return "Fromage frais"
     
     def _get_type_info(self, cheese_type):
         """Récupère les infos du type de fromage"""
