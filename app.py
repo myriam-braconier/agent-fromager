@@ -1582,7 +1582,7 @@ agent = AgentFromagerHF()
 def create_interface():
     """Crée l'interface Gradio"""
     
-    with gr.Blocks(title="🧀 Agent Fromager", them=gr.Monochrome()) as demo:
+    with gr.Blocks(title="🧀 Agent Fromager", theme=gr.Monochrome()) as demo:
         
         gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
