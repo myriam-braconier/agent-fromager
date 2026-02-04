@@ -373,6 +373,90 @@ class AgentFromagerHF:
             return f"✅ Internet fonctionne !\n\nStatus: {response.status_code}\nURL testée: https://httpbin.org/get"
         except Exception as  e:
             return f"❌ Erreur d'accès Internet:\n{str(e)}"
+        
+def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
+    """Scrape le web pour trouver 6 recettes de fromage"""
+    
+    # Construire la requête de recherche
+    ingredients_clean = ingredients.replace(',', ' ')
+    query = f"recette fromage {cheese_type} {ingredients_clean}"
+    
+    recipes = []
+    
+    try:
+        from duckduckgo_search import DDGS
+        
+        print(f"🔍 Recherche web : {query}")
+        
+        # Recherche avec DuckDuckGo (gratuit, pas d'API key)
+        ddg = DDGS()
+        search_results = ddg.text(
+            keywords=query,
+            region='fr-fr',
+            safesearch='off',
+            max_results=max_results * 3  # Chercher plus pour filtrer
+        )
+        
+        # Filtrer les résultats pertinents
+        seen_domains = set()
+        
+        for result in search_results:
+            # Extraire les infos
+            url = result.get('href') or result.get('link', '')
+            title = result.get('title', 'Sans titre')
+            description = result.get('body', '') or result.get('description', '')
+            
+            if not url:
+                continue
+            
+            # Extraire le domaine
+            domain = self._extract_domain(url)
+            
+            # Éviter les doublons du même site
+            if domain in seen_domains:
+                continue
+            
+            # Filtrer les sites de recettes connus + blogs culinaires
+            relevant_sites = [
+                'marmiton', '750g', 'cuisineaz', 'journaldesfemmes',
+                'ricardocuisine', 'ptitchef', 'supertoinette',
+                'cuisine-facile', 'recette', 'blog', 'chef',
+                'fromage', 'gastronomie', 'cuisine'
+            ]
+            
+            if any(site in url.lower() or site in domain.lower() for site in relevant_sites):
+                recipes.append({
+                    'title': title,
+                    'url': url,
+                    'description': description[:250] + "..." if len(description) > 250 else description,
+                    'source': domain
+                })
+                
+                seen_domains.add(domain)
+                
+                if len(recipes) >= max_results:
+                    break
+        
+        print(f"✅ Trouvé {len(recipes)} recettes web")
+        return recipes[:max_results]
+    
+    except Exception as e:
+        print(f"❌ Erreur recherche web: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def _extract_domain(self, url: str) -> str:
+    """Extrait le nom de domaine d'une URL"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc
+        # Retirer 'www.' et garder le domaine principal
+        domain = domain.replace('www.', '')
+        return domain
+    except:
+        return "web"
     
     # =====  MÉTHODE de validationICI =====
     def _validate_combination(self, lait: str, type_pate: str, aromates: list = None) -> tuple:
