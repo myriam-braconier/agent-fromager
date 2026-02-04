@@ -428,13 +428,13 @@ en molécules aromatiques complexes. Plus long = goût plus prononcé.
         
         return '\n'.join(advice)
     
-        def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-	 """Sauvegarde dans l'historique avec meilleure gestion"""
-	 try:
-       		 history = []
-       		 if os.path.exists(self.recipes_file):
-           		 with open(self.recipes_file, 'r', encoding='utf-8') as f:
-               			 history = json.load(f)
+ def _save_to_history(self, ingredients, cheese_type, constraints, recipes):
+    """Sauvegarde dans l'historique avec meilleure gestion"""
+    try:
+        history = []
+        if os.path.exists(self.recipes_file):
+            with open(self.recipes_file, 'r', encoding='utf-8') as f:
+                history = json.load(f)
         
         # Extraire le nom du fromage depuis la recette
         recipe_lines = recipe.split('\n')
