@@ -1,3 +1,4 @@
+import random
 import gradio as gr
 import json
 import os
@@ -8,6 +9,7 @@ class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
     
     def __init__(self):
+        self.rng = random.Random()
         self.knowledge_base = self._init_knowledge()
         self.recipes_file = 'recipes_history.json'
         self.hf_repo = "volubyl/fromager-recipes"
@@ -740,10 +742,15 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         problemes = ""
         # Prendre les 5 problèmes les plus courants
-        for prob, sol in list(self.knowledge_base['problemes_courants'].items())[:5]:
+        problemes_items = list(self.knowledge_base['problemes_courants'].items())
+        selection = self.rng.sample(
+            problemes_items,
+            k=min(5, len(problemes_items))
+)
+        for prob, sol in selection:
             problemes += f"❌ **{prob}**\n"
             problemes += f"   ✅ {sol}\n\n"
-        
+                  
         return problemes
     
     def _get_materiel_debutant(self):
@@ -794,7 +801,7 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         if 'epices_et_aromates' in self.knowledge_base:
             variantes += "1. **Version aux herbes** : "
-            herbes = self.knowledge_base['epices_et_aromates'].get('Herbes fraîches', [])
+            herbes = self.rng.sample(self.knowledge_base['epices_et_aromates'].get('Herbes fraîches', []),k=3)
             variantes += f"Incorporer {', '.join(herbes[:3][:])}\n\n"
             
             variantes += "2. **Version épicée** : "
@@ -828,26 +835,36 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 ✨ **Goûter régulièrement** : Le fromage évolue, trouver votre stade préféré"""
     
     def _generate_creative_name(self, cheese_type, ingredients):
-        """Génère un nom créatif pour le fromage"""
-        ingredients_str = ' '.join(ingredients).lower()
-        
-        if 'chèvre' in ingredients_str:
-            names = ['Chèvre des Prés', 'Caprice Lacté', 'Blanc de Chèvre']
-        elif 'brebis' in ingredients_str:
-            names = ['Brebis d\'Or', 'Douceur Pastorale', 'Trésor de Bergère']
-        elif 'herbe' in ingredients_str or 'épice' in ingredients_str:
-            names = ['Jardin Fromager', 'Bouquet Lacté', 'Pré Fleuri']
-        elif 'frais' in cheese_type.lower():
-            names = ['Blanc Nuage', 'Fraîcheur Matinale', 'Douceur Lactée']
-        elif 'molle' in cheese_type.lower():
-            names = ['Velours de Cave', 'Crème d\'Artisan', 'Délice Fondant']
-        elif 'pressée' in cheese_type.lower():
-            names = ['Roc du Terroir', 'Meule Tradition', 'Pierre Lactée']
-        else:
-            names = ['Fromage Maison', 'Création Artisanale', 'Trésor Fromager']
-        
-        import random
-        return random.choice(names)
+    """Génère un nom créatif pour le fromage"""
+    ingredients_str = ' '.join(ingredients).lower()
+
+    # Briques génériques
+    base_general = ["Trésor", "Délice", "Nuage", "Essence", "Secret", "Velours"]
+    style_general = ["Lacté", "Artisan", "Fondant", "Crémeux", "Rustique"]
+
+    if 'chèvre' in ingredients_str:
+        base = ["Chèvre", "Caprice", "Blanc"]
+        qualifier = ["des Prés", "Lacté", "Frais"]
+    elif 'brebis' in ingredients_str:
+        base = ["Brebis", "Douceur", "Trésor"]
+        qualifier = ["Pastorale", "de Bergère", "Montagnard"]
+    elif 'herbe' in ingredients_str or 'épice' in ingredients_str:
+        base = ["Jardin", "Bouquet", "Pré"]
+        qualifier = ["Fromager", "Lacté", "Fleuri"]
+    elif 'frais' in cheese_type.lower():
+        base = ["Blanc", "Nuage", "Fraîcheur"]
+        qualifier = ["Matinale", "Lactée", "Pure"]
+    elif 'molle' in cheese_type.lower():
+        base = ["Velours", "Crème", "Délice"]
+        qualifier = ["de Cave", "d'Artisan", "Fondant"]
+    elif 'pressée' in cheese_type.lower():
+        base = ["Roc", "Meule", "Pierre"]
+        qualifier = ["du Terroir", "Tradition", "Lactée"]
+    else:
+        base = base_general
+        qualifier = ["Maison", "Artisanale", "Fromagère"]
+
+    return f"{self.rng.choice(base)} {self.rng.choice(qualifier)} {self.rng.choice(style_general)}"
     
     def _format_user_ingredients(self, ingredients):
         """Formate joliment les ingrédients utilisateur"""
