@@ -429,28 +429,108 @@ en molécules aromatiques complexes. Plus long = goût plus prononcé.
         return '\n'.join(advice)
     
     def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-        """Sauvegarde dans l'historique"""
+    """Sauvegarde dans l'historique avec meilleure gestion"""
+    try:
+        history = []
+        if os.path.exists(self.recipes_file):
+            with open(self.recipes_file, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        
+        # Extraire le nom du fromage depuis la recette
+        recipe_lines = recipe.split('\n')
+        cheese_name = "Fromage personnalisé"
+        for line in recipe_lines:
+            if '🧀' in line and len(line) < 100:
+                cheese_name = line.replace('🧀', '').strip()
+                break
+        
+        # Créer l'entrée
+        entry = {
+            'id': len(history) + 1,
+            'date': datetime.now().isoformat(),
+            'cheese_name': cheese_name,
+            'ingredients': ingredients,
+            'type': cheese_type,
+            'constraints': constraints,
+            'recipe_complete': recipe,
+            'recipe_preview': recipe[:300] + "..." if len(recipe) > 300 else recipe
+        }
+        
+        history.append(entry)
+        
+        # Garder seulement les 100 dernières recettes
+        history = history[-100:]
+        
+        with open(self.recipes_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+        
+        return True
+    except Exception as e:
+        print(f"Erreur sauvegarde historique: {e}")
+        return False
+
+def get_history(self):
+    """Retourne l'historique complet"""
+    if os.path.exists(self.recipes_file):
         try:
-            history = []
-            if os.path.exists(self.recipes_file):
-                with open(self.recipes_file, 'r', encoding='utf-8') as f:
-                    history = json.load(f)
-            
-            history.append({
-                'date': datetime.now().isoformat(),
-                'ingredients': ingredients,
-                'type': cheese_type,
-                'constraints': constraints,
-                'recipe_preview': recipe[:500] + "..."
-            })
-            
-            # Garder seulement les 50 dernières
-            history = history[-50:]
-            
-            with open(self.recipes_file, 'w', encoding='utf-8') as f:
-                json.dump(history, f, indent=2, ensure_ascii=False)
+            with open(self.recipes_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
         except:
-            pass  # Pas critique si ça échoue
+            return []
+    return []
+
+def get_history_display(self):
+    """Retourne l'historique formaté pour affichage"""
+    history = self.get_history()
+    
+    if not history:
+        return "📭 Aucune recette créée pour le moment.\n\nCommencez par créer votre première recette ! 🧀"
+    
+    display = f"📚 HISTORIQUE DE VOS FROMAGES ({len(history)} recettes)\n"
+    display += "="*70 + "\n\n"
+    
+    # Afficher les 20 dernières recettes (les plus récentes en premier)
+    for entry in reversed(history[-20:]):
+        date_obj = datetime.fromisoformat(entry['date'])
+        date_str = date_obj.strftime('%d/%m/%Y à %H:%M')
+        
+        display += f"🧀 #{entry['id']} - {entry.get('cheese_name', 'Fromage')}\n"
+        display += f"📅 {date_str}\n"
+        display += f"🏷️  Type: {entry['type']}\n"
+        display += f"🥛 Ingrédients: {', '.join(entry['ingredients'][:3])}"
+        
+        if len(entry['ingredients']) > 3:
+            display += f" (+{len(entry['ingredients'])-3} autres)"
+        display += "\n"
+        
+        if entry.get('constraints'):
+            display += f"⚙️  Contraintes: {entry['constraints']}\n"
+        
+        display += "-"*70 + "\n\n"
+    
+    if len(history) > 20:
+        display += f"💡 {len(history) - 20} recettes plus anciennes disponibles\n"
+    
+    return display
+
+def get_recipe_by_id(self, recipe_id):
+    """Récupère une recette complète par son ID"""
+    history = self.get_history()
+    for entry in history:
+        if entry['id'] == recipe_id:
+            return entry['recipe_complete']
+    return "❌ Recette non trouvée"
+
+def clear_history(self):
+    """Efface l'historique"""
+    try:
+        if os.path.exists(self.recipes_file):
+            os.remove(self.recipes_file)
+        return "✅ Historique effacé avec succès !"
+    except:
+        return "❌ Erreur lors de l'effacement"
+
+
     
     def get_knowledge_summary(self):
         """Retourne un résumé de la base de connaissances"""
@@ -557,6 +637,9 @@ def create_interface():
                     outputs=recipe_output
                 )
             
+# Notification de sauvegarde
+                gr.Markdown("💡 *Votre recette sera automatiquement sauvegardée dans l'onglet Historique*")
+
             # TAB 2 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
                 knowledge_output = gr.Textbox(
@@ -565,8 +648,56 @@ def create_interface():
                     lines=40,
                     max_lines=60
                 )
-            
-            # TAB 3 : À propos
+# TAB 3 : Historique (NOUVEAU)
+            with gr.Tab("🕒 Historique"):
+                gr.HTML("<div class='info-card'><h2>📚 Vos recettes créées</h2></div>")
+                
+                with gr.Row():
+                    refresh_btn = gr.Button("🔄 Actualiser l'historique", variant="secondary")
+                    clear_btn = gr.Button("🗑️ Effacer l'historique", variant="stop")
+                
+                history_display = gr.Textbox(
+                    label="",
+                    value=agent.get_history_display(),
+                    lines=30,
+                    max_lines=50,
+                    interactive=False
+                )
+                
+                gr.Markdown("---")
+                
+                with gr.Row():
+                    recipe_id_input = gr.Number(
+                        label="🔍 Afficher la recette complète #",
+                        value=1,
+                        precision=0
+                    )
+                    load_recipe_btn = gr.Button("📖 Charger la recette", variant="primary")
+                
+                loaded_recipe = gr.Textbox(
+                    label="📖 Recette complète",
+                    lines=30,
+                    max_lines=50
+                )
+                
+                # Actions
+                refresh_btn.click(
+                    fn=agent.get_history_display,
+                    outputs=history_display
+                )
+                
+                clear_btn.click(
+                    fn=agent.clear_history,
+                    outputs=history_display
+                )
+                
+                load_recipe_btn.click(
+                    fn=agent.get_recipe_by_id,
+                    inputs=recipe_id_input,
+                    outputs=loaded_recipe
+                )            
+
+            # TAB 4 : À propos
             with gr.Tab("ℹ️ À propos"):
                 gr.Markdown("""
                 ## 🧀 Agent Fromager Intelligent
