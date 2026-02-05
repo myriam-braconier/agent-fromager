@@ -9,6 +9,9 @@ class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
     
     def __init__(self):
+        print(f"🔍 HF_TOKEN détecté : {'✅ OUI' if os.environ.get('HF_TOKEN') else '❌ NON'}")
+        print(f"🔍 Repo cible : {self.hf_repo}")
+        print(f"🔍 API initialisée : {'✅ OUI' if self.api else '❌ NON'}")
         self.rng = random.Random()
         self.knowledge_base = self._init_knowledge()
         self.recipes_file = 'recipes_history.json'
