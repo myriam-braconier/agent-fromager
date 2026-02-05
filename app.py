@@ -1924,7 +1924,8 @@ def create_interface():
         # ===== FONCTIONS POUR L'HISTORIQUE (DÉFINIES AVANT) =====
         def get_recipe_choices():
             """Retourne la liste des noms de recettes pour le Radio"""
-            if not agent.history:
+            # Vérifier si agent.history existe
+            if not hasattr(agent, 'history') or not agent.history:
                 return []
             
             choices = []
@@ -1942,7 +1943,7 @@ def create_interface():
         
         def show_selected_recipe(selected):
             """Affiche la recette complète sélectionnée"""
-            if not selected or not agent.history:
+            if not selected or not hasattr(agent, 'history') or not agent.history:
                 return "Aucune recette sélectionnée"
             
             # Extraire le numéro de la recette
@@ -1964,7 +1965,8 @@ def create_interface():
         
         def clear_history():
             """Efface l'historique"""
-            agent.clear_history()
+            if hasattr(agent, 'clear_history'):
+                agent.clear_history()
             return gr.Radio(choices=["Aucune recette sauvegardée"], value=None), ""
         
         # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
@@ -2009,9 +2011,12 @@ def create_interface():
                 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        # Liste des recettes - INITIALISÉE CORRECTEMENT
-                        initial_choices = get_recipe_choices()
-                        if not initial_choices:
+                        # Liste des recettes - INITIALISÉE AVEC GESTION D'ERREUR
+                        try:
+                            initial_choices = get_recipe_choices()
+                            if not initial_choices:
+                                initial_choices = ["Aucune recette sauvegardée"]
+                        except:
                             initial_choices = ["Aucune recette sauvegardée"]
                         
                         history_list = gr.Radio(
@@ -2137,6 +2142,7 @@ def create_interface():
         """)
     
     return demo
+
 if __name__ == "__main__":
     interface = create_interface()
     interface.launch()
