@@ -2136,17 +2136,43 @@ def create_interface():
             return "Erreur lors du chargement de la recette"
 
         def refresh_history():
-            """Actualise la liste des recettes"""
-            choices = get_recipe_choices()
-            if not choices:
-                return gr.update(choices=["Aucune recette sauvegardée"], value=None), ""
-            return gr.update(choices=choices, value=None), ""
+            """Actualise local + sync HF → État RÉEL"""
+            try:
+                # 1. SYNC HF → local (récupère effacements)
+                agent._download_history_from_hf()
+                
+                # 2. Charge local (maintenant sync)
+                agent_history = agent._load_history()
+                
+                if not agent_history:
+                    return ["Aucune recette sauvegardée"], agent.get_history_display()
+                
+                # 3. Formatte pour Gradio Radio
+                choices = [f"#{entry['id']} - {entry['cheese_name']} ({entry['date'][:10]})" 
+                        for entry in agent_history[-20:][::-1]]
+                
+                preview = agent.get_history_display()
+                return choices, preview
+            
+            except Exception as e:
+                return ["Erreur refresh"], f"❌ Erreur: {e}"
+
 
         def clear_history():
-            """Efface l'historique"""
-            if hasattr(agent, 'clear_history'):
-                agent.clear_history()
-            return gr.update(choices=["Aucune recette sauvegardée"], value=None), ""
+            """Efface local ET push vers HF"""
+            try:
+                # 1. Efface local
+                with open(agent.recipes_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+                
+                # 2. PUSH vide vers HF (efface sur HF aussi)
+                agent._upload_history_to_hf()
+                
+                # 3. Met à jour interface
+                return ["Aucune recette sauvegardée"], "✅ Historique effacé partout !"
+            
+            except Exception as e:
+                return ["Erreur"], f"❌ Erreur: {e}"
 
         # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
         with gr.Tabs():
