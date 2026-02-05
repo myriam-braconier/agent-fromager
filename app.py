@@ -1928,27 +1928,22 @@ def create_interface():
                     value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>"
                 )
             
-            # TAB Base de connaissances 
+            # TAB 3 : Base de connaissances - SANS ERREUR !
             with gr.Tab("📚 Base de connaissances"):
                 with gr.Row():
-                    gr.Column(scale=1): knowledge_btn = gr.Button("📖 Charger résumé COMPLET", variant="primary", size="lg")
-                    gr.Column(scale=3): knowledge_status = gr.Textbox(
-                            value="💡 Cliquez pour charger TOUS les types, épices, dosages, problèmes...",
-                            interactive=False
+                    knowledge_btn = gr.Button("📖 Charger résumé COMPLET", variant="primary")
+    
+            knowledge_output = gr.Textbox(
+                label="🧀 SAVOIR FROMAGÈRE COMPLET", 
+                lines=45, 
+                max_lines=60,
+                placeholder="Cliquez pour charger TOUS les types, épices, dosages..."
             )
     
-                knowledge_output = gr.Textbox(
-                    label="🧀 SAVOIR FROMAGÈRE COMPLET", 
-                    lines=45, 
-                    max_lines=60
-    )
-    
-    # ← TON MÉTHODE APPELEE UNIQUEMENT SUR CLIC
-                knowledge_btn.click(
-                    fn=agent.get_knowledge_summary,
-                    outputs=[knowledge_output, knowledge_status]
-    )
-
+            knowledge_btn.click(
+                fn=agent.get_knowledge_summary,  # ← TA MÉTHODE !
+                outputs=knowledge_output
+            )
 
             # ONGLET 4 : Historique
             with gr.Tab("🕒 Historique"):
