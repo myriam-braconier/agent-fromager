@@ -761,17 +761,17 @@ class AgentFromagerHF:
             return []
 
 
-def _extract_domain(self, url: str) -> str:
-    """Extrait le nom de domaine d'une URL"""
-    try:
-        from urllib.parse import urlparse
-        parsed = urlparse(url)
-        domain = parsed.netloc
-        # Retirer 'www.' et garder le domaine principal
-        domain = domain.replace('www.', '')
-        return domain
-    except:
-        return "web"
+    def _extract_domain(self, url: str) -> str:
+        """Extrait le nom de domaine d'une URL"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            # Retirer 'www.' et garder le domaine principal
+            domain = domain.replace('www.', '')
+            return domain
+        except:
+            return "web"
 
     
     # =====  MÉTHODE de validationICI =====
