@@ -1928,23 +1928,28 @@ def create_interface():
                     value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>"
                 )
             
-            # ONGLET 3 : Base de connaissances
+            # TAB Base de connaissances 
             with gr.Tab("📚 Base de connaissances"):
                 with gr.Row():
-                    knowledge_btn = gr.Button("📖 Charger la base complète", variant="primary")
+                    gr.Column(scale=1): knowledge_btn = gr.Button("📖 Charger résumé COMPLET", variant="primary", size="lg")
+                    gr.Column(scale=3): knowledge_status = gr.Textbox(
+                            value="💡 Cliquez pour charger TOUS les types, épices, dosages, problèmes...",
+                            interactive=False
+            )
+    
                 knowledge_output = gr.Textbox(
-                    label="🧀 Base de connaissances fromagère", 
-                    lines=40, 
-                    max_lines=60,
-                    placeholder="Cliquez 'Charger la base complète' pour afficher TOUT le savoir fromager..."
-)
-
+                    label="🧀 SAVOIR FROMAGÈRE COMPLET", 
+                    lines=45, 
+                    max_lines=60
+    )
+    
+    # ← TON MÉTHODE APPELEE UNIQUEMENT SUR CLIC
                 knowledge_btn.click(
-                    fn=agent.get_knowledge_summary,  # ← Fonctionne au CLIC uniquement
-                    outputs=knowledge_output
-)
+                    fn=agent.get_knowledge_summary,
+                    outputs=[knowledge_output, knowledge_status]
+    )
 
-            
+
             # ONGLET 4 : Historique
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
