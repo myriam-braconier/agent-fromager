@@ -688,10 +688,19 @@ class AgentFromagerHF:
         try:
             with open(self.recipes_file, 'w', encoding='utf-8') as f:
                 json.dump([], f)
-            self._upload_history_to_hf()
-            return "🗑️ Historique effacé avec succès."
+                
+            # ✅ AJOUTER CETTE LIGNE
+            self.history = []
+        
+            if self.api:
+                self._upload_history_to_hf()
+                return "✅ Historique effacé (local + HF) !"
+            else:
+                return "✅ Historique local effacé"
+        
         except Exception as e:
             return f"❌ Erreur: {e}"
+                
     
     # vérification connexion internet dans ta classe AgentFromagerHF
     def test_internet(self):
