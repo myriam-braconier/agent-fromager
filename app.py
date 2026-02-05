@@ -366,8 +366,8 @@ class AgentFromagerHF:
     
     def _download_history_from_hf(self):
         """Télécharge l'historique depuis HF Dataset"""
-    if not self.api:
-        print("⚠️  Pas de token HF - historique local uniquement")
+        if not self.api:
+            print("⚠️  Pas de token HF - historique local uniquement")
         return
     
     try:
@@ -395,7 +395,7 @@ def _upload_history_to_hf(self):
     """Upload l'historique vers HF Dataset"""
     if not self.api:
         print("⚠️  Pas de token HF - sauvegarde locale uniquement")
-        return False
+    return False
     
     try:
         self.api.upload_file(
@@ -409,7 +409,7 @@ def _upload_history_to_hf(self):
         return True
     except Exception as e:
         print(f"❌ Erreur upload HF: {e}")
-        return False
+    return False
 
 def _load_history(self):
     """Charge l'historique depuis le fichier local"""
