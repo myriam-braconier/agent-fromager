@@ -368,58 +368,56 @@ class AgentFromagerHF:
         """Télécharge l'historique depuis HF Dataset"""
         if not self.api:
             print("⚠️  Pas de token HF - historique local uniquement")
-        return
+            return
     
-    try:
-        downloaded_path = hf_hub_download(
-            repo_id=self.hf_repo,
-            filename=self.recipes_file,
-            repo_type="dataset",
-            token=self.hf_token
-        )
-        
-        with open(downloaded_path, 'r', encoding='utf-8') as src:
-            history = json.load(src)
-        
-        with open(self.recipes_file, 'w', encoding='utf-8') as dst:
-            json.dump(history, dst, indent=2, ensure_ascii=False)
-        
-        print(f"✅ Historique chargé : {len(history)} recettes")
-        
-    except Exception as e:
-        print(f"ℹ️  Pas d'historique existant: {e}")
-        with open(self.recipes_file, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-
-def _upload_history_to_hf(self):
-    """Upload l'historique vers HF Dataset"""
-    if not self.api:
-        print("⚠️  Pas de token HF - sauvegarde locale uniquement")
-    return False
-    
-    try:
-        self.api.upload_file(
-            path_or_fileobj=self.recipes_file,
-            path_in_repo=self.recipes_file,
-            repo_id=self.hf_repo,
-            repo_type="dataset",
-            commit_message=f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        )
-        print("✅ Historique synchronisé avec HF")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur upload HF: {e}")
-    return False
-
-def _load_history(self):
-    """Charge l'historique depuis le fichier local"""
-    if os.path.exists(self.recipes_file):
         try:
-            with open(self.recipes_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return []
-    return []
+            downloaded_path = hf_hub_download(
+                repo_id=self.hf_repo,
+                filename=self.recipes_file,
+                repo_type="dataset",
+                token=self.hf_token
+            )
+        
+            with open(downloaded_path, 'r', encoding='utf-8') as src:
+                history = json.load(src)
+        
+            with open(self.recipes_file, 'w', encoding='utf-8') as dst:
+                json.dump(history, dst, indent=2, ensure_ascii=False)
+        
+            print(f"✅ Historique chargé : {len(history)} recettes")
+        
+        except Exception as e:
+            print(f"ℹ️  Pas d'historique existant: {e}")
+            with open(self.recipes_file, 'w', encoding='utf-8') as f:json.dump([], f)
+
+    def _upload_history_to_hf(self):
+        """Upload l'historique vers HF Dataset"""
+        if not self.api:
+            print("⚠️  Pas de token HF - sauvegarde locale uniquement")
+            return False
+    
+        try:
+            self.api.upload_file(
+                path_or_fileobj=self.recipes_file,
+                path_in_repo=self.recipes_file,
+                repo_id=self.hf_repo,
+                repo_type="dataset",
+                commit_message=f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            )   
+            print("✅ Historique synchronisé avec HF")
+            return True
+        except Exception as e:
+            print(f"❌ Erreur upload HF: {e}")
+            return False
+
+    def _load_history(self):
+        """Charge l'historique depuis le fichier local"""
+        if os.path.exists(self.recipes_file):
+            try:
+                with open(self.recipes_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except:
+                return []
 
 def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
     """Sauvegarde une recette dans l'historique"""
