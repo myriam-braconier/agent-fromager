@@ -1009,12 +1009,17 @@ class AgentFromagerHF:
             with open(self.recipes_file, 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
             
-            sync_success = self._upload_history_to_hf()
-            
-            if sync_success:
-                print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
+            # ✅ FORCE RETRY HF (3 tentatives)
+            import time
+            for i in range(3):
+                sync_success = self._upload_history_to_hf()
+                if sync_success:
+                    print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
+                    break
+                print(f"⚠️  Tentative HF {i+1}/3...")
+                time.sleep(1)
             else:
-                print(f"⚠️  Recette #{entry['id']} sauvegardée localement")
+                print(f"⚠️  Recette #{entry['id']} sauvegardée localement (HF échoué)")
             
             return True
             
