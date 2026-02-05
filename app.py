@@ -1921,6 +1921,52 @@ def create_interface():
                 **Tout se remplit automatiquement !**
                 """)
         
+        # ===== FONCTIONS POUR L'HISTORIQUE (DÉFINIES AVANT) =====
+        def get_recipe_choices():
+            """Retourne la liste des noms de recettes pour le Radio"""
+            if not agent.history:
+                return []
+            
+            choices = []
+            for i, entry in enumerate(agent.history, 1):
+                # Extraire le nom de la recette (première ligne après "🧀")
+                lines = entry.split('\n')
+                recipe_name = "Recette sans nom"
+                for line in lines:
+                    if line.strip() and not line.startswith('---') and not line.startswith('📅'):
+                        recipe_name = line.strip()[:60]  # Limiter à 60 caractères
+                        break
+                choices.append(f"{i}. {recipe_name}")
+            
+            return choices
+        
+        def show_selected_recipe(selected):
+            """Affiche la recette complète sélectionnée"""
+            if not selected or not agent.history:
+                return "Aucune recette sélectionnée"
+            
+            # Extraire le numéro de la recette
+            try:
+                recipe_num = int(selected.split('.')[0]) - 1
+                if 0 <= recipe_num < len(agent.history):
+                    return agent.history[recipe_num]
+            except:
+                pass
+            
+            return "Erreur lors du chargement de la recette"
+        
+        def refresh_history():
+            """Actualise la liste des recettes"""
+            choices = get_recipe_choices()
+            if not choices:
+                return gr.Radio(choices=["Aucune recette sauvegardée"], value=None), ""
+            return gr.Radio(choices=choices), ""
+        
+        def clear_history():
+            """Efface l'historique"""
+            agent.clear_history()
+            return gr.Radio(choices=["Aucune recette sauvegardée"], value=None), ""
+        
         # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
         with gr.Tabs():
             # ONGLET 1 : Recette générée
@@ -1963,10 +2009,14 @@ def create_interface():
                 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        # Liste des recettes
+                        # Liste des recettes - INITIALISÉE CORRECTEMENT
+                        initial_choices = get_recipe_choices()
+                        if not initial_choices:
+                            initial_choices = ["Aucune recette sauvegardée"]
+                        
                         history_list = gr.Radio(
                             label="Sélectionnez une recette",
-                            choices=[],
+                            choices=initial_choices,
                             interactive=True
                         )
                         
@@ -1982,51 +2032,6 @@ def create_interface():
                             max_lines=50,
                             placeholder="Sélectionnez une recette dans la liste pour la voir en détail..."
                         )
-                
-                # Fonction pour obtenir la liste des recettes
-                def get_recipe_choices():
-                    """Retourne la liste des noms de recettes pour le Radio"""
-                    if not agent.history:
-                        return gr.Radio(choices=["Aucune recette sauvegardée"])
-                    
-                    choices = []
-                    for i, entry in enumerate(agent.history, 1):
-                        # Extraire le nom de la recette (première ligne après "🧀")
-                        lines = entry.split('\n')
-                        recipe_name = "Recette sans nom"
-                        for line in lines:
-                            if line.strip() and not line.startswith('---') and not line.startswith('📅'):
-                                recipe_name = line.strip()
-                                break
-                        choices.append(f"{i}. {recipe_name}")
-                    
-                    return gr.Radio(choices=choices)
-                
-                # Fonction pour afficher la recette sélectionnée
-                def show_selected_recipe(selected):
-                    """Affiche la recette complète sélectionnée"""
-                    if not selected or selected == "Aucune recette sauvegardée":
-                        return "Aucune recette sélectionnée"
-                    
-                    # Extraire le numéro de la recette
-                    try:
-                        recipe_num = int(selected.split('.')[0]) - 1
-                        if 0 <= recipe_num < len(agent.history):
-                            return agent.history[recipe_num]
-                    except:
-                        pass
-                    
-                    return "Erreur lors du chargement de la recette"
-                
-                # Fonction pour actualiser et effacer
-                def refresh_history():
-                    """Actualise la liste des recettes"""
-                    return get_recipe_choices(), ""
-                
-                def clear_history():
-                    """Efface l'historique"""
-                    agent.clear_history()
-                    return gr.Radio(choices=["Aucune recette sauvegardée"]), ""
                 
                 # Connecter les événements
                 refresh_btn.click(
@@ -2132,7 +2137,6 @@ def create_interface():
         """)
     
     return demo
-
 if __name__ == "__main__":
     interface = create_interface()
     interface.launch()
