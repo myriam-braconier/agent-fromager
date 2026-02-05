@@ -453,7 +453,6 @@ class AgentFromagerHF:
             print(f"❌ Erreur sauvegarde: {e}")
             return False
 
-
     def get_knowledge_summary(self):
         """Retourne un résumé complet de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
@@ -635,43 +634,49 @@ class AgentFromagerHF:
         
         return summary
     
+    def get_history_display(self):
+        """Retourne l'historique formaté pour affichage"""
+        try:
+            history = self._load_history()
+
+            if not history:
+                return "📭 Aucune recette sauvegardée pour le moment."
+
+            display = f"📚 **{len(history)} recette(s) sauvegardée(s)**\n\n"
+            display += "---\n\n"
+
+            for entry in reversed(history[-10:]):  # 10 dernières recettes
+                display += f"**#{entry['id']}** | 📅 {entry['timestamp']}\n"
+                display += f"🧀 Type: {entry['cheese_type']}\n"
+
+                ing = entry['ingredients']
+                if isinstance(ing, list):
+                    ing = ', '.join(str(i) for i in ing)  # ✅ CORRECT !
+                elif isinstance(ing, str):
+                    ing = ing[:50]  # Limite si déjà string
+
+                display += f"🥛 Ingrédients: {ing[:50]}...\n"
+
+                if entry.get('constraints'):
+                    display += f"⚙️ Contraintes: {entry['constraints']}\n"
+
+                display += "\n---\n\n"
+
+            return display
+
+        except Exception as e:
+            return f"❌ Erreur lecture historique: {e}"
 
 
-def get_history_display(self):
-    """Retourne l'historique formaté pour affichage"""
-    try:
-        history = self._load_history()
-        
-        if not history:
-            return "📭 Aucune recette sauvegardée pour le moment."
-        
-        display = f"📚 **{len(history)} recette(s) sauvegardée(s)**\n\n"
-        display += "---\n\n"
-        
-        for entry in reversed(history[-10:]):  # 10 dernières recettes
-            display += f"**#{entry['id']}** | 📅 {entry['timestamp']}\n"
-            display += f"🧀 Type: {entry['cheese_type']}\n"
-            ing = entry['ingredients']
-            if isinstance(ing, list):
-                ing = ', '.join(ing)
-            display += f"🥛 Ingrédients: {ing[:50]}...\n"
-            if entry.get('constraints'):
-                display += f"⚙️ Contraintes: {entry['constraints']}\n"
-            display += "\n---\n\n"
-        
-        return display
-    except Exception as e:
-        return f"❌ Erreur lecture historique: {e}"
-
-def clear_history(self):
-    """Efface tout l'historique"""
-    try:
-        with open(self.recipes_file, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-        self._upload_history_to_hf()
-        return "🗑️ Historique effacé avec succès."
-    except Exception as e:
-        return f"❌ Erreur: {e}"
+    def clear_history(self):
+        """Efface tout l'historique"""
+        try:
+            with open(self.recipes_file, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+            self._upload_history_to_hf()
+            return "🗑️ Historique effacé avec succès."
+        except Exception as e:
+            return f"❌ Erreur: {e}"
     
     # vérification connexion internet dans ta classe AgentFromagerHF
     def test_internet(self):
@@ -683,77 +688,78 @@ def clear_history(self):
         except Exception as  e:
             return f"❌ Erreur d'accès Internet:\n{str(e)}"
         
-def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
-    """Scrape le web pour trouver 6 recettes de fromage"""
+    def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
+        """Scrape le web pour trouver 6 recettes de fromage"""
     
-    # Construire la requête de recherche
-    ingredients_clean = ingredients.replace(',', ' ')
-    query = f"recette fromage {cheese_type} {ingredients_clean}"
+        # Construire la requête de recherche
+        ingredients_clean = ingredients.replace(',', ' ')
+        query = f"recette fromage {cheese_type} {ingredients_clean}"
+
+        recipes = []
+
+        try:
+            from duckduckgo_search import DDGS
     
-    recipes = []
+            print(f"🔍 Recherche web : {query}")
     
-    try:
-        from duckduckgo_search import DDGS
-        
-        print(f"🔍 Recherche web : {query}")
-        
-        # Recherche avec DuckDuckGo (gratuit, pas d'API key)
-        ddg = DDGS()
-        search_results = ddg.text(
-            keywords=query,
-            region='fr-fr',
-            safesearch='off',
-            max_results=max_results * 3  # Chercher plus pour filtrer
+            # Recherche avec DuckDuckGo (gratuit, pas d'API key)
+            ddg = DDGS()
+            search_results = ddg.text(
+                keywords=query,
+                region='fr-fr',
+                safesearch='off',
+                max_results=max_results * 3  # Chercher plus pour filtrer
         )
-        
-        # Filtrer les résultats pertinents
-        seen_domains = set()
-        
-        for result in search_results:
-            # Extraire les infos
-            url = result.get('href') or result.get('link', '')
-            title = result.get('title', 'Sans titre')
-            description = result.get('body', '') or result.get('description', '')
-            
-            if not url:
-                continue
-            
-            # Extraire le domaine
-            domain = self._extract_domain(url)
-            
-            # Éviter les doublons du même site
-            if domain in seen_domains:
-                continue
-            
-            # Filtrer les sites de recettes connus + blogs culinaires
-            relevant_sites = [
-                'marmiton', '750g', 'cuisineaz', 'journaldesfemmes',
-                'ricardocuisine', 'ptitchef', 'supertoinette',
-                'cuisine-facile', 'recette', 'blog', 'chef',
-                'fromage', 'gastronomie', 'cuisine'
-            ]
-            
-            if any(site in url.lower() or site in domain.lower() for site in relevant_sites):
-                recipes.append({
-                    'title': title,
-                    'url': url,
-                    'description': description[:250] + "..." if len(description) > 250 else description,
-                    'source': domain
-                })
-                
-                seen_domains.add(domain)
-                
-                if len(recipes) >= max_results:
-                    break
-        
-        print(f"✅ Trouvé {len(recipes)} recettes web")
-        return recipes[:max_results]
     
-    except Exception as e:
-        print(f"❌ Erreur recherche web: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
+            # Filtrer les résultats pertinents
+            seen_domains = set()
+
+            for result in search_results:
+                # Extraire les infos
+                url = result.get('href') or result.get('link', '')
+                title = result.get('title', 'Sans titre')
+                description = result.get('body', '') or result.get('description', '')
+        
+                if not url:
+                    continue
+        
+                # Extraire le domaine
+                domain = self._extract_domain(url)
+        
+                # Éviter les doublons du même site
+                if domain in seen_domains:
+                    continue
+        
+                # Filtrer les sites de recettes connus + blogs culinaires
+                relevant_sites = [
+                    'marmiton', '750g', 'cuisineaz', 'journaldesfemmes',
+                    'ricardocuisine', 'ptitchef', 'supertoinette',
+                    'cuisine-facile', 'recette', 'blog', 'chef',
+                    'fromage', 'gastronomie', 'cuisine'
+                ]
+        
+                if any(site in url.lower() or site in domain.lower() for site in relevant_sites):
+                    recipes.append({
+                        'title': title,
+                        'url': url,
+                        'description': description[:250] + "..." if len(description) > 250 else description,
+                        'source': domain
+                    })
+                
+                    seen_domains.add(domain)
+                
+                    if len(recipes) >= max_results:
+                        break
+    
+            print(f"✅ Trouvé {len(recipes)} recettes web")
+            return recipes[:max_results]
+    
+        except Exception as e:
+            print(f"❌ Erreur recherche web: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
 
 def _extract_domain(self, url: str) -> str:
     """Extrait le nom de domaine d'une URL"""
@@ -766,6 +772,7 @@ def _extract_domain(self, url: str) -> str:
         return domain
     except:
         return "web"
+
     
     # =====  MÉTHODE de validationICI =====
     def _validate_combination(self, lait: str, type_pate: str, aromates: list = None) -> tuple:
