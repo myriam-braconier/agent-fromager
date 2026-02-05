@@ -719,169 +719,122 @@ class AgentFromagerHF:
             return f"✅ Internet fonctionne !\n\nStatus: {response.status_code}\nURL testée: https://httpbin.org/get"
         except Exception as  e:
             return f"❌ Erreur d'accès Internet:\n{str(e)}"
+    
     def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
-        """Scrape le web pour trouver des recettes de fromage - VERSION AMÉLIORÉE"""
+        """Recherche web - COMPATIBLE HF SPACES"""
     
         recipes = []
         
         try:
-            from duckduckgo_search import DDGS
+            import requests
+            from urllib.parse import quote
+            from bs4 import BeautifulSoup
             
-            # ===== 1. CONSTRUIRE DES REQUÊTES MULTIPLES =====
-            # Au lieu d'une seule requête, en faire plusieurs pour plus de résultats
-            
-            ingredients_clean = ingredients.replace(',', ' ')
-            
-            queries = []
-            
-            # Requête principale
+            # Construire la requête
+            query = f"recette fromage {ingredients}"
             if cheese_type and cheese_type != "Laissez l'IA choisir":
-                queries.append(f"recette {cheese_type} {ingredients_clean}")
-                queries.append(f"fabrication {cheese_type} maison")
-            else:
-                queries.append(f"recette fromage {ingredients_clean}")
+                query = f"recette {cheese_type} {ingredients}"
             
-            # Requêtes par ingrédient principal
-            main_ingredients = [ing.strip() for ing in ingredients.split(',')[:2]]  # 2 premiers
-            for ing in main_ingredients:
-                if ing and len(ing) > 3:
-                    queries.append(f"fromage {ing} recette")
+            print(f"🔍 Recherche DuckDuckGo HTML : {query}")
             
-            # Requête artisanale
-            queries.append(f"fromage artisanal maison {ingredients_clean}")
+            # ✅ Utiliser DuckDuckGo HTML (non bloqué)
+            url = f"https://html.duckduckgo.com/html/?q={quote(query)}"
             
-            print(f"🔍 Recherche avec {len(queries)} requêtes différentes")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
             
-            # ===== 2. RECHERCHE MULTIPLE AVEC DUCKDUCKGO =====
-            ddg = DDGS()
-            seen_urls = set()  # Éviter les doublons
-            seen_domains = set()
+            response = requests.get(url, headers=headers, timeout=15)
             
-            for query in queries[:3]:  # Limiter à 3 requêtes pour ne pas spammer
-                try:
-                    print(f"   → Recherche : {query}")
-                    
-                    search_results = ddg.text(
-                        keywords=query,
-                        region='fr-fr',
-                        safesearch='off',
-                        max_results=10  # Plus de résultats par requête
-                    )
-                    
-                    for result in search_results:
-                        url = result.get('href') or result.get('link', '')
-                        title = result.get('title', 'Sans titre')
-                        description = result.get('body', '') or result.get('description', '')
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Parser les résultats
+                results = soup.find_all('div', class_='result')
+                
+                print(f"   ✓ {len(results)} résultats trouvés")
+                
+                seen_urls = set()
+                blocked_sites = ['youtube', 'pinterest', 'instagram', 'facebook', 'amazon']
+                
+                for result in results[:max_results * 3]:
+                    try:
+                        # Extraire le lien
+                        link_tag = result.find('a', class_='result__a')
+                        url_tag = result.find('a', class_='result__url')
                         
-                        if not url or url in seen_urls:
+                        if not link_tag or not url_tag:
                             continue
                         
-                        # Extraire le domaine
-                        domain = self._extract_domain(url)
+                        title = link_tag.get_text(strip=True)
+                        url_href = url_tag.get('href', '')
                         
-                        # ===== 3. FILTRAGE INTELLIGENT =====
+                        # Nettoyer l'URL (DuckDuckGo utilise des redirections)
+                        if url_href.startswith('//duckduckgo.com'):
+                            import re
+                            match = re.search(r'uddg=([^&]+)', url_href)
+                            if match:
+                                from urllib.parse import unquote
+                                clean_url = unquote(match.group(1))
+                            else:
+                                continue
+                        else:
+                            clean_url = url_href
                         
-                        # Sites de recettes prioritaires (score élevé)
-                        priority_sites = [
-                            'marmiton', '750g', 'cuisineaz', 'ricardocuisine',
-                            'ptitchef', 'cuisine-facile', 'chefsimon', 'hervecuisine',
-                            'lasantedanslassiette', 'supertoinette', 'auxdelicesdupalais'
-                        ]
-                        
-                        # Sites fromagers spécialisés (score très élevé)
-                        cheese_sites = [
-                            'fromage', 'fromagerie', 'laiterie', 'fermier',
-                            'artisan', 'cheese', 'dairy'
-                        ]
-                        
-                        # Sites à éviter
-                        blocked_sites = [
-                            'youtube', 'pinterest', 'instagram', 'facebook',
-                            'amazon', 'ebay', 'shopping', 'pub', 'ad'
-                        ]
-                        
-                        # Vérifier si le site est bloqué
-                        if any(blocked in url.lower() or blocked in domain.lower() 
-                            for blocked in blocked_sites):
+                        # Filtrer les sites bloqués
+                        if any(blocked in clean_url.lower() for blocked in blocked_sites):
                             continue
                         
-                        # Vérifier pertinence du contenu
-                        content_lower = (title + ' ' + description).lower()
-                        
-                        # Mots-clés fromagers obligatoires
-                        cheese_keywords = ['fromage', 'cheese', 'lait', 'caillé', 'présure', 'affinage']
-                        has_cheese_keyword = any(kw in content_lower for kw in cheese_keywords)
-                        
-                        if not has_cheese_keyword:
+                        # Éviter les doublons
+                        if clean_url in seen_urls:
                             continue
                         
-                        # ===== 4. SCORING DES RÉSULTATS =====
-                        score = 0
+                        # Vérifier pertinence
+                        if not any(kw in title.lower() for kw in ['fromage', 'cheese', 'recette', 'recipe']):
+                            continue
                         
-                        # Bonus pour sites prioritaires
-                        if any(site in domain.lower() or site in url.lower() 
-                            for site in priority_sites):
-                            score += 10
+                        # Extraire la description
+                        snippet_tag = result.find('a', class_='result__snippet')
+                        description = snippet_tag.get_text(strip=True) if snippet_tag else "Recette de fromage"
                         
-                        # Bonus énorme pour sites fromagers
-                        if any(site in domain.lower() or site in url.lower() 
-                            for site in cheese_sites):
-                            score += 20
+                        recipes.append({
+                            'title': title,
+                            'url': clean_url,
+                            'description': description[:200],
+                            'source': self._extract_domain(clean_url),
+                            'score': 10
+                        })
                         
-                        # Bonus pour type de fromage dans le titre
-                        if cheese_type and cheese_type.lower() in title.lower():
-                            score += 15
+                        seen_urls.add(clean_url)
                         
-                        # Bonus pour ingrédients dans le titre
-                        for ing in main_ingredients:
-                            if ing.lower() in title.lower():
-                                score += 5
+                        print(f"      ✓ Ajouté : {title[:50]}...")
                         
-                        # Bonus pour mots-clés "maison", "artisan", "facile"
-                        if any(kw in content_lower for kw in ['maison', 'artisan', 'facile', 'diy']):
-                            score += 5
-                        
-                        # Éviter trop de résultats du même domaine
-                        if domain in seen_domains:
-                            score -= 10
-                        
-                        # ===== 5. AJOUTER SI SCORE SUFFISANT =====
-                        if score >= 5:  # Seuil minimal
-                            recipes.append({
-                                'title': title,
-                                'url': url,
-                                'description': self._clean_description(description),
-                                'source': domain,
-                                'score': score  # Pour trier par pertinence
-                            })
-                            
-                            seen_urls.add(url)
-                            seen_domains.add(domain)
-                            
-                            print(f"   ✓ Ajouté : {title[:50]}... (score: {score})")
-                        
-                        # Arrêter si on a assez de résultats
-                        if len(recipes) >= max_results * 2:
+                        if len(recipes) >= max_results:
                             break
-                    
-                except Exception as e:
-                    print(f"   ⚠️ Erreur sur requête '{query}': {e}")
-                    continue
+                            
+                    except Exception as e:
+                        print(f"      ⚠️ Erreur parsing : {e}")
+                        continue
+                
+                if recipes:
+                    print(f"✅ DuckDuckGo HTML : {len(recipes)} recettes trouvées")
+                    return recipes
+                else:
+                    print("⚠️ Aucun résultat pertinent, utilisation de la base de secours")
+                    return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
             
-            # ===== 6. TRIER PAR SCORE ET LIMITER =====
-            recipes.sort(key=lambda x: x['score'], reverse=True)
-            recipes = recipes[:max_results]
-            
-            print(f"✅ {len(recipes)} recettes trouvées (sur {len(seen_urls)} résultats)")
-            
-            return recipes
+            else:
+                print(f"⚠️ Erreur HTTP {response.status_code}")
+                return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
         
         except Exception as e:
-            print(f"❌ Erreur recherche web globale: {e}")
+            print(f"❌ Erreur recherche web : {e}")
             import traceback
             traceback.print_exc()
-            return []
-
+            
+            # Fallback
+            print("🔄 Utilisation de la base de secours")
+            return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
 
     def _clean_description(self, description: str) -> str:
         """Nettoie et formate la description"""
