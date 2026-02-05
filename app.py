@@ -725,7 +725,7 @@ class AgentFromagerHF:
         recipes = []
         
         try:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
             
             # ===== 1. CONSTRUIRE DES REQUÊTES MULTIPLES =====
             # Au lieu d'une seule requête, en faire plusieurs pour plus de résultats
