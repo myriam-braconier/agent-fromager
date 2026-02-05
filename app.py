@@ -2080,7 +2080,7 @@ def create_interface():
         
         # ===== FONCTIONS LOCALES =====
         def load_history():
-            """Charge l'historique avec résumé détaillé"""
+            """Charge l'historique avec résumé détaillé - FORMAT UNIFORME"""
             print("🔍 DEBUG: load_history() appelé")
             
             try:
@@ -2100,51 +2100,62 @@ def create_interface():
                     print("   → Historique vide")
                     return "📭 Aucune recette sauvegardée", []
                 
-                # Créer les choix pour le dropdown
+                # ✅ CRÉER LES CHOIX AVEC FORMAT UNIFORME
                 choices = []
-                for entry in history[-20:][::-1]:  # 20 dernières, ordre inverse
+                for i, entry in enumerate(history[-20:][::-1], 1):  # Ordre inverse, numérotation 1,2,3...
                     cheese_name = entry.get('cheese_name', 'Sans nom')
-                    id_num = entry.get('id', 0)
-                    date = entry.get('date', '')[:10] if entry.get('date') else ''
+                    date = entry.get('date', '').split('T')[0] if entry.get('date') else ''
                     
+                    # FORMAT UNIFORME : "N. NOM (DD/MM/YYYY)"
                     if date:
-                        choice_text = f"#{id_num} - {cheese_name} ({date})"
+                        # Convertir 2026-02-05 → 05/02/2026
+                        try:
+                            year, month, day = date.split('-')
+                            date_formatted = f"{day}/{month}/{year}"
+                            choice_text = f"{i}. {cheese_name} ({date_formatted})"
+                        except:
+                            choice_text = f"{i}. {cheese_name}"
                     else:
-                        choice_text = f"#{id_num} - {cheese_name}"
+                        choice_text = f"{i}. {cheese_name}"
                     
                     choices.append(choice_text)
                 
-                print(f"   ✅ Choices créés: {len(choices)} recettes")
+                print(f"   ✅ Choices créés: {choices}")
                 
                 # ✅ CRÉER UN RÉSUMÉ DÉTAILLÉ
-                summary = f"📚 {len(history)} recette(s) sauvegardée(s)\n"
-                summary += "═" * 60 + "\n\n"
-                summary += "🧀 DERNIÈRES RECETTES :\n\n"
+                summary = "╔══════════════════════════════════════════════════════════╗\n"
+                summary += f"║   📚 HISTORIQUE : {len(history)} RECETTE(S) SAUVEGARDÉE(S)   \n"
+                summary += "╚══════════════════════════════════════════════════════════╝\n\n"
                 
                 # Afficher les 10 dernières recettes
-                for entry in history[-10:][::-1]:
+                for i, entry in enumerate(history[-10:][::-1], 1):
                     try:
                         cheese_name = entry.get('cheese_name', 'Sans nom')
                         id_num = entry.get('id', 0)
-                        date = entry.get('date', '')[:16] if entry.get('date') else 'Date inconnue'
+                        date = entry.get('date', '').split('T')[0] if entry.get('date') else '????-??-??'
                         ingredients = entry.get('ingredients', [])
                         cheese_type = entry.get('type', 'Type inconnu')
                         
-                        summary += f"#{id_num} - {cheese_name}\n"
-                        summary += f"   📅 {date}\n"
-                        summary += f"   🧀 Type: {cheese_type}\n"
+                        summary += f"🧀 {i}. {cheese_name}\n"
+                        summary += f"    ├─ ID: #{id_num}\n"
+                        summary += f"    ├─ 📅 {date}\n"
+                        summary += f"    ├─ 🧈 {cheese_type}\n"
                         
-                        # Afficher les 3 premiers ingrédients
                         if ingredients:
-                            ing_preview = ', '.join(ingredients[:3])
+                            ing_str = ', '.join(ingredients[:3])
                             if len(ingredients) > 3:
-                                ing_preview += f"... (+{len(ingredients)-3})"
-                            summary += f"   🥛 {ing_preview}\n"
+                                ing_str += f" ... (+{len(ingredients)-3})"
+                            summary += f"    └─ 🥛 {ing_str}\n"
+                        else:
+                            summary += f"    └─ 🥛 Ingrédients non disponibles\n"
                         
-                        summary += "─" * 60 + "\n\n"
+                        summary += "\n"
                     except Exception as e:
                         print(f"   ⚠️ Erreur sur une entrée: {e}")
                         continue
+                
+                if len(history) > 10:
+                    summary += f"\n💡 {len(history)-10} recette(s) plus ancienne(s) disponible(s) dans le dropdown\n"
                 
                 return summary, choices
                 
@@ -2152,16 +2163,49 @@ def create_interface():
                 print(f"❌ Erreur load_history: {e}")
                 import traceback
                 traceback.print_exc()
-                return f"❌ Erreur: {str(e)}", []
+                return f"❌ Erreur: {str(e)}", []       
+        
         def show_recipe_select(choice):
-            """Affiche la recette sélectionnée"""
+            """Affiche la recette sélectionnée - COMPATIBLE AVEC NOUVEAU FORMAT"""
             if not choice:
                 return ""
+            
+            print(f"🔍 Sélection: {choice}")
+            
             try:
-                id_num = int(choice.split('#')[1].split('-')[0])
-                return agent.get_recipe_by_id(id_num)
-            except:
-                return "❌ Erreur chargement recette"
+                # Extraire le numéro (format: "1. NOM (DATE)")
+                num_str = choice.split('.')[0].strip()
+                position = int(num_str)
+                
+                print(f"   → Position extraite: {position}")
+                
+                # Charger l'historique
+                if hasattr(agent, 'history') and agent.history:
+                    history = agent.history
+                elif os.path.exists(agent.recipes_file):
+                    with open(agent.recipes_file, 'r', encoding='utf-8') as f:
+                        history = json.load(f)
+                else:
+                    return "❌ Historique introuvable"
+                
+                # Récupérer la recette (position est 1-indexed, liste est 0-indexed)
+                # Les recettes sont affichées en ordre inverse
+                reversed_history = history[-20:][::-1]
+                
+                if position > 0 and position <= len(reversed_history):
+                    entry = reversed_history[position - 1]
+                    recipe = entry.get('recipe_complete', '')
+                    print(f"   ✅ Recette trouvée: {len(recipe)} caractères")
+                    return recipe
+                else:
+                    print(f"   ❌ Position {position} hors limites")
+                    return f"❌ Recette #{position} introuvable"
+                
+            except Exception as e:
+                print(f"❌ ERREUR show_recipe_select: {e}")
+                import traceback
+                traceback.print_exc()
+                return f"❌ Erreur: {str(e)}"
 
         def agent_clear_history():
             """Efface l'historique"""
