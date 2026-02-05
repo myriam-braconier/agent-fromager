@@ -825,6 +825,7 @@ class AgentFromagerHF:
         """Télécharge l'historique depuis HF Dataset"""
         if not self.api:
             print("⚠️  Pas de token HF - historique local uniquement")
+            self.history = [] 
             return
         
         try:
@@ -1882,7 +1883,7 @@ def create_interface():
     ... (ton CSS)
     """
     
-    with gr.Blocks(title="🧀 Agent Fromager", theme=fromage_theme, css=custom_css) as demo:
+    with gr.Blocks(title="🧀 Agent Fromager") as demo:
         
         gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
@@ -1963,13 +1964,14 @@ def create_interface():
         # ===== FONCTIONS POUR L'HISTORIQUE (DÉFINIES AVANT) =====
         def get_recipe_choices():
             """Retourne la liste des noms de recettes pour le Radio"""
+            
             # Vérifier si agent.history existe
             if not hasattr(agent, 'history') or not agent.history:
                 return []
             
             choices = []
-            for i, entry in enumerate(agent.history, 1):  # ✅ AJOUTER CETTE LIGNE
-                # ✅ CORRECTION : entry est un DICT, pas une string
+            for i, entry in enumerate(agent.history, 1):
+                # CORRECTION : entry est un DICT, pas une string
                 if isinstance(entry, dict):
                     # Extraire le nom depuis le dictionnaire
                     cheese_name = entry.get('cheese_name', 'Recette sans nom')
@@ -2011,7 +2013,7 @@ def create_interface():
                 if 0 <= recipe_num < len(agent.history):
                     entry = agent.history[recipe_num]
                     
-                    # ✅ CORRECTION : entry est un DICT
+                    # CORRECTION : entry est un DICT
                     if isinstance(entry, dict):
                         # Retourner la recette complète depuis le dict
                         return entry.get('recipe_complete', 'Recette non disponible')
@@ -2027,15 +2029,15 @@ def create_interface():
             """Actualise la liste des recettes"""
             choices = get_recipe_choices()
             if not choices:
-                return gr.Radio(choices=["Aucune recette sauvegardée"], value=None), ""
-            return gr.Radio(choices=choices), ""
-        
+                return gr.update(choices=["Aucune recette sauvegardée"], value=None), ""
+            return gr.update(choices=choices, value=None), ""
+
         def clear_history():
             """Efface l'historique"""
             if hasattr(agent, 'clear_history'):
                 agent.clear_history()
-            return gr.Radio(choices=["Aucune recette sauvegardée"], value=None), ""
-        
+            return gr.update(choices=["Aucune recette sauvegardée"], value=None), ""
+
         # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
         with gr.Tabs():
             # ONGLET 1 : Recette générée
@@ -2048,7 +2050,7 @@ def create_interface():
                 )
             
             # ONGLET 2 : Recherche web
-            with gr.Tab("🌐 Recettes Web (6)"):
+            with gr.Tab("🌐 Recettes Web"):
                 search_status = gr.HTML(label="Statut", value="")
                 web_results = gr.HTML(
                     label="Résultats",
@@ -2128,7 +2130,7 @@ def create_interface():
                 test_output = gr.Textbox(lines=5)
                 test_btn.click(fn=agent.test_internet, outputs=test_output)
         
-        # ===== FONCTION QUI GÉNÈRE LES DEUX EN PARALLÈLE =====
+        # ===== FONCTION QUI GÉNÈRE LES DEUX recherches EN PARALLÈLE =====
         def generate_all(ingredients, cheese_type, constraints, 
                         creativity, texture, affinage, spice):
             """Génère recette locale + recherche web simultanément"""
@@ -2140,15 +2142,11 @@ def create_interface():
             )
             
             # 2. Rechercher sur le web
-            status_html = """
-            <div class="search-status">
-                🔍 Recherche en cours...
-            </div>
-            """
-            
             web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
             
             if not web_recipes:
+                history_choices, _ = refresh_history()
+                
                 return recipe, """
                 <div class="search-status">
                     ✅ Recherche terminée
@@ -2183,6 +2181,10 @@ def create_interface():
                     </a>
                 </div>
                 """
+                
+                
+            # ✅ AJOUTER CETTE LIGNE
+            history_choices, _ = refresh_history()
             
             return recipe, "", cards_html
         
@@ -2210,6 +2212,508 @@ def create_interface():
     
     return demo
 
+# ========================================
+# LANCEMENT DE L'APPLICATION
+# ========================================
 if __name__ == "__main__":
+    # 🧀 THÈME FROMAGER - Couleurs chaudes et gourmandes
+    fromage_theme = gr.themes.Soft(
+        primary_hue="amber",      # Jaune doré comme un fromage affiné
+        secondary_hue="orange",   # Orange crémeux
+        neutral_hue="stone",      # Beige pierre comme une cave à fromage
+        font=gr.themes.GoogleFont("Quicksand"),  # Police ronde et douce
+    ).set(
+        # Couleurs primaires
+        body_background_fill="#FFF9E6",           # Crème légère
+        body_background_fill_dark="#2C2416",      # Marron cave sombre
+        
+        # Boutons
+        button_primary_background_fill="#FF8F00",      # Orange fromage
+        button_primary_background_fill_hover="#FF6F00", # Orange plus foncé
+        button_primary_text_color="#FFFFFF",
+        
+        # Inputs
+        input_background_fill="#FFFBF0",          # Blanc crémeux
+        input_border_color="#FFB74D",             # Bordure orange douce
+        
+        # Tabs
+        block_label_text_color="#E65100",         # Orange foncé
+        block_title_text_color="#BF360C",         # Marron fromage affiné
+    )
+    
+    # 🎨 CSS PERSONNALISÉ - Design fromager gourmand
+    custom_css = """
+    <style>
+        /* ===== GLOBAL ===== */
+        * {
+            font-family: 'Quicksand', sans-serif !important;
+        }
+        
+        /* Fond général avec texture fromage */
+        .gradio-container {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%) !important;
+        }
+        
+        /* ===== TEXTE MARKDOWN - LISIBLE ===== */
+        .prose, .markdown, p, li, span, label, .gr-box, div {
+            color: #3E2723 !important;
+        }
+        
+        /* En-tête avec ombre fromagère */
+        h1, h2, h3 {
+            color: #BF360C !important;
+            text-shadow: 2px 2px 4px rgba(191, 54, 12, 0.2);
+            font-weight: 700 !important;
+        }
+        
+        /* Texte dans les zones d'information */
+        .gr-prose p, .gr-prose li {
+            color: #4E342E !important;
+            font-size: 1.05em !important;
+        }
+        
+        /* Labels des champs */
+        label {
+            color: #5D4037 !important;
+            font-weight: 600 !important;
+        }
+        
+        /* ===== ONGLETS - FOND OPAQUE ===== */
+        .tabitem, .tab-nav, [role="tabpanel"] {
+            background: #FFFBF0 !important;
+            border-radius: 12px !important;
+            padding: 20px !important;
+        }
+        
+        .tab-content {
+            background: #FFFBF0 !important;
+            padding: 20px !important;
+        }
+        
+        .tabs {
+            background: transparent !important;
+        }
+        
+        .tab-nav {
+            background: transparent !important;
+            border-bottom: 3px solid #FFE0B2 !important;
+            padding: 0 !important;
+        }
+        
+        .tab-nav button {
+            background: #FFF3E0 !important;
+            color: #5D4037 !important;
+            border: 2px solid #FFE0B2 !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+            padding: 12px 24px !important;
+            margin: 0 4px !important;
+            border-radius: 12px 12px 0 0 !important;
+        }
+        
+        .tab-nav button:hover {
+            background: #FFE0B2 !important;
+            border-color: #FF8F00 !important;
+            color: #3E2723 !important;
+        }
+        
+        .tab-nav button.selected, .tab-nav button[aria-selected="true"] {
+            background: linear-gradient(135deg, #FF8F00 0%, #F57C00 100%) !important;
+            color: white !important;
+            border-color: #E65100 !important;
+            box-shadow: 0 4px 12px rgba(230, 81, 0, 0.3) !important;
+        }
+        
+        /* ===== DROPDOWN / MENU DÉROULANT - CORRECTION COMPLÈTE ===== */
+        
+        /* Le champ dropdown lui-même */
+        select, 
+        .gr-dropdown, 
+        .dropdown,
+        .svelte-1gfkn6j,
+        [data-testid="dropdown"] {
+            background: #FFFBF0 !important;
+            color: #3E2723 !important;
+            border: 2px solid #FFE0B2 !important;
+            border-radius: 12px !important;
+            padding: 10px 16px !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Texte du dropdown sélectionné */
+        .gr-dropdown input,
+        .dropdown input,
+        .svelte-1gfkn6j input {
+            background: #FFFBF0 !important;
+            color: #3E2723 !important;
+        }
+        
+        /* Menu déroulant ouvert */
+        .gr-dropdown ul,
+        .dropdown-menu,
+        ul[role="listbox"],
+        .svelte-1gfkn6j ul {
+            background: #FFFBF0 !important;
+            border: 2px solid #FFE0B2 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+            padding: 8px !important;
+        }
+        
+        /* Items du menu déroulant */
+        .gr-dropdown li,
+        .dropdown-item,
+        li[role="option"],
+        .svelte-1gfkn6j li {
+            background: transparent !important;
+            color: #3E2723 !important;
+            padding: 10px 16px !important;
+            border-radius: 8px !important;
+            margin: 2px 0 !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Item survolé */
+        .gr-dropdown li:hover,
+        .dropdown-item:hover,
+        li[role="option"]:hover,
+        .svelte-1gfkn6j li:hover {
+            background: #FFE0B2 !important;
+            color: #E65100 !important;
+        }
+        
+        /* Item sélectionné */
+        .gr-dropdown li.selected,
+        .gr-dropdown li[aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        .svelte-1gfkn6j li.selected {
+            background: #FF8F00 !important;
+            color: white !important;
+            font-weight: 700 !important;
+        }
+        
+        /* Options natives du select HTML */
+        option {
+            background: #FFFBF0 !important;
+            color: #3E2723 !important;
+            padding: 8px !important;
+        }
+        
+        option:hover,
+        option:focus {
+            background: #FFE0B2 !important;
+            color: #E65100 !important;
+        }
+        
+        /* Icône du dropdown */
+        .gr-dropdown svg,
+        .dropdown svg {
+            fill: #FF8F00 !important;
+        }
+        
+        /* ===== RADIO BUTTONS - FOND OPAQUE ===== */
+        .gr-radio, .gr-radio-group {
+            background: #FFFBF0 !important;
+            padding: 12px !important;
+            border-radius: 12px !important;
+            border: 2px solid #FFE0B2 !important;
+        }
+        
+        .gr-radio label, .gr-radio-group label {
+            color: #3E2723 !important;
+            font-weight: 500 !important;
+        }
+        
+        input[type="radio"] {
+            accent-color: #FF8F00 !important;
+        }
+        
+        input[type="radio"]:checked {
+            background: #FF8F00 !important;
+            border-color: #E65100 !important;
+        }
+        
+        /* ===== SLIDERS - LISIBLES ===== */
+        .gr-slider {
+            background: #FFFBF0 !important;
+            padding: 12px !important;
+            border-radius: 12px !important;
+            border: 2px solid #FFE0B2 !important;
+        }
+        
+        input[type="range"] {
+            accent-color: #FF8F00 !important;
+        }
+        
+        /* ===== BOUTON PRINCIPAL ===== */
+        button[variant="primary"], .primary, button.primary {
+            background: linear-gradient(135deg, #FF8F00 0%, #FF6F00 100%) !important;
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(255, 111, 0, 0.4) !important;
+            transition: all 0.3s ease !important;
+            font-weight: 600 !important;
+            color: white !important;
+        }
+        
+        button[variant="primary"]:hover, .primary:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 20px rgba(255, 111, 0, 0.6) !important;
+        }
+        
+        /* Tous les autres boutons */
+        button {
+            background: #FFF3E0 !important;
+            color: #5D4037 !important;
+            border: 2px solid #FFE0B2 !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button:hover {
+            background: #FFE0B2 !important;
+            border-color: #FF8F00 !important;
+        }
+        
+        /* ===== CARTES DE RECETTES WEB ===== */
+        .recipe-card {
+            background: linear-gradient(145deg, #FFFBF0 0%, #FFE0B2 100%);
+            border-left: 6px solid #FF8F00;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+            box-shadow: 
+                0 4px 12px rgba(191, 54, 12, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .recipe-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent
+            );
+            transform: rotate(45deg);
+            transition: all 0.6s;
+            opacity: 0;
+        }
+        
+        .recipe-card:hover::before {
+            opacity: 1;
+            left: 100%;
+        }
+        
+        .recipe-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 
+                0 12px 28px rgba(191, 54, 12, 0.25),
+                0 0 0 1px rgba(255, 143, 0, 0.3);
+            border-left-width: 8px;
+        }
+        
+        .recipe-title {
+            font-size: 1.4em;
+            font-weight: 800;
+            color: #E65100 !important;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .recipe-title::before {
+            content: '🧀';
+            font-size: 1.2em;
+            animation: rotate 3s infinite ease-in-out;
+        }
+        
+        @keyframes rotate {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(15deg); }
+        }
+        
+        .recipe-source {
+            font-size: 0.95em;
+            color: #795548 !important;
+            margin-bottom: 12px;
+            font-style: italic;
+            font-weight: 500;
+        }
+        
+        .recipe-description {
+            color: #4E342E !important;
+            line-height: 1.8;
+            margin-bottom: 18px;
+            font-size: 1.05em;
+        }
+        
+        .recipe-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #FF8F00 0%, #F57C00 100%);
+            color: white !important;
+            padding: 12px 24px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05em;
+            box-shadow: 0 4px 12px rgba(245, 124, 0, 0.4);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .recipe-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(245, 124, 0, 0.6);
+            background: linear-gradient(135deg, #F57C00 0%, #E65100 100%);
+        }
+        
+        /* ===== STATUT DE RECHERCHE ===== */
+        .search-status {
+            background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+            border-left: 5px solid #FF8F00;
+            padding: 18px 24px;
+            margin: 20px 0;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #E65100 !important;
+            box-shadow: 0 3px 10px rgba(230, 81, 0, 0.2);
+        }
+        
+        /* ===== MESSAGE "AUCUNE RECETTE" ===== */
+        .no-recipes {
+            text-align: center;
+            padding: 60px 40px;
+            color: #8D6E63 !important;
+            font-style: italic;
+            font-size: 1.2em;
+            background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
+            border-radius: 20px;
+            margin: 30px 0;
+            border: 3px dashed #FFB74D;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .no-recipes::before {
+            content: '🧀';
+            display: block;
+            font-size: 4em;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        /* ===== INPUTS ET TEXTAREAS ===== */
+        input, textarea {
+            background: #FFFBF0 !important;
+            border: 2px solid #FFE0B2 !important;
+            border-radius: 12px !important;
+            transition: all 0.3s ease !important;
+            color: #3E2723 !important;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: #A1887F !important;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            border-color: #FF8F00 !important;
+            box-shadow: 0 0 0 3px rgba(255, 143, 0, 0.2) !important;
+        }
+        
+        /* ===== TEXTBOX/TEXTAREA GRADIO ===== */
+        .gr-text-input, .gr-text-area, .gr-textbox {
+            background: #FFFBF0 !important;
+            color: #3E2723 !important;
+        }
+        
+        /* ===== COLONNES ET ROWS ===== */
+        .gr-column, .gr-row {
+            background: transparent !important;
+        }
+        
+        /* ===== FOOTER ===== */
+        footer {
+            background: linear-gradient(135deg, #FFE0B2 0%, #FFCC80 100%) !important;
+            color: #BF360C !important;
+            font-weight: 600 !important;
+            padding: 20px !important;
+            border-top: 3px solid #FF8F00 !important;
+        }
+        
+        footer p {
+            color: #5D4037 !important;
+        }
+        
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #FFF3E0;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #FF8F00 0%, #F57C00 100%);
+            border-radius: 10px;
+            border: 2px solid #FFF3E0;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #F57C00 0%, #E65100 100%);
+        }
+        
+        /* ===== CONTRASTE ===== */
+        strong, b {
+            color: #BF360C !important;
+        }
+        
+        em, i {
+            color: #5D4037 !important;
+        }
+        
+        code {
+            background: #FFE0B2 !important;
+            color: #E65100 !important;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .recipe-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+    </style>
+    """
+    
+    # Créer et lancer l'interface
     interface = create_interface()
-    interface.launch()
+    interface.launch(
+        theme=fromage_theme,
+        css=custom_css
+    )
+    
