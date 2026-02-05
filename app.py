@@ -4,6 +4,10 @@ import json
 import os
 from datetime import datetime
 from huggingface_hub import HfApi, hf_hub_download
+import pandas as pd
+
+# ✅ AJOUTE ÇA ICI (ligne ~10)
+pd.set_option('future.no_silent_downcasting', True)
 
 class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
@@ -417,14 +421,16 @@ class AgentFromagerHF:
             print(f"❌ Erreur upload HF: {e}")
             return False
 
-    def _load_history(self):
-        """Charge l'historique depuis le fichier local"""
-        if os.path.exists(self.recipes_file):
-            try:
+    def get_history(self):
+        """Retourne l'historique complet"""
+        try:
+            if os.path.exists(self.recipes_file):
                 with open(self.recipes_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
-                return []
+            return []
+        except Exception as e:
+            print(f"❌ Erreur get_history: {e}")
+            return []
 
     def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
         """Sauvegarde une recette dans l'historique"""
@@ -1982,13 +1988,16 @@ agent = AgentFromagerHF()
 def create_interface():
     """Interface avec génération simultanée"""
     
+    import gradio as gr  # ✅ AJOUTER CET IMPORT ICI
+    import json
+    import os
+    
     fromage_theme = gr.themes.Soft(
         primary_hue="amber",
         secondary_hue="orange",
         neutral_hue="stone"
     )
     
-    # CSS (ton code existant)
     custom_css = """
     ... (ton CSS)
     """
@@ -2028,7 +2037,6 @@ def create_interface():
                     lines=2
                 )
                 
-                # Micro-choix
                 gr.Markdown("### 🎛️ Micro-choix")
                 
                 with gr.Row():
@@ -2047,7 +2055,6 @@ def create_interface():
                         label="🌶️ Épices"
                     )
                 
-                # ===== BOUTON UNIQUE QUI FAIT TOUT =====
                 generate_all_btn = gr.Button(
                     "✨ Générer la recette + Recherche web", 
                     variant="primary", 
@@ -2071,112 +2078,190 @@ def create_interface():
                 **Tout se remplit automatiquement !**
                 """)
         
-        # ===== FONCTIONS POUR L'HISTORIQUE (DÉFINIES AVANT) =====
-        def get_recipe_choices():
-            """Retourne la liste des noms de recettes pour le Radio"""
+        # ===== FONCTIONS LOCALES =====
+        def load_history():
+            """Charge l'historique avec résumé détaillé"""
+            print("🔍 DEBUG: load_history() appelé")
             
-            # Vérifier si agent.history existe
-            if not hasattr(agent, 'history') or not agent.history:
-                return []
-            
-            choices = []
-            for i, entry in enumerate(agent.history, 1):
-                # CORRECTION : entry est un DICT, pas une string
-                if isinstance(entry, dict):
-                    # Extraire le nom depuis le dictionnaire
-                    cheese_name = entry.get('cheese_name', 'Recette sans nom')
-                    recipe_date = entry.get('date', '')
-                    
-                    # Formatter la date si elle existe
-                    if recipe_date:
-                        try:
-                            from datetime import datetime
-                            date_obj = datetime.fromisoformat(recipe_date)
-                            date_str = date_obj.strftime('%d/%m/%Y')
-                            label = f"{i}. {cheese_name} ({date_str})"
-                        except:
-                            label = f"{i}. {cheese_name}"
-                    else:
-                        label = f"{i}. {cheese_name}"
-                    
-                    choices.append(label)
+            try:
+                # Charger l'historique
+                if hasattr(agent, 'history') and agent.history:
+                    history = agent.history
+                    print(f"   → Historique depuis agent.history: {len(history)} recettes")
+                elif os.path.exists(agent.recipes_file):
+                    with open(agent.recipes_file, 'r', encoding='utf-8') as f:
+                        history = json.load(f)
+                    print(f"   → Historique depuis fichier: {len(history)} recettes")
                 else:
-                    # Ancien format (string) - pour compatibilité
-                    lines = entry.split('\n')
-                    recipe_name = "Recette sans nom"
-                    for line in lines:
-                        if line.strip() and not line.startswith('---') and not line.startswith('📅'):
-                            recipe_name = line.strip()[:60]
-                            break
-                    choices.append(f"{i}. {recipe_name}")
-            
-            return choices
-        
-        def show_selected_recipe(selected):
-            """Affiche la recette complète sélectionnée"""
-            if not selected or not hasattr(agent, 'history') or not agent.history:
-                return "Aucune recette sélectionnée"
-            
-            # Extraire le numéro de la recette
-            try:
-                recipe_num = int(selected.split('.')[0]) - 1
-                if 0 <= recipe_num < len(agent.history):
-                    entry = agent.history[recipe_num]
+                    print("   → Aucun historique trouvé")
+                    return "📭 Aucune recette sauvegardée", []
+                
+                if not history:
+                    print("   → Historique vide")
+                    return "📭 Aucune recette sauvegardée", []
+                
+                # Créer les choix pour le dropdown
+                choices = []
+                for entry in history[-20:][::-1]:  # 20 dernières, ordre inverse
+                    cheese_name = entry.get('cheese_name', 'Sans nom')
+                    id_num = entry.get('id', 0)
+                    date = entry.get('date', '')[:10] if entry.get('date') else ''
                     
-                    # CORRECTION : entry est un DICT
-                    if isinstance(entry, dict):
-                        # Retourner la recette complète depuis le dict
-                        return entry.get('recipe_complete', 'Recette non disponible')
+                    if date:
+                        choice_text = f"#{id_num} - {cheese_name} ({date})"
                     else:
-                        # Ancien format (string)
-                        return entry
-            except:
-                pass
-            
-            return "Erreur lors du chargement de la recette"
-
-        def refresh_history():
-            """Actualise local + sync HF → État RÉEL"""
-            try:
-                # 1. SYNC HF → local (récupère effacements)
-                agent._download_history_from_hf()
+                        choice_text = f"#{id_num} - {cheese_name}"
+                    
+                    choices.append(choice_text)
                 
-                # 2. Charge local (maintenant sync)
-                agent_history = agent._load_history()
+                print(f"   ✅ Choices créés: {len(choices)} recettes")
                 
-                if not agent_history:
-                    return ["Aucune recette sauvegardée"], agent.get_history_display()
+                # ✅ CRÉER UN RÉSUMÉ DÉTAILLÉ
+                summary = f"📚 {len(history)} recette(s) sauvegardée(s)\n"
+                summary += "═" * 60 + "\n\n"
+                summary += "🧀 DERNIÈRES RECETTES :\n\n"
                 
-                # 3. Formatte pour Gradio Radio
-                choices = [f"#{entry['id']} - {entry['cheese_name']} ({entry['date'][:10]})" 
-                        for entry in agent_history[-20:][::-1]]
+                # Afficher les 10 dernières recettes
+                for entry in history[-10:][::-1]:
+                    try:
+                        cheese_name = entry.get('cheese_name', 'Sans nom')
+                        id_num = entry.get('id', 0)
+                        date = entry.get('date', '')[:16] if entry.get('date') else 'Date inconnue'
+                        ingredients = entry.get('ingredients', [])
+                        cheese_type = entry.get('type', 'Type inconnu')
+                        
+                        summary += f"#{id_num} - {cheese_name}\n"
+                        summary += f"   📅 {date}\n"
+                        summary += f"   🧀 Type: {cheese_type}\n"
+                        
+                        # Afficher les 3 premiers ingrédients
+                        if ingredients:
+                            ing_preview = ', '.join(ingredients[:3])
+                            if len(ingredients) > 3:
+                                ing_preview += f"... (+{len(ingredients)-3})"
+                            summary += f"   🥛 {ing_preview}\n"
+                        
+                        summary += "─" * 60 + "\n\n"
+                    except Exception as e:
+                        print(f"   ⚠️ Erreur sur une entrée: {e}")
+                        continue
                 
-                preview = agent.get_history_display()
-                return choices, preview
-            
+                return summary, choices
+                
             except Exception as e:
-                return ["Erreur refresh"], f"❌ Erreur: {e}"
-
-
-        def clear_history():
-            """Efface local ET push vers HF"""
+                print(f"❌ Erreur load_history: {e}")
+                import traceback
+                traceback.print_exc()
+                return f"❌ Erreur: {str(e)}", []
+        def show_recipe_select(choice):
+            """Affiche la recette sélectionnée"""
+            if not choice:
+                return ""
             try:
-                # 1. Efface local
-                with open(agent.recipes_file, 'w', encoding='utf-8') as f:
+                id_num = int(choice.split('#')[1].split('-')[0])
+                return agent.get_recipe_by_id(id_num)
+            except:
+                return "❌ Erreur chargement recette"
+
+        def agent_clear_history():
+            """Efface l'historique"""
+            try:
+                import json
+                import os
+                
+                # Effacer le fichier
+                recipes_file = "recipes_history.json"
+                with open(recipes_file, 'w', encoding='utf-8') as f:
                     json.dump([], f)
                 
-                # 2. PUSH vide vers HF (efface sur HF aussi)
-                agent._upload_history_to_hf()
+                # Effacer en mémoire
+                if hasattr(agent, 'history'):
+                    agent.history = []
                 
-                # 3. Met à jour interface
-                return ["Aucune recette sauvegardée"], "✅ Historique effacé partout !"
-            
+                print("✅ Historique effacé")
+                
+                return (
+                    "✅ Historique effacé avec succès",
+                    gr.update(choices=[], value=None),
+                    ""
+                )
             except Exception as e:
-                return ["Erreur"], f"❌ Erreur: {e}"
+                print(f"❌ Erreur clear: {e}")
+                return (
+                    f"❌ Erreur: {str(e)}",
+                    gr.update(choices=[], value=None),
+                    ""
+                )
 
-        # ===== ONGLETS POUR AFFICHER LES RÉSULTATS =====
+        def generate_all(ingredients, cheese_type, constraints, creativity, texture, affinage, spice):
+            """Génère recette + recherche web"""
+            try:
+                # Générer la recette
+                recipe = agent.generate_recipe_creative(
+                    ingredients, cheese_type, constraints, 
+                    creativity, texture, affinage, spice
+                )
+                
+                # Sauvegarder dans l'historique
+                ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+                agent._save_to_history(ingredients_list, cheese_type, constraints, recipe)
+                
+                # Rechercher sur le web
+                try:
+                    web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
+                except Exception as e:
+                    print(f"⚠️ Erreur recherche web: {e}")
+                    web_recipes = []
+                
+                # Construire HTML
+                if not web_recipes:
+                    cards_html = """
+                    <div class="no-recipes">
+                        😔 Aucune recette trouvée sur le web<br>
+                        <small>💡 Essayez des ingrédients plus courants</small>
+                    </div>
+                    """
+                else:
+                    cards_html = f"""
+                    <div class="search-status">
+                        ✅ {len(web_recipes)} recettes trouvées sur le web
+                    </div>
+                    """
+                    for i, r in enumerate(web_recipes, 1):
+                        cards_html += f"""
+                        <div class="recipe-card">
+                            <div class="recipe-title">{i}. {r.get('title', 'Recette')}</div>
+                            <div class="recipe-source">📍 {r.get('source', 'Web')}</div>
+                            <div class="recipe-description">{r.get('description', '')[:200]}...</div>
+                            <a href="{r.get('url', '#')}" target="_blank" class="recipe-link">🔗 Voir la recette</a>
+                        </div>
+                        """
+                
+                print("✅ Génération terminée avec succès")
+                return recipe, "", cards_html
+                
+            except Exception as e:
+                print(f"❌ Erreur generate_all: {e}")
+                import traceback
+                traceback.print_exc()
+                return f"❌ Erreur: {str(e)}", "❌ Erreur", "<div class='no-recipes'>❌ Erreur technique</div>"
+     
+        # ✅ AJOUTER CES DEUX FONCTIONS ICI
+        def load_and_populate():
+            """Charge ET met à jour le dropdown"""
+            summary, choices = load_history()
+            print(f"🔄 Wrapper: summary={len(summary)} chars, choices={choices}")
+            return summary, gr.Dropdown(choices=choices, value=None)
+        
+        def clear_and_reset():
+            """Efface et reset"""
+            result = agent_clear_history()
+            # agent_clear_history retourne déjà 3 valeurs
+            return result
+        
+        # ===== ONGLETS =====
         with gr.Tabs():
-            # ONGLET 1 : Recette générée
+            # ONGLET 1
             with gr.Tab("📖 Ma Recette"):
                 recipe_output = gr.Textbox(
                     label="Votre recette complète",
@@ -2185,7 +2270,7 @@ def create_interface():
                     placeholder="Votre recette apparaîtra ici après génération..."
                 )
             
-            # ONGLET 2 : Recherche web
+            # ONGLET 2
             with gr.Tab("🌐 Recettes Web"):
                 search_status = gr.HTML(label="Statut", value="")
                 web_results = gr.HTML(
@@ -2193,7 +2278,7 @@ def create_interface():
                     value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>"
                 )
             
-            # ONGLET 3 : Base de connaissances
+            # ONGLET 3
             with gr.Tab("📚 Base de connaissances"):
                 with gr.Row():
                     knowledge_btn = gr.Button("📖 Charger résumé COMPLET", variant="primary")
@@ -2209,122 +2294,72 @@ def create_interface():
                     fn=agent.get_knowledge_summary,
                     outputs=knowledge_output
                 )
-
-            # ONGLET 4 : Historique avec visualisation complète
+            
+            # ONGLET 4 : Historique
             with gr.Tab("🕒 Historique"):
-                gr.Markdown("### 📚 Vos recettes sauvegardées")
+                gr.Markdown("### 📚 Historique de vos recettes")
+                
+                with gr.Row():
+                    history_btn = gr.Button("📋 Charger mes recettes", variant="primary", size="lg")
+                    clear_btn = gr.Button("🗑️ Effacer tout", variant="stop", size="lg")
                 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        # Liste des recettes - INITIALISÉE AVEC GESTION D'ERREUR
-                        try:
-                            initial_choices = get_recipe_choices()
-                            if not initial_choices:
-                                initial_choices = ["Aucune recette sauvegardée"]
-                        except:
-                            initial_choices = ["Aucune recette sauvegardée"]
-                        
-                        history_list = gr.Radio(
-                            label="Sélectionnez une recette",
-                            choices=initial_choices,
-                            interactive=True
+                        history_summary = gr.Textbox(
+                            label="📊 Résumé",
+                            lines=10,
+                            interactive=False,
+                            placeholder="Cliquez sur 'Charger mes recettes' pour voir le résumé..."
                         )
-                        
-                        with gr.Row():
-                            refresh_btn = gr.Button("🔄 Actualiser", size="sm")
-                            clear_btn = gr.Button("🗑️ Effacer tout", size="sm", variant="stop")
                     
                     with gr.Column(scale=2):
-                        # Affichage de la recette complète
-                        selected_recipe_display = gr.Textbox(
+                        recipe_dropdown = gr.Dropdown(
+                            label="🍽️ Sélectionner une recette",
+                            choices=[],
+                            interactive=True,
+                            value=None
+                        )
+                        
+                        recipe_display = gr.Textbox(
                             label="📖 Recette complète",
-                            lines=30,
-                            max_lines=50,
-                            placeholder="Sélectionnez une recette dans la liste pour la voir en détail..."
+                            lines=25,
+                            interactive=False,
+                            placeholder="Sélectionnez une recette dans la liste..."
                         )
                 
-                # Connecter les événements
-                refresh_btn.click(
-                    fn=refresh_history,
-                    outputs=[history_list, selected_recipe_display]
+                # === CONNEXIONS ===
+                history_btn.click(
+                    fn=load_and_populate,
+                    inputs=[],
+                    outputs=[history_summary, recipe_dropdown]
                 )
                 
+                recipe_dropdown.select(
+                    fn=show_recipe_select,
+                    inputs=[recipe_dropdown],
+                    outputs=[recipe_display]
+                )
+                
+                # ✅ FONCTION POUR EFFACER
+                def clear_and_reset():
+                    """Efface et reset"""
+                    result = agent_clear_history()
+                    return "✅ Historique effacé", gr.Dropdown(choices=[], value=None), ""
+                
+                # ✅ CONNEXION DU BOUTON EFFACER
                 clear_btn.click(
-                    fn=clear_history,
-                    outputs=[history_list, selected_recipe_display]
-                )
-                
-                history_list.change(
-                    fn=show_selected_recipe,
-                    inputs=history_list,
-                    outputs=selected_recipe_display
+                    fn=clear_and_reset,
+                    inputs=[],
+                    outputs=[history_summary, recipe_dropdown, recipe_display]
                 )
             
-            # ONGLET 5 : Test Internet
+            # ONGLET 5
             with gr.Tab("🧪 Test Internet"):
                 test_btn = gr.Button("🔍 Tester")
                 test_output = gr.Textbox(lines=5)
                 test_btn.click(fn=agent.test_internet, outputs=test_output)
         
-        # ===== FONCTION QUI GÉNÈRE LES DEUX recherches EN PARALLÈLE =====
-        def generate_all(ingredients, cheese_type, constraints, 
-                        creativity, texture, affinage, spice):
-            """Génère recette locale + recherche web simultanément"""
-            
-            # 1. Générer la recette locale
-            recipe = agent.generate_recipe_creative(
-                ingredients, cheese_type, constraints,
-                creativity, texture, affinage, spice
-            )
-            
-            # 2. Rechercher sur le web
-            web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
-            
-            if not web_recipes:
-                history_choices, _ = refresh_history()
-                
-                return recipe, """
-                <div class="search-status">
-                    ✅ Recherche terminée
-                </div>
-                """, """
-                <div class="no-recipes">
-                    😔 Aucune recette trouvée sur le web pour ces critères.
-                </div>
-                """
-            
-            # Construire les cartes HTML
-            cards_html = f"""
-            <div class="search-status">
-                ✅ {len(web_recipes)} recettes trouvées sur le web
-            </div>
-            """
-            
-            for i, web_recipe in enumerate(web_recipes, 1):
-                cards_html += f"""
-                <div class="recipe-card">
-                    <div class="recipe-title">
-                        {i}. {web_recipe['title']}
-                    </div>
-                    <div class="recipe-source">
-                        📍 Source : {web_recipe['source']}
-                    </div>
-                    <div class="recipe-description">
-                        {web_recipe['description']}
-                    </div>
-                    <a href="{web_recipe['url']}" target="_blank" class="recipe-link">
-                        🔗 Voir la recette complète
-                    </a>
-                </div>
-                """
-                
-                
-            # ✅ AJOUTER CETTE LIGNE
-            history_choices, _ = refresh_history()
-            
-            return recipe, "", cards_html
-        
-        # ===== CONNECTER LE BOUTON =====
+        # ===== CONNEXION BOUTON PRINCIPAL =====
         generate_all_btn.click(
             fn=generate_all,
             inputs=[
@@ -2346,6 +2381,78 @@ def create_interface():
         </center>
         """)
     
+    return demo
+def generate_all(ingredients, cheese_type, constraints, creativity, texture, affinage, spice):
+    """Génère + FORCE historique + recherche web"""
+    try:
+        # 1. GÉNÉRATION
+        recipe = agent.generate_recipe_creative(
+            ingredients, cheese_type, constraints, creativity, texture, affinage, spice
+        )
+        
+        # 2. FORCE HISTORIQUE (AVANT web)
+        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+        agent._save_to_history(ingredients_list, cheese_type, constraints, recipe)
+        
+        # 3. RECHERCHE WEB (fallback si erreur)
+        try:
+            web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
+        except:
+            web_recipes = []
+        
+        # 4. CARDS HTML
+        if not web_recipes:
+            cards_html = """
+            <div class="no-recipes">
+                😔 Aucune recette trouvée sur le web<br>
+                <small>💡 Essayez des ingrédients plus courants</small>
+            </div>
+            """
+        else:
+            cards_html = f"""
+            <div class="search-status">
+                ✅ {len(web_recipes)} recettes web trouvées !
+            </div>
+            """
+            for i, r in enumerate(web_recipes[:6], 1):
+                cards_html += f"""
+                <div class="recipe-card">
+                    <b>{i}. {r.get('title', 'Recette')}</b><br>
+                    📍 {r.get('source', 'Web')}<br>
+                    {r.get('description', '')[:200]}...
+                    <br><a href="{r.get('url', '#')}" target="_blank">🔗 Voir</a>
+                </div>
+                """
+        
+        print("✅ Génération + historique OK")
+        return recipe, "", cards_html
+        
+    except Exception as e:
+        print(f"❌ Erreur generate_all: {e}")
+        return "❌ Erreur génération", "Erreur", "Erreur technique"
+
+    # ===== CONNECTER LE BOUTON =====
+    generate_all_btn.click(
+        fn=generate_all,
+        inputs=[
+            ingredients_input,
+            cheese_type_input,
+            constraints_input,
+            creativity_slider,
+            texture_choice,
+            affinage_slider,
+            spice_choice
+        ],
+        outputs=[recipe_output, search_status, web_results]
+    )
+    
+    gr.Markdown("""
+    ---
+    <center>
+    Fait avec 🧀 et 🤖 | Hugging Face Spaces | © 2026 Braconier
+    </center>
+    """)
+
     return demo
 
 # ========================================
