@@ -9,15 +9,16 @@ class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
     
     def __init__(self):
-        print(f"🔍 HF_TOKEN détecté : {'✅ OUI' if os.environ.get('HF_TOKEN') else '❌ NON'}")
-        print(f"🔍 Repo cible : {self.hf_repo}")
-        print(f"🔍 API initialisée : {'✅ OUI' if self.api else '❌ NON'}")
         self.rng = random.Random()
         self.knowledge_base = self._init_knowledge()
         self.recipes_file = 'recipes_history.json'
         self.hf_repo = "volubyl/fromager-recipes"
         self.hf_token = os.environ.get("HF_TOKEN")
         self.api = HfApi(token=self.hf_token) if self.hf_token else None
+        
+        print(f"🔍 HF_TOKEN détecté : {'✅ OUI' if os.environ.get('HF_TOKEN') else '❌ NON'}")
+        print(f"🔍 Repo cible : {self.hf_repo}")
+        print(f"🔍 API initialisée : {'✅ OUI' if self.api else '❌ NON'}")
         
         # Charger l'historique depuis HF au démarrage
         self._download_history_from_hf()
