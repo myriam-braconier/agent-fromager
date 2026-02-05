@@ -682,7 +682,6 @@ class AgentFromagerHF:
         except Exception as e:
             return f"❌ Erreur lecture historique: {e}"
 
-
     def clear_history(self):
         """Efface tout l'historique"""
         try:
@@ -700,8 +699,7 @@ class AgentFromagerHF:
         
         except Exception as e:
             return f"❌ Erreur: {e}"
-                
-    
+                 
     # vérification connexion internet dans ta classe AgentFromagerHF
     def test_internet(self):
         """Test si Internet fonctionne"""
@@ -1303,52 +1301,69 @@ en molécules aromatiques. Plus long = goût plus prononcé.
                             affinage_duration, spice_intensity):
         """Génère une recette avec mode créatif et micro-choix"""
     
-        # Validation de base
-        valid, message = self.validate_ingredients(ingredients)
-        if not valid:
-            return message
+        # Initialisation des variables
+        is_valid = False
+        recipe = ""
+        lait = None
     
-        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
-        cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
-    
-        # Validation compatibilité lait/pâte
-        lait = self._extract_lait_from_text(ingredients)
-        if lait and cheese_type_clean != "Fromage artisanal":
-            is_valid, reason = self._validate_combination(lait, cheese_type_clean)
-        if not is_valid:
-            alternatives = self._suggest_alternatives(lait, cheese_type_clean)
-            return f"❌ Combinaison invalide\n\n{reason}\n\n{alternatives}"
-    
-        # ===== APPLIQUER LES MICRO-CHOIX =====
-        # Adapter selon les préférences
-        modified_ingredients = self._apply_micro_choices(
-            ingredients_list, 
-            texture_preference,
-            spice_intensity,
-            affinage_duration
-    )
-    
-        # Générer recette de base
-        recipe = self._generate_detailed_recipe(
-            modified_ingredients, 
-            cheese_type_clean, 
-            constraints
-    )
-    
-        # ===== MODE CRÉATIF =====
-        if creativity_level > 0:
-            recipe = self._add_creative_variations(
-                recipe, 
-                creativity_level,
-                cheese_type_clean,
-                lait
-        )
-    
-        # Sauvegarder
-        self._save_to_history(modified_ingredients, cheese_type_clean, constraints, recipe)
-    
-        return recipe
-
+        try:
+            # Validation de base
+            valid, message = self.validate_ingredients(ingredients)
+            if not valid:
+                return message
+        
+            ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+            cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
+        
+            # Validation compatibilité lait/pâte
+            lait = self._extract_lait_from_text(ingredients)
+            if lait and cheese_type_clean != "Fromage artisanal":
+                is_valid, reason = self._validate_combination(lait, cheese_type_clean)
+                if not is_valid:
+                    alternatives = self._suggest_alternatives(lait, cheese_type_clean)
+                    return f"❌ Combinaison invalide\n\n{reason}\n\n{alternatives}"
+        
+            # ===== APPLIQUER LES MICRO-CHOIX =====
+            # Adapter selon les préférences
+            modified_ingredients = self._apply_micro_choices(
+                ingredients_list, 
+                texture_preference,
+                spice_intensity,
+                affinage_duration
+            )
+        
+            # Générer recette de base
+            recipe = self._generate_detailed_recipe(
+                modified_ingredients, 
+                cheese_type_clean, 
+                constraints
+            )
+        
+            # ===== MODE CRÉATIF =====
+            if creativity_level > 0:
+                recipe = self._add_creative_variations(
+                    recipe, 
+                    creativity_level,
+                    cheese_type_clean,
+                    lait
+                )
+        
+            # Sauvegarder
+            self._save_to_history(modified_ingredients, cheese_type_clean, constraints, recipe)
+        
+            return recipe
+        
+        except Exception as e:
+            error_msg = f"❌ Erreur lors de la génération de la recette : {str(e)}"
+            print(error_msg)
+        
+         # Retourner une recette de secours simple
+            try:
+                cheese_type_clean = cheese_type if cheese_type != "Laissez l'IA choisir" else "Fromage artisanal"
+                return self._create_simple_fallback_recipe(ingredients, cheese_type_clean)
+            except:
+                return f"{error_msg}\n\nImpossible de générer une recette de secours."
+        
     def _apply_micro_choices(self, ingredients, texture, spice_intensity, affinage):
         """Applique les micro-choix aux ingrédients"""
         modified = ingredients.copy()
@@ -1953,15 +1968,35 @@ def create_interface():
                 return []
             
             choices = []
-            for i, entry in enumerate(agent.history, 1):
-                # Extraire le nom de la recette (première ligne après "🧀")
-                lines = entry.split('\n')
-                recipe_name = "Recette sans nom"
-                for line in lines:
-                    if line.strip() and not line.startswith('---') and not line.startswith('📅'):
-                        recipe_name = line.strip()[:60]  # Limiter à 60 caractères
-                        break
-                choices.append(f"{i}. {recipe_name}")
+            for i, entry in enumerate(agent.history, 1):  # ✅ AJOUTER CETTE LIGNE
+                # ✅ CORRECTION : entry est un DICT, pas une string
+                if isinstance(entry, dict):
+                    # Extraire le nom depuis le dictionnaire
+                    cheese_name = entry.get('cheese_name', 'Recette sans nom')
+                    recipe_date = entry.get('date', '')
+                    
+                    # Formatter la date si elle existe
+                    if recipe_date:
+                        try:
+                            from datetime import datetime
+                            date_obj = datetime.fromisoformat(recipe_date)
+                            date_str = date_obj.strftime('%d/%m/%Y')
+                            label = f"{i}. {cheese_name} ({date_str})"
+                        except:
+                            label = f"{i}. {cheese_name}"
+                    else:
+                        label = f"{i}. {cheese_name}"
+                    
+                    choices.append(label)
+                else:
+                    # Ancien format (string) - pour compatibilité
+                    lines = entry.split('\n')
+                    recipe_name = "Recette sans nom"
+                    for line in lines:
+                        if line.strip() and not line.startswith('---') and not line.startswith('📅'):
+                            recipe_name = line.strip()[:60]
+                            break
+                    choices.append(f"{i}. {recipe_name}")
             
             return choices
         
@@ -1974,12 +2009,20 @@ def create_interface():
             try:
                 recipe_num = int(selected.split('.')[0]) - 1
                 if 0 <= recipe_num < len(agent.history):
-                    return agent.history[recipe_num]
+                    entry = agent.history[recipe_num]
+                    
+                    # ✅ CORRECTION : entry est un DICT
+                    if isinstance(entry, dict):
+                        # Retourner la recette complète depuis le dict
+                        return entry.get('recipe_complete', 'Recette non disponible')
+                    else:
+                        # Ancien format (string)
+                        return entry
             except:
                 pass
             
             return "Erreur lors du chargement de la recette"
-        
+
         def refresh_history():
             """Actualise la liste des recettes"""
             choices = get_recipe_choices()
@@ -2161,7 +2204,7 @@ def create_interface():
         gr.Markdown("""
         ---
         <center>
-        Fait avec 🧀 et 🤖 | Hugging Face Spaces | 2025
+        Fait avec 🧀 et 🤖 | Hugging Face Spaces | © 2026 Braconier
         </center>
         """)
     
