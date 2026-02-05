@@ -419,41 +419,42 @@ class AgentFromagerHF:
             except:
                 return []
 
-def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-    """Sauvegarde une recette dans l'historique"""
-    try:
-        history = self._load_history()
-        
-        entry = {
-            'id': len(history) + 1,
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'ingredients': ingredients if isinstance(ingredients, str) else ', '.join(ingredients),
-            'cheese_type': cheese_type,
-            'constraints': constraints,
-            'recipe': recipe
-        }
-        
-        history.append(entry)
-        
-        # Sauvegarder localement
-        with open(self.recipes_file, 'w', encoding='utf-8') as f:
-            json.dump(history, f, indent=2, ensure_ascii=False)
-        
-        # Upload vers HF
-        sync_success = self._upload_history_to_hf()
-        
-        if sync_success:
-            print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
-        else:
-            print(f"⚠️  Recette #{entry['id']} sauvegardée localement")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erreur sauvegarde: {e}")
-        return False
+    def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
+        """Sauvegarde une recette dans l'historique"""
+        try:
+            history = self._load_history()
 
-def get_knowledge_summary(self):
+            entry = {
+                'id': len(history) + 1,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'ingredients': ingredients if isinstance(ingredients, str) else ', '.join(ingredients),
+                'cheese_type': cheese_type,
+                'constraints': constraints,
+                'recipe': recipe
+            }
+
+            history.append(entry)
+
+            # Sauvegarder localement
+            with open(self.recipes_file, 'w', encoding='utf-8') as f:
+                json.dump(history, f, indent=2, ensure_ascii=False)
+
+            # Upload vers HF
+            sync_success = self._upload_history_to_hf()
+
+            if sync_success:
+                print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
+            else:
+                print(f"⚠️  Recette #{entry['id']} sauvegardée localement")
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Erreur sauvegarde: {e}")
+            return False
+
+
+    def get_knowledge_summary(self):
         """Retourne un résumé complet de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
         
