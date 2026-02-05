@@ -1930,11 +1930,20 @@ def create_interface():
             
             # ONGLET 3 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
+                with gr.Row():
+                    knowledge_btn = gr.Button("📖 Charger la base complète", variant="primary")
                 knowledge_output = gr.Textbox(
-                    label="Documentation",
-                    value=agent.get_knowledge_summary(),
-                    lines=40
-                )
+                    label="🧀 Base de connaissances fromagère", 
+                    lines=40, 
+                    max_lines=60,
+                    placeholder="Cliquez 'Charger la base complète' pour afficher TOUT le savoir fromager..."
+)
+
+                knowledge_btn.click(
+                    fn=agent.get_knowledge_summary,  # ← Fonctionne au CLIC uniquement
+                    outputs=knowledge_output
+)
+
             
             # ONGLET 4 : Historique
             with gr.Tab("🕒 Historique"):
