@@ -1957,19 +1957,93 @@ def create_interface():
                     outputs=knowledge_output
                 )
 
-            # ONGLET 4 : Historique (UN SEUL !)
+            # ONGLET 4 : Historique avec visualisation complète
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
+                
                 with gr.Row():
-                    refresh_btn = gr.Button("🔄 Actualiser")
-                    clear_btn = gr.Button("🗑️ Effacer")
-                history_display = gr.Textbox(
-                    label="",
-                    value=agent.get_history_display(),
-                    lines=30
+                    with gr.Column(scale=1):
+                        # Liste des recettes
+                        history_list = gr.Radio(
+                            label="Sélectionnez une recette",
+                            choices=[],
+                            interactive=True
+                        )
+                        
+                        with gr.Row():
+                            refresh_btn = gr.Button("🔄 Actualiser", size="sm")
+                            clear_btn = gr.Button("🗑️ Effacer tout", size="sm", variant="stop")
+                    
+                    with gr.Column(scale=2):
+                        # Affichage de la recette complète
+                        selected_recipe_display = gr.Textbox(
+                            label="📖 Recette complète",
+                            lines=30,
+                            max_lines=50,
+                            placeholder="Sélectionnez une recette dans la liste pour la voir en détail..."
+                        )
+                
+                # Fonction pour obtenir la liste des recettes
+                def get_recipe_choices():
+                    """Retourne la liste des noms de recettes pour le Radio"""
+                    if not agent.history:
+                        return gr.Radio(choices=["Aucune recette sauvegardée"])
+                    
+                    choices = []
+                    for i, entry in enumerate(agent.history, 1):
+                        # Extraire le nom de la recette (première ligne après "🧀")
+                        lines = entry.split('\n')
+                        recipe_name = "Recette sans nom"
+                        for line in lines:
+                            if line.strip() and not line.startswith('---') and not line.startswith('📅'):
+                                recipe_name = line.strip()
+                                break
+                        choices.append(f"{i}. {recipe_name}")
+                    
+                    return gr.Radio(choices=choices)
+                
+                # Fonction pour afficher la recette sélectionnée
+                def show_selected_recipe(selected):
+                    """Affiche la recette complète sélectionnée"""
+                    if not selected or selected == "Aucune recette sauvegardée":
+                        return "Aucune recette sélectionnée"
+                    
+                    # Extraire le numéro de la recette
+                    try:
+                        recipe_num = int(selected.split('.')[0]) - 1
+                        if 0 <= recipe_num < len(agent.history):
+                            return agent.history[recipe_num]
+                    except:
+                        pass
+                    
+                    return "Erreur lors du chargement de la recette"
+                
+                # Fonction pour actualiser et effacer
+                def refresh_history():
+                    """Actualise la liste des recettes"""
+                    return get_recipe_choices(), ""
+                
+                def clear_history():
+                    """Efface l'historique"""
+                    agent.clear_history()
+                    return gr.Radio(choices=["Aucune recette sauvegardée"]), ""
+                
+                # Connecter les événements
+                refresh_btn.click(
+                    fn=refresh_history,
+                    outputs=[history_list, selected_recipe_display]
                 )
-                refresh_btn.click(fn=agent.get_history_display, outputs=history_display)
-                clear_btn.click(fn=agent.clear_history, outputs=history_display)
+                
+                clear_btn.click(
+                    fn=clear_history,
+                    outputs=[history_list, selected_recipe_display]
+                )
+                
+                history_list.change(
+                    fn=show_selected_recipe,
+                    inputs=history_list,
+                    outputs=selected_recipe_display
+                )
             
             # ONGLET 5 : Test Internet
             with gr.Tab("🧪 Test Internet"):
