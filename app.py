@@ -1940,25 +1940,24 @@ def create_interface():
                     value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>"
                 )
             
-            # TAB 3 : Base de connaissances - SANS ERREUR !
+            # ONGLET 3 : Base de connaissances
             with gr.Tab("📚 Base de connaissances"):
                 with gr.Row():
                     knowledge_btn = gr.Button("📖 Charger résumé COMPLET", variant="primary")
-    
-            knowledge_output = gr.Textbox(
-                label="🧀 SAVOIR FROMAGÈRE COMPLET", 
-                lines=45, 
-                max_lines=60,
-                placeholder="Cliquez pour charger TOUS les types, épices, dosages..."
-            )
-    
-            knowledge_btn.click(
-                fn=agent.get_knowledge_summary,  # ← TA MÉTHODE !
-                outputs=knowledge_output
-            )
+                
+                knowledge_output = gr.Textbox(
+                    label="🧀 SAVOIR FROMAGÈRE COMPLET", 
+                    lines=45, 
+                    max_lines=60,
+                    placeholder="Cliquez pour charger TOUS les types, épices, dosages..."
+                )
+                
+                knowledge_btn.click(
+                    fn=agent.get_knowledge_summary,
+                    outputs=knowledge_output
+                )
 
-
-            # ONGLET 4 : Historique
+            # ONGLET 4 : Historique (UN SEUL !)
             with gr.Tab("🕒 Historique"):
                 gr.Markdown("### 📚 Vos recettes sauvegardées")
                 with gr.Row():
@@ -1972,7 +1971,7 @@ def create_interface():
                 refresh_btn.click(fn=agent.get_history_display, outputs=history_display)
                 clear_btn.click(fn=agent.clear_history, outputs=history_display)
             
-            # ONGLET 5 : Test
+            # ONGLET 5 : Test Internet
             with gr.Tab("🧪 Test Internet"):
                 test_btn = gr.Button("🔍 Tester")
                 test_output = gr.Textbox(lines=5)
@@ -2059,7 +2058,6 @@ def create_interface():
         """)
     
     return demo
-
 
 if __name__ == "__main__":
     interface = create_interface()
