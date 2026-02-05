@@ -18,6 +18,9 @@ class AgentFromagerHF:
         
         # Charger l'historique depuis HF au démarrage
         self._download_history_from_hf()
+        
+         # ✅ AJOUTER CETTE LIGNE
+        self.history = self._load_history()  # Charger l'historique en mémoire
     
     def _init_knowledge(self):
         """Base de connaissances fromage intégrée"""
@@ -423,14 +426,23 @@ class AgentFromagerHF:
         """Sauvegarde une recette dans l'historique"""
         try:
             history = self._load_history()
+            
+            recipe_lines = recipe.split('\n')
+            cheese_name = "Fromage personnalisé"
+            for line in recipe_lines:
+                if '🧀' in line and len(line) < 100:
+                    cheese_name = line.replace('🧀', '').replace('═', '').replace('║', '').strip()
+                    break
 
             entry = {
                 'id': len(history) + 1,
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ingredients': ingredients if isinstance(ingredients, str) else ', '.join(ingredients),
-                'cheese_type': cheese_type,
+                'date': datetime.now().isoformat(),
+                'cheese_name': cheese_name,
+                'ingredients': ingredients,
+                'type': cheese_type,
                 'constraints': constraints,
-                'recipe': recipe
+                'recipe_complete': recipe,
+                'recipe_preview': recipe[:300] + "..." if len(recipe) > 300 else recipe
             }
 
             history.append(entry)
@@ -438,6 +450,9 @@ class AgentFromagerHF:
             # Sauvegarder localement
             with open(self.recipes_file, 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
+                
+            # ✅ AJOUTER CETTE LIGNE : Mettre à jour l'historique en mémoire
+            self.history = history
 
             # Upload vers HF
             sync_success = self._upload_history_to_hf()
