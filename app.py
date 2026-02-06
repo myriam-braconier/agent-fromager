@@ -2723,15 +2723,14 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             qualifier = ["Maison", "Artisanale", "Fromagère"]
 
         return f"{self.rng.choice(base)} {self.rng.choice(lieu)} {self.rng.choice(style)}"
-
-    
+   
     def _format_user_ingredients(self, ingredients):
         """Formate joliment les ingrédients utilisateur"""
         formatted = ""
         for ing in ingredients:
             formatted += f"• {ing.capitalize()}\n"
         return formatted
-    
+
     def _add_constraints_note(self, constraints):
         """Ajoute une note sur les contraintes"""
         if not constraints or constraints.strip() == "":
@@ -2798,7 +2797,7 @@ def create_interface():
     
     with gr.Blocks(title="🧀 Agent Fromager") as demo:
         
-        gr.Markdown("""
+        gr.Markdown("""k
         # 🧀 Agent Fromager Intelligent
         ### Créez vos fromages avec l'IA + Recherche web automatique
         """)
@@ -3042,7 +3041,6 @@ def create_interface():
                 
                 # Sauvegarder dans l'historique
                 ingredients_list = [ing.strip() for ing in ingredients.split(',')]
-                agent._save_to_history(ingredients_list, cheese_type, constraints, recipe)
                 
                 # Rechercher sur le web
                 try:
