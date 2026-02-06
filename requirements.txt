@@ -3,3 +3,4 @@ huggingface_hub
 duckduckgo-search
 beautifulsoup4
 requests
+python-dotenv>=1.0.0
