@@ -5193,9 +5193,31 @@ if __name__ == "__main__":
         
         /* Fond général avec texture fromage */
         .gradio-container {
-            background: linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%) !important;
+            background-image: url('https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
         }
-        
+        /* Couche semi-transparente pour garder la lisibilité */
+        .gradio-container::before {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(135deg, rgba(255, 249, 230, 0.92) 0%, rgba(255, 229, 180, 0.32) 100%) !important;
+            pointer-events: none !important;
+            z-index: 0 !important;
+        }
+
+        /* Assurer que le contenu reste au-dessus */
+        .gradio-container > * {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+
         /* ===== TEXTE MARKDOWN - LISIBLE ===== */
         .prose, .markdown, p, li, span, label, .gr-box, div {
             color: #3E2723 !important;
