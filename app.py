@@ -5264,13 +5264,15 @@ if __name__ == "__main__":
             padding: 0 !important;
         }
         
+        .svelte-llgaql,
         .tab-nav button {
             background: #FFF3E0 !important;
             color: #5D4037 !important;
             border: 2px solid #FFE0B2 !important;
             font-weight: 600 !important;
             transition: all 0.3s ease !important;
-            padding: 12px 24px !important;
+            font-size: 1.6em !important;           /* ← AJOUTÉ */
+            padding: 14px 28px !important;         /* ← MODIFIÉ */
             margin: 0 4px !important;
             border-radius: 12px 12px 0 0 !important;
         }
