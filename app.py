@@ -3221,24 +3221,20 @@ def create_interface():
     
     return demo
 def generate_all(ingredients, cheese_type, constraints, creativity, texture, affinage, spice):
-    """Génère + FORCE historique + recherche web"""
+    """Génère + FORCE historique + recherche web - sauvegarde 1 seule fois"""
     try:
         # 1. GÉNÉRATION
         recipe = agent.generate_recipe_creative(
             ingredients, cheese_type, constraints, creativity, texture, affinage, spice
         )
         
-        # 2. FORCE HISTORIQUE (AVANT web)
-        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
-        agent._save_to_history(ingredients_list, cheese_type, constraints, recipe)
-        
-        # 3. RECHERCHE WEB (fallback si erreur)
+        # 2. RECHERCHE WEB (fallback si erreur)
         try:
             web_recipes = agent.search_web_recipes(ingredients, cheese_type, max_results=6)
         except:
             web_recipes = []
         
-        # 4. CARDS HTML
+        # 3. CARDS HTML
         if not web_recipes:
             cards_html = """
             <div class="no-recipes">
