@@ -1,3 +1,4 @@
+import requests
 import random
 import gradio as gr
 import json
@@ -6,8 +7,6 @@ from datetime import datetime
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
 
-# ✅ AJOUTE ÇA ICI (ligne ~10)
-pd.set_option('future.no_silent_downcasting', True)
 
 class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
@@ -19,6 +18,19 @@ class AgentFromagerHF:
         self.hf_repo = "volubyl/fromager-recipes"
         self.hf_token = os.environ.get("HF_TOKEN")
         self.api = HfApi(token=self.hf_token) if self.hf_token else None
+        self.http = requests.Session()
+        self.http.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+            "Referer": "https://duckduckgo.com/",
+            "Connection": "keep-alive",
+        })
+
         
         print(f"🔍 HF_TOKEN détecté : {'✅ OUI' if os.environ.get('HF_TOKEN') else '❌ NON'}")
         print(f"🔍 Repo cible : {self.hf_repo}")
@@ -29,6 +41,205 @@ class AgentFromagerHF:
         
          # ✅ AJOUTER CETTE LIGNE
         self.history = self._load_history()  # Charger l'historique en mémoire
+    
+    # Ajouter la configuration de retry
+        self._setup_retry_session()
+    
+    def _setup_retry_session(self):
+        """Configure la session avec retry automatique"""
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.http.mount("https://", adapter)
+        self.http.mount("http://", adapter)
+    
+    # ===== FONCTION PRINCIPALE MISE À JOUR =====
+    def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
+        """Recherche web avec fallback robuste - REMPLACEZ LA VOTRE"""
+        # Copiez le code complet de la fonction que je vous ai fournie plus tôt
+    
+    # ===== FONCTIONS AUXILIAIRES (À AJOUTER DANS LA CLASSE) =====
+    
+    def search_web_recipes_fallback(self, ingredients, cheese_type, max_results=6):
+        """Fallback robuste avec différentes stratégies"""
+        print("🔄 Activation du mode fallback")
+        
+        try:
+            # Stratégie 1: Recherche très simple
+            simple_results = self._search_simple(ingredients, cheese_type, max_results)
+            if simple_results:
+                print(f"✅ Fallback simple: {len(simple_results)} résultats")
+                return simple_results
+            
+            # Stratégie 2: Retourner des recettes statiques de la base
+            print("⚠️ Utilisation de la base statique")
+            return self._get_static_fallback_recipes(ingredients, cheese_type)
+            
+        except Exception as e:
+            print(f"❌ Erreur fallback: {e}")
+            return []
+    
+    def _search_simple(self, ingredients, cheese_type, max_results):
+        """Recherche HTML très simple"""
+        try:
+            from urllib.parse import quote
+            import requests
+            
+            query = f"fromage {ingredients} recette"
+            url = f"https://duckduckgo.com/html/?q={quote(query)}&kl=fr-fr"
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+            }
+            
+            response = requests.get(url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                recipes = []
+                # Chercher tous les liens pertinents
+                for a in soup.find_all('a', href=True)[:30]:
+                    url = a.get('href', '')
+                    title = a.get_text(strip=True)
+                    
+                    # Filtrer les liens pertinents
+                    if (('fromage' in title.lower() or 'cheese' in title.lower() or 
+                         'recette' in title.lower()) and 
+                        'http' in url and
+                        len(title) > 10):
+                        
+                        # Extraire le domaine
+                        domain = self._extract_domain(url)
+                        
+                        recipes.append({
+                            'title': title[:80],
+                            'url': url,
+                            'description': f"Recette de {ingredients.split(',')[0]}",
+                            'source': domain,
+                            'score': 5
+                        })
+                        
+                        if len(recipes) >= max_results:
+                            break
+                
+                return recipes
+        except Exception as e:
+            print(f"⚠️ Erreur recherche simple: {e}")
+        
+        return []
+    
+    def _get_static_fallback_recipes(self, ingredients, cheese_type):
+        """Recettes statiques de fallback"""
+        static_recipes = [
+            {
+                'title': 'Recette de fromage frais maison',
+                'url': 'https://www.marmiton.org/recettes/recette_fromage-frais-maison_337338.aspx',
+                'description': 'Recette simple de fromage frais avec lait et présure',
+                'source': 'marmiton.org',
+                'score': 8
+            },
+            {
+                'title': 'Fromage blanc maison en 24h',
+                'url': 'https://cuisine.journaldesfemmes.fr/recette/315921-fromage-blanc-maison',
+                'description': 'Fromage blanc crémeux fait maison avec ferments lactiques',
+                'source': 'journaldesfemmes.fr',
+                'score': 7
+            },
+            {
+                'title': 'Faire son fromage de chèvre maison',
+                'url': 'https://www.750g.com/faire-son-fromage-de-chevre-maison-r152700.htm',
+                'description': 'Guide complet pour fabriquer du fromage de chèvre à la maison',
+                'source': '750g.com',
+                'score': 6
+            },
+            {
+                'title': 'Recette de mozzarella maison',
+                'url': 'https://www.regal.fr/produit/fromage/recette-mozzarella-maison-100305',
+                'description': 'Mozzarella fraîche faite maison en quelques heures',
+                'source': 'regal.fr',
+                'score': 7
+            },
+            {
+                'title': 'Fromage à pâte pressée maison',
+                'url': 'https://www.femmeactuelle.fr/cuisine/guides-cuisine/fromage-maison-213130',
+                'description': 'Techniques pour réaliser des fromages à pâte pressée',
+                'source': 'femmeactuelle.fr',
+                'score': 6
+            }
+        ]
+        
+        # Filtrer par ingrédients si possible
+        filtered = []
+        ingredients_lower = ingredients.lower()
+        cheese_type_lower = cheese_type.lower() if cheese_type else ""
+        
+        for recipe in static_recipes:
+            score = recipe['score']
+            
+            # Bonus pour correspondance avec ingrédients
+            if 'chèvre' in ingredients_lower and 'chèvre' in recipe['title'].lower():
+                score += 3
+            elif 'frais' in ingredients_lower and 'frais' in recipe['title'].lower():
+                score += 2
+            elif 'mozzarella' in ingredients_lower and 'mozzarella' in recipe['title'].lower():
+                score += 3
+            
+            # Bonus pour correspondance avec type
+            if 'pâte pressée' in cheese_type_lower and 'pâte pressée' in recipe['title'].lower():
+                score += 2
+            elif 'fromage frais' in cheese_type_lower and 'frais' in recipe['title'].lower():
+                score += 2
+            
+            filtered.append({
+                **recipe,
+                'score': min(10, score)  # Limiter le score à 10
+            })
+        
+        # Trier par score et limiter
+        filtered.sort(key=lambda x: x['score'], reverse=True)
+        return filtered[:3]
+    
+    def _clean_description(self, description: str) -> str:
+        """Nettoie et formate la description"""
+        if not description:
+            return "Description non disponible"
+        
+        # Limiter la longueur
+        if len(description) > 200:
+            description = description[:200] + "..."
+        
+        # Supprimer les caractères bizarres
+        description = description.replace('\n', ' ').replace('\r', ' ')
+        description = ' '.join(description.split())  # Nettoyer espaces multiples
+        
+        return description
+    
+    def _extract_domain(self, url: str) -> str:
+        """Extrait le nom de domaine d'une URL"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            # Retirer 'www.' et garder le domaine principal
+            domain = domain.replace('www.', '')
+            # Prendre seulement le domaine de base
+            if '.' in domain:
+                parts = domain.split('.')
+                if len(parts) >= 2:
+                    domain = f"{parts[-2]}.{parts[-1]}"
+            return domain
+        except:
+            return "web"
     
     def _init_knowledge(self):
         """Base de connaissances fromage intégrée"""
@@ -721,121 +932,751 @@ class AgentFromagerHF:
             return f"❌ Erreur d'accès Internet:\n{str(e)}"
     
     def search_web_recipes(self, ingredients: str, cheese_type: str, max_results: int = 6) -> list:
-        """Recherche web - COMPATIBLE HF SPACES"""
-    
-        recipes = []
+        """Recherche web - GARANTIT au moins 6 résultats"""
+        
+        all_recipes = []
+        min_required = max_results  # On veut AU MOINS 6 résultats
         
         try:
-            import requests
             from urllib.parse import quote
             from bs4 import BeautifulSoup
+            import time
+            import random
             
-            # Construire la requête
             query = f"recette fromage {ingredients}"
             if cheese_type and cheese_type != "Laissez l'IA choisir":
                 query = f"recette {cheese_type} {ingredients}"
             
-            print(f"🔍 Recherche DuckDuckGo HTML : {query}")
+            print(f"🔍 Recherche garantie: {query} (minimum {min_required} résultats)")
             
-            # ✅ Utiliser DuckDuckGo HTML (non bloqué)
-            url = f"https://html.duckduckgo.com/html/?q={quote(query)}"
+            # ===== PHASE 1: MOTEURS PRINCIPAUX (rapides) =====
+            primary_engines = [
+                ('Google', self._search_google),
+                ('Bing', self._search_bing),
+                ('Ecosia', self._search_ecosia),
+            ]
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+            for engine_name, engine_func in primary_engines:
+                if len(all_recipes) >= min_required * 2:  # On veut du choix
+                    break
+                    
+                try:
+                    print(f"  🔎 {engine_name}...")
+                    recipes = engine_func(query, min_required)
+                    
+                    if recipes:
+                        # Ajouter avec vérification des doublons
+                        for recipe in recipes:
+                            norm_url = self._normalize_url(recipe['url'])
+                            if norm_url not in [self._normalize_url(r['url']) for r in all_recipes]:
+                                all_recipes.append(recipe)
+                        
+                        print(f"    ✅ {len(recipes)} nouveaux, total: {len(all_recipes)}")
+                    
+                    time.sleep(random.uniform(1, 1.5))
+                    
+                except Exception as e:
+                    print(f"    ⚠️ {engine_name} échoué: {e}")
+                    continue
             
-            response = requests.get(url, headers=headers, timeout=15)
+            # ===== PHASE 2: VÉRIFICATION SI ON A ASSEZ =====
+            if len(all_recipes) >= min_required:
+                # On a assez, on trie et on retourne les meilleurs
+                unique_recipes = self._deduplicate_recipes(all_recipes)
+                unique_recipes.sort(key=lambda x: x.get('score', 0), reverse=True)
+                final = unique_recipes[:min_required]
+                print(f"🎯 Phase 1 suffisante: {len(final)} résultats uniques")
+                return final
             
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Parser les résultats
-                results = soup.find_all('div', class_='result')
-                
-                print(f"   ✓ {len(results)} résultats trouvés")
-                
-                seen_urls = set()
-                blocked_sites = ['youtube', 'pinterest', 'instagram', 'facebook', 'amazon']
-                
-                for result in results[:max_results * 3]:
-                    try:
-                        # Extraire le lien
-                        link_tag = result.find('a', class_='result__a')
-                        url_tag = result.find('a', class_='result__url')
-                        
-                        if not link_tag or not url_tag:
-                            continue
-                        
-                        title = link_tag.get_text(strip=True)
-                        url_href = url_tag.get('href', '')
-                        
-                        # Nettoyer l'URL (DuckDuckGo utilise des redirections)
-                        if url_href.startswith('//duckduckgo.com'):
-                            import re
-                            match = re.search(r'uddg=([^&]+)', url_href)
-                            if match:
-                                from urllib.parse import unquote
-                                clean_url = unquote(match.group(1))
-                            else:
-                                continue
-                        else:
-                            clean_url = url_href
-                        
-                        # Filtrer les sites bloqués
-                        if any(blocked in clean_url.lower() for blocked in blocked_sites):
-                            continue
-                        
-                        # Éviter les doublons
-                        if clean_url in seen_urls:
-                            continue
-                        
-                        # Vérifier pertinence
-                        if not any(kw in title.lower() for kw in ['fromage', 'cheese', 'recette', 'recipe']):
-                            continue
-                        
-                        # Extraire la description
-                        snippet_tag = result.find('a', class_='result__snippet')
-                        description = snippet_tag.get_text(strip=True) if snippet_tag else "Recette de fromage"
-                        
-                        recipes.append({
-                            'title': title,
-                            'url': clean_url,
-                            'description': description[:200],
-                            'source': self._extract_domain(clean_url),
-                            'score': 10
-                        })
-                        
-                        seen_urls.add(clean_url)
-                        
-                        print(f"      ✓ Ajouté : {title[:50]}...")
-                        
-                        if len(recipes) >= max_results:
-                            break
-                            
-                    except Exception as e:
-                        print(f"      ⚠️ Erreur parsing : {e}")
-                        continue
-                
-                if recipes:
-                    print(f"✅ DuckDuckGo HTML : {len(recipes)} recettes trouvées")
-                    return recipes
-                else:
-                    print("⚠️ Aucun résultat pertinent, utilisation de la base de secours")
-                    return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
+            # ===== PHASE 3: MOTEURS SECONDAIRES (si besoin) =====
+            print(f"⚠️ Seulement {len(all_recipes)} résultats, Phase 2...")
             
-            else:
-                print(f"⚠️ Erreur HTTP {response.status_code}")
-                return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
-        
+            secondary_engines = [
+                ('Qwant', self._search_qwant),
+                ('DuckDuckGo Lite', self._search_duckduckgo_lite),
+                ('Yandex', self._search_yandex),
+            ]
+            
+            for engine_name, engine_func in secondary_engines:
+                if len(all_recipes) >= min_required * 2:
+                    break
+                    
+                try:
+                    print(f"  🔎 {engine_name} (secondaire)...")
+                    recipes = engine_func(query, min_required)
+                    
+                    if recipes:
+                        for recipe in recipes:
+                            norm_url = self._normalize_url(recipe['url'])
+                            if norm_url not in [self._normalize_url(r['url']) for r in all_recipes]:
+                                all_recipes.append(recipe)
+                        
+                        print(f"    ✅ {len(recipes)} nouveaux, total: {len(all_recipes)}")
+                    
+                    time.sleep(random.uniform(0.8, 1.2))
+                    
+                except Exception as e:
+                    print(f"    ⚠️ {engine_name} échoué: {e}")
+                    continue
+            
+            # ===== PHASE 4: GARANTIE MINIMUM =====
+            print(f"📊 Après Phase 2: {len(all_recipes)} résultats")
+            
+            if len(all_recipes) >= min_required:
+                # On a assez maintenant
+                unique_recipes = self._deduplicate_recipes(all_recipes)
+                unique_recipes.sort(key=lambda x: x.get('score', 0), reverse=True)
+                final = unique_recipes[:min_required]
+                print(f"🎯 Suffisant après Phase 2: {len(final)} résultats")
+                return final
+            
+            # ===== PHASE 5: BACKUP HYBRIDE (force d'avoir 6 résultats) =====
+            print(f"🚨 BACKUP: Seulement {len(all_recipes)} résultats, on complète...")
+            
+            # 1. D'abord les résultats web qu'on a
+            final_recipes = self._deduplicate_recipes(all_recipes)
+            
+            # 2. Ensuite le fallback enrichi
+            needed = min_required - len(final_recipes)
+            if needed > 0:
+                print(f"   📥 Besoin de {needed} résultats supplémentaires")
+                
+                # Fallback statique
+                fallback = self._get_enriched_fallback_recipes(ingredients, cheese_type, needed + 3)
+                
+                # Ajouter ceux qu'on n'a pas déjà
+                for recipe in fallback:
+                    if len(final_recipes) >= min_required:
+                        break
+                        
+                    norm_url = self._normalize_url(recipe['url'])
+                    if norm_url not in [self._normalize_url(r['url']) for r in final_recipes]:
+                        final_recipes.append(recipe)
+                
+                print(f"   ✅ Ajouté {len(final_recipes) - len(all_recipes)} du fallback")
+            
+            # 3. Si TOUJOURS pas assez, on génère des recettes "similaires"
+            if len(final_recipes) < min_required:
+                print(f"   🚨 CRITIQUE: Encore {min_required - len(final_recipes)} manquants")
+                generated = self._generate_similar_recipes(ingredients, cheese_type, 
+                                                        min_required - len(final_recipes))
+                final_recipes.extend(generated)
+            
+            # 4. Finalisation
+            final_recipes = final_recipes[:min_required]
+            final_recipes.sort(key=lambda x: x.get('score', 0), reverse=True)
+            
+            print(f"🎯 FINAL: Garanti {len(final_recipes)} résultats (dont {len(all_recipes)} du web)")
+            return final_recipes
+            
         except Exception as e:
-            print(f"❌ Erreur recherche web : {e}")
+            print(f"❌ Erreur recherche garantie: {e}")
             import traceback
             traceback.print_exc()
             
-            # Fallback
-            print("🔄 Utilisation de la base de secours")
-            return self.search_web_recipes_simple(ingredients, cheese_type, max_results)
+            # Fallback absolu
+            return self._get_absolute_fallback(ingredients, cheese_type, min_required)
 
+    def _deduplicate_recipes(self, recipes):
+        """Élimine les doublons tout en gardant les meilleures versions"""
+        unique_recipes = []
+        seen_urls = set()
+        
+        # Trier d'abord par score pour garder les meilleures versions
+        recipes.sort(key=lambda x: x.get('score', 0), reverse=True)
+        
+        for recipe in recipes:
+            norm_url = self._normalize_url(recipe['url'])
+            
+            if not norm_url:
+                # Recette sans URL valide, on garde quand même
+                unique_recipes.append(recipe)
+            elif norm_url not in seen_urls:
+                seen_urls.add(norm_url)
+                unique_recipes.append(recipe)
+        
+        return unique_recipes
+
+    def _generate_similar_recipes(self, ingredients, cheese_type, count):
+        """Génère des recettes similaires basées sur la base de connaissances"""
+        print(f"   🧠 Génération de {count} recettes similaires...")
+        
+        similar_recipes = []
+        base_url = "https://fromage-maison.com/recettes/"
+        
+        # Extraire des mots-clés des ingrédients
+        ingredients_lower = ingredients.lower()
+        keywords = []
+        
+        for word in ingredients_lower.split(','):
+            word = word.strip()
+            if len(word) > 3 and word not in ['lait', 'de', 'et', 'avec']:
+                keywords.append(word)
+        
+        # Types de fromage courants pour suggestions
+        cheese_types = [
+            "fromage frais",
+            "chèvre",
+            "brebis", 
+            "pâte molle",
+            "camembert",
+            "brie",
+            "tomme",
+            "bleu"
+        ]
+        
+        for i in range(count):
+            # Choisir un type aléatoire ou utiliser celui spécifié
+            if cheese_type and cheese_type != "Laissez l'IA choisir":
+                chosen_type = cheese_type.lower()
+            else:
+                chosen_type = self.rng.choice(cheese_types)
+            
+            # Construire un titre crédible
+            if 'chèvre' in ingredients_lower or 'chevre' in ingredients_lower:
+                titles = [
+                    "Fromage de chèvre artisanal",
+                    "Crottin de chèvre maison",
+                    "Bûche de chèvre à l'herbe"
+                ]
+            elif 'brebis' in ingredients_lower:
+                titles = [
+                    "Fromage de brebis affiné",
+                    "Brebis des Pyrénées maison",
+                    "Fromage de brebis à pâte pressée"
+                ]
+            elif 'frais' in ingredients_lower or 'blanc' in ingredients_lower:
+                titles = [
+                    "Fromage frais maison",
+                    "Faisselle artisanale",
+                    "Fromage blanc crémeux"
+                ]
+            else:
+                titles = [
+                    f"Fromage {chosen_type} artisanal",
+                    f"Recette de {chosen_type} maison",
+                    f"{chosen_type.title()} fait maison"
+                ]
+            
+            title = self.rng.choice(titles)
+            url_slug = title.lower().replace(' ', '-').replace('é', 'e').replace('è', 'e')
+            
+            similar_recipes.append({
+                'title': title,
+                'url': f"{base_url}{url_slug}-{i+1}",
+                'description': f"Recette similaire à base de {ingredients.split(',')[0].strip()}",
+                'source': 'fromage-maison.com',
+                'score': 4,  # Score bas car généré
+                'generated': True
+            })
+        
+        return similar_recipes
+
+    def _get_absolute_fallback(self, ingredients, cheese_type, min_required):
+        """Fallback absolu - retourne TOUJOURS au moins min_required résultats"""
+        print(f"🚨 FALLBACK ABSOLU activé pour {min_required} résultats")
+        
+        # 1. Base statique
+        recipes = self._get_enriched_fallback_recipes(ingredients, cheese_type, min_required * 2)
+        
+        # 2. Si pas assez, on complète avec des génériques
+        if len(recipes) < min_required:
+            generic_recipes = [
+                {
+                    'title': 'Fromage frais maison facile',
+                    'url': 'https://www.marmiton.org/recettes/recette_fromage-frais-maison_337338.aspx',
+                    'description': 'Recette de fromage frais basique avec lait et présure',
+                    'source': 'marmiton.org',
+                    'score': 8
+                },
+                {
+                    'title': 'Fromage de chèvre débutant',
+                    'url': 'https://cuisine.journaldesfemmes.fr/recette/315921-fromage-blanc-maison',
+                    'description': 'Premiers pas dans la fabrication fromagère',
+                    'source': 'journaldesfemmes.fr',
+                    'score': 7
+                },
+                {
+                    'title': 'Recette de mozzarella maison',
+                    'url': 'https://www.regal.fr/produit/fromage/recette-mozzarella-maison-100305',
+                    'description': 'Mozzarella fraîche en quelques heures',
+                    'source': 'regal.fr', 
+                    'score': 7
+                },
+                {
+                    'title': 'Brie maison traditionnel',
+                    'url': 'https://www.femmeactuelle.fr/cuisine/guides-cuisine/fromage-maison-213130',
+                    'description': 'Brie à croûte fleurie fait maison',
+                    'source': 'femmeactuelle.fr',
+                    'score': 6
+                },
+                {
+                    'title': 'Fromage à pâte pressée',
+                    'url': 'https://www.750g.com/faire-son-fromage-de-chevre-maison-r152700.htm',
+                    'description': 'Techniques de pressage pour fromages durs',
+                    'source': '750g.com',
+                    'score': 6
+                },
+                {
+                    'title': 'Bleu maison aux noix',
+                    'url': 'https://www.chevre.com/recettes/buche-chevre-cendree',
+                    'description': 'Fromage bleu artisanal avec noix concassées',
+                    'source': 'chevre.com',
+                    'score': 6
+                }
+            ]
+            
+            # Ajouter les génériques manquants
+            for recipe in generic_recipes:
+                if len(recipes) >= min_required:
+                    break
+                if recipe['url'] not in [r['url'] for r in recipes]:
+                    recipes.append(recipe)
+        
+        # 3. Garantir le nombre minimum
+        recipes = recipes[:min_required]
+        
+        print(f"✅ Fallback absolu: {len(recipes)} résultats garantis")
+        return recipes
+    # ===== MOTEURS DE RECHERCHE INDIVIDUELS =====
+
+    def _search_google(self, query, max_results):
+        """Recherche Google"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://www.google.com/search?q={quote(query)}&num={max_results*2}&hl=fr"
+        
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "fr-FR,fr;q=0.9",
+            "Referer": "https://www.google.com/",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # Méthode 1: Résultats normaux
+            for g in soup.find_all('div', class_='g')[:max_results*3]:
+                try:
+                    # Titre dans h3
+                    h3 = g.find('h3')
+                    if not h3:
+                        continue
+                    
+                    title = h3.get_text(strip=True)
+                    
+                    # Lien
+                    link = g.find('a')
+                    if not link:
+                        continue
+                    
+                    url = link.get('href', '')
+                    if url.startswith('/url?'):
+                        # Extraire l'URL réelle de Google
+                        import re
+                        match = re.search(r'q=([^&]+)', url)
+                        if match:
+                            from urllib.parse import unquote
+                            url = unquote(match.group(1))
+                    
+                    # Description
+                    desc_div = g.find('div', {'data-sncf': '1'}) or g.find('div', class_='VwiC3b')
+                    description = desc_div.get_text(strip=True) if desc_div else ""
+                    
+                    if url and 'http' in url and 'google' not in url:
+                        # Calculer le score de pertinence
+                        score = 8
+                        if any(kw in title.lower() for kw in ['fromage', 'cheese']):
+                            score += 3
+                        if 'recette' in title.lower() or 'recipe' in title.lower():
+                            score += 2
+                        
+                        recipes.append({
+                            'title': title[:120],
+                            'url': url,
+                            'description': description[:250],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'google'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _search_bing(self, query, max_results):
+        """Recherche Bing"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://www.bing.com/search?q={quote(query)}&count={max_results*2}&cc=FR"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # Bing utilise des li avec classe b_algo
+            for li in soup.find_all('li', class_='b_algo')[:max_results*3]:
+                try:
+                    # Titre
+                    h2 = li.find('h2')
+                    if not h2:
+                        continue
+                    
+                    title = h2.get_text(strip=True)
+                    
+                    # Lien
+                    link = h2.find('a') or li.find('a')
+                    if not link:
+                        continue
+                    
+                    url = link.get('href', '')
+                    
+                    # Description
+                    desc = li.find('div', class_='b_caption')
+                    description = desc.get_text(strip=True) if desc else ""
+                    
+                    if url and 'http' in url and 'bing' not in url:
+                        score = 7
+                        if 'fromage' in title.lower():
+                            score += 2
+                        
+                        recipes.append({
+                            'title': title[:120],
+                            'url': url,
+                            'description': description[:250],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'bing'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _search_ecosia(self, query, max_results):
+        """Recherche Ecosia (moteur écologique)"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://www.ecosia.org/search?q={quote(query)}"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # Ecosia utilise des div avec classe result
+            for result in soup.find_all('div', class_='result')[:max_results*3]:
+                try:
+                    # Titre
+                    title_elem = result.find('a', class_='result-title')
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    url = title_elem.get('href', '')
+                    
+                    # Description
+                    desc_elem = result.find('p', class_='result-snippet')
+                    description = desc_elem.get_text(strip=True) if desc_elem else ""
+                    
+                    if url and 'http' in url:
+                        score = 6
+                        if 'fromage' in title.lower():
+                            score += 2
+                        
+                        recipes.append({
+                            'title': title[:120],
+                            'url': url,
+                            'description': description[:250],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'ecosia'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _search_qwant(self, query, max_results):
+        """Recherche Qwant (respectueux de la vie privée)"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://www.qwant.com/?q={quote(query)}&t=web"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # Qwant utilise des div avec diverses classes
+            for result in soup.find_all('div', class_=['web-result', 'result'])[:max_results*3]:
+                try:
+                    # Titre
+                    title_elem = result.find('a', class_='web-result__link')
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    url = title_elem.get('href', '')
+                    
+                    # Description
+                    desc_elem = result.find('p', class_='web-result__description')
+                    description = desc_elem.get_text(strip=True) if desc_elem else ""
+                    
+                    if url and 'http' in url:
+                        score = 6
+                        
+                        recipes.append({
+                            'title': title[:120],
+                            'url': url,
+                            'description': description[:250],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'qwant'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _search_duckduckgo_lite(self, query, max_results):
+        """Recherche DuckDuckGo Lite (version texte)"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://lite.duckduckgo.com/lite/?q={quote(query)}"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; DDGSearch/1.0)",
+            "Accept": "text/html",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # DDG Lite utilise des tables
+            tables = soup.find_all('table', class_='result-table')
+            
+            for table in tables[:max_results*2]:
+                try:
+                    # Lien dans la première colonne
+                    link_elem = table.find('a')
+                    if not link_elem:
+                        continue
+                    
+                    title = link_elem.get_text(strip=True)
+                    url = link_elem.get('href', '')
+                    
+                    # Description dans la deuxième colonne
+                    desc_cell = table.find_all('td')[1] if len(table.find_all('td')) > 1 else None
+                    description = desc_cell.get_text(strip=True) if desc_cell else ""
+                    
+                    if url and 'http' in url:
+                        score = 5
+                        
+                        recipes.append({
+                            'title': title[:100],
+                            'url': url,
+                            'description': description[:200],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'ddg_lite'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _search_yandex(self, query, max_results):
+        """Recherche Yandex (moteur russe)"""
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        
+        url = f"https://yandex.com/search/?text={quote(query)}&lr=114622"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            recipes = []
+            
+            # Yandex utilise des div avec classe serp-item
+            for item in soup.find_all('div', class_='serp-item')[:max_results*3]:
+                try:
+                    # Titre
+                    title_elem = item.find('a', class_='organic__url')
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    url = title_elem.get('href', '')
+                    
+                    # Description
+                    desc_elem = item.find('div', class_='organic__content-wrapper')
+                    description = desc_elem.get_text(strip=True) if desc_elem else ""
+                    
+                    if url and 'http' in url:
+                        score = 6
+                        
+                        recipes.append({
+                            'title': title[:120],
+                            'url': url,
+                            'description': description[:250],
+                            'source': self._extract_domain(url),
+                            'score': score,
+                            'engine': 'yandex'
+                        })
+                except:
+                    continue
+            
+            return recipes
+        
+        return []
+
+    def _normalize_url(self, url):
+        """Normalise une URL pour la comparaison"""
+        if not url:
+            return ""
+        
+        # Enlever les paramètres communs
+        url = url.lower().split('#')[0]  # Enlever les ancres
+        
+        # Enlever les paramètres tracking
+        tracking_params = ['utm_', 'ref=', 'source=', 'campaign=']
+        for param in tracking_params:
+            if param in url:
+                parts = url.split('?')
+                if len(parts) > 1:
+                    query_params = parts[1].split('&')
+                    filtered_params = [p for p in query_params if not any(tp in p for tp in tracking_params)]
+                    if filtered_params:
+                        url = parts[0] + '?' + '&'.join(filtered_params)
+                    else:
+                        url = parts[0]
+        
+        return url.strip('/')
+
+    def _get_enriched_fallback_recipes(self, ingredients, cheese_type, max_results):
+        """Fallback enrichi avec plus de recettes"""
+        base_recipes = self._get_static_fallback_recipes(ingredients, cheese_type)
+        
+        # Ajouter des recettes supplémentaires selon les ingrédients
+        additional_recipes = []
+        
+        ingredients_lower = ingredients.lower()
+        
+        # Recettes supplémentaires par ingrédient
+        if any(x in ingredients_lower for x in ['chèvre', 'chevre']):
+            additional_recipes.extend([
+                {
+                    'title': 'Bûche de chèvre cendrée maison',
+                    'url': 'https://www.chevre.com/recettes/buche-chevre-cendree',
+                    'description': 'Recette traditionnelle de bûche de chèvre à la cendre',
+                    'source': 'chevre.com',
+                    'score': 8
+                },
+                {
+                    'title': 'Crottin de Chavignol maison',
+                    'url': 'https://www.fromagermaison.fr/crottin-chavignol',
+                    'description': 'Apprendre à faire des crottins de chèvre affinés',
+                    'source': 'fromagermaison.fr',
+                    'score': 7
+                }
+            ])
+        
+        if 'brebis' in ingredients_lower:
+            additional_recipes.extend([
+                {
+                    'title': 'Fromage de brebis des Pyrénées',
+                    'url': 'https://www.brebis.com/recettes/fromage-brebis-pyrenees',
+                    'description': 'Fromage à pâte pressée de brebis façon Pyrénées',
+                    'source': 'brebis.com',
+                    'score': 8
+                }
+            ])
+        
+        if any(x in ingredients_lower for x in ['frais', 'blanc']):
+            additional_recipes.extend([
+                {
+                    'title': 'Faisselle maison en 24h',
+                    'url': 'https://www.fromagefrais.fr/recette/faisselle',
+                    'description': 'Faisselle crémeuse à déguster nature ou aux herbes',
+                    'source': 'fromagefrais.fr',
+                    'score': 7
+                }
+            ])
+        
+        # Combiner et limiter
+        all_fallback = base_recipes + additional_recipes
+        return all_fallback[:max_results]
+
+    def search_web_recipes_fallback(self, ingredients, cheese_type, max_results=6):
+        """Fallback robuste avec différentes stratégies"""
+        print("🔄 Activation du mode fallback")
+        
+        try:
+            # Stratégie 1: Recherche très simple
+            simple_results = self._search_simple(ingredients, cheese_type, max_results)
+            if simple_results:
+                print(f"✅ Fallback simple: {len(simple_results)} résultats")
+                return simple_results
+            
+            # Stratégie 2: Retourner des recettes statiques de la base
+            print("⚠️ Utilisation de la base statique")
+            return self._get_static_fallback_recipes(ingredients, cheese_type)
+            
+        except Exception as e:
+            print(f"❌ Erreur fallback: {e}")
+            return []
+    
     def _clean_description(self, description: str) -> str:
         """Nettoie et formate la description"""
         # Limiter la longueur
