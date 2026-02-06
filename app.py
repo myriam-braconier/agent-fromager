@@ -4474,7 +4474,14 @@ def create_interface():
     ... (ton CSS)
     """
     
-    with gr.Blocks(title="🧀 Agent Fromager") as demo:
+    with gr.Blocks(
+        title="🧀 Agent Fromager",
+        theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
+        css=custom_css,
+        head="""
+        <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
+        """
+        ) as demo:
         
         gr.HTML("""
         <h1 style="text-align: center; color: #BF360C;">🧀 Agent Fromager Intelligent</h1>
