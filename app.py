@@ -4476,7 +4476,7 @@ def create_interface():
     
     with gr.Blocks(title="🧀 Agent Fromager") as demo:
         
-        gr.Markdown("""k
+        gr.Markdown("""
         # 🧀 Agent Fromager Intelligent
         ### Créez vos fromages avec l'IA + Recherche web automatique
         """)
