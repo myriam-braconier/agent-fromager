@@ -4476,9 +4476,9 @@ def create_interface():
     
     with gr.Blocks(title="🧀 Agent Fromager") as demo:
         
-        gr.Markdown("""
-        # 🧀 Agent Fromager Intelligent
-        ### Créez vos fromages avec l'IA + Recherche web automatique
+        gr.HTML("""
+        <h1 style="text-align: center; color: #BF360C;">🧀 Agent Fromager Intelligent</h1>
+        <h3 style="text-align: center; color: #5D4037;">Créez vos fromages avec l'IA + Recherche web automatique</h3>
         """)
         
         # ===== ZONE DE SAISIE COMMUNE EN HAUT =====
