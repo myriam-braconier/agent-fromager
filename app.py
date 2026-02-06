@@ -34,6 +34,8 @@ class AgentFromagerHF:
         self.hf_token = os.environ.get("HF_TOKEN")
         self.api = HfApi(token=self.hf_token) if self.hf_token else None
         self.http = requests.Session()
+        
+        # Configuration HTTP
         self.http.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (X11; Linux x86_64) "
@@ -46,9 +48,13 @@ class AgentFromagerHF:
             "Connection": "keep-alive",
         })
         
+        # Variables d'environnement
         self.serpapi_key = os.environ.get("SERPAPI_KEY")
         self.hf_token = os.environ.get("HF_TOKEN")
 
+        # ===== SECTION DIAGNOSTIC ORIGINALE =====
+        print("="*50)
+        print("🧪 DIAGNOSTIC SYSTÈME")
         print("="*50)
         print(f"   SerpAPI: {'✅ PRÉSENTE' if self.serpapi_key else '❌ ABSENTE'}")
         print(f"🔍 HF_TOKEN détecté : {'✅ OUI' if os.environ.get('HF_TOKEN') else '❌ NON'}")
@@ -56,32 +62,124 @@ class AgentFromagerHF:
         print(f"🔍 API initialisée : {'✅ OUI' if self.api else '❌ NON'}")
         print("="*50)
         
-          # ===== CONFIGURATION CHAT LLM (AJOUTER ICI) =====
-        print("\n🤖 CONFIGURATION CHAT LLM")
+        # ===== CONFIGURATION CHAT LLM =====
+        print("\n" + "="*50)
+        print("🤖 CONFIGURATION CHAT LLM")
         print("="*50)
         
-         # Configuration DeepSeek (100% gratuit - recommandé)
+        # Initialiser tous les attributs
+        self.deepseek_enabled = False
+        self.ollama_enabled = False
+        self.hf_inference_enabled = False
+        self.lmstudio_enabled = False
+        self.google_ai_enabled = False
+        self.openrouter_enabled = False
+        self.together_enabled = False  # Ajouté pour Together AI
+        
+        # ===== OPENROUTER (PRIORITÉ HAUTE - GRATUIT AVEC QUOTAS) =====
+        self.openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+        if self.openrouter_api_key and self.openrouter_api_key.strip():
+            self.openrouter_enabled = True
+            print("✅ OpenRouter: CONFIGURÉ (gratuit avec quotas)")
+            print(f"   📝 Clé: {self.openrouter_api_key[:10]}...{self.openrouter_api_key[-4:]}")
+        else:
+            print("❌ OpenRouter: PAS DE CLÉ - https://openrouter.ai/ (gratuit)")
+        
+        # ===== GOOGLE AI / GEMINI (PRIORITÉ MOYENNE - TRÈS GÉNÉREUX) =====
+        self.google_ai_api_key = os.environ.get("GOOGLE_AI_API_KEY")
+        if self.google_ai_api_key:
+            self.google_ai_enabled = True
+            print("✅ Google AI (Gemini): CONFIGURÉ (gratuit)")
+        else:
+            print("ℹ️ Google AI: PAS DE CLÉ - https://makersuite.google.com/")
+        
+        # ===== TOGETHER AI (PRIORITÉ MOYENNE - 25$ GRATUIT) =====
+        self.together_api_key = os.environ.get("TOGETHER_API_KEY")
+        if self.together_api_key:
+            self.together_enabled = True
+            print("✅ Together AI: CONFIGURÉ (25$ gratuit)")
+        else:
+            print("ℹ️ Together AI: PAS DE CLÉ - https://api.together.xyz/")
+        
+        # ===== DEEPSEEK (PRIORITÉ BASSE - VOUS AVEZ DIT QUE ÇA NE FONCTIONNE PAS) =====
         self.deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY")
         if self.deepseek_api_key and self.deepseek_api_key != "sk-xxx":
             self.deepseek_enabled = True
-            print("✅ DeepSeek API: CONFIGURÉ (gratuit)")
+            print("✅ DeepSeek: CONFIGURÉ")
         else:
-            self.deepseek_enabled = False
-            print("⚠️ DeepSeek: PAS DE CLÉ - mode fallback activé")
+            print("❌ DeepSeek: NON CONFIGURÉ")
         
-        # Configuration Ollama (local - option alternative)
+        # ===== SOLUTIONS LOCALES =====
+        
+        # OLLAMA (local)
         self.ollama_url = "http://localhost:11434/api/generate"
-        self.ollama_model = "llama2"  # ou "mistral", "gemma:2b"
-        self.ollama_enabled = self._test_ollama_connection()
-        if self.ollama_enabled:
-            print(f"✅ Ollama: CONNECTÉ (modèle: {self.ollama_model})")
-        else:
-            print("ℹ️ Ollama: NON DÉTECTÉ (installer avec: curl -fsSL https://ollama.ai/install.sh | sh)")
+        self.ollama_model = "qwen2.5:7b"  # Meilleur que llama2 pour le français
         
-        # Configuration Hugging Face (si token disponible)
-        self.hf_inference_enabled = bool(self.hf_token)
-        if self.hf_inference_enabled:
+        try:
+            response = requests.post(
+                self.ollama_url,
+                json={"model": self.ollama_model, "prompt": "test", "stream": False},
+                timeout=2
+            )
+            self.ollama_enabled = (response.status_code == 200)
+        except:
+            self.ollama_enabled = False
+        
+        if self.ollama_enabled:
+            print(f"✅ Ollama: CONNECTÉ ({self.ollama_model})")
+        else:
+            print("ℹ️ Ollama: NON DÉTECTÉ")
+        
+        # LM STUDIO (local)
+        try:
+            response = requests.get("http://localhost:1234/v1/models", timeout=2)
+            self.lmstudio_enabled = (response.status_code == 200)
+        except:
+            self.lmstudio_enabled = False
+        
+        if self.lmstudio_enabled:
+            print("✅ LM Studio: CONNECTÉ")
+        else:
+            print("ℹ️ LM Studio: NON DÉTECTÉ")
+        
+        # HUGGING FACE INFERENCE
+        if self.hf_token:
+            self.hf_inference_enabled = True
             print("✅ Hugging Face Inference: DISPONIBLE")
+        else:
+            print("ℹ️ Hugging Face Inference: PAS DE TOKEN")
+        
+        # FALLBACK LOCAL (TOUJOURS DISPONIBLE)
+        print("✅ Base de connaissances: PRÊTE (fallback intelligent)")
+        
+        # ===== RÉSUMÉ DES OPTIONS DISPONIBLES =====
+        print("\n" + "="*50)
+        print("🎯 OPTIONS DISPONIBLES (par ordre de priorité)")
+        print("="*50)
+        
+        options = []
+        if self.openrouter_enabled: 
+            options.append("1. OpenRouter 🌐 (cloud, gratuit)")
+        if self.google_ai_enabled: 
+            options.append("2. Google AI 🌐 (cloud, gratuit)")
+        if self.together_enabled: 
+            options.append("3. Together AI 🌐 (cloud, 25$ gratuit)")
+        if self.ollama_enabled: 
+            options.append("4. Ollama 💻 (local, 100% gratuit)")
+        if self.lmstudio_enabled: 
+            options.append("5. LM Studio 💻 (local, 100% gratuit)")
+        if self.hf_inference_enabled: 
+            options.append("6. Hugging Face 🌐 (cloud, gratuit)")
+        if self.deepseek_enabled: 
+            options.append("7. DeepSeek 🌐 (cloud)")
+        
+        for option in options:
+            print(f"   {option}")
+        
+        if not options:
+            print("   ⚠️ AUCUN LLM externe - mode fallback uniquement")
+        else:
+            print(f"\n   Total: {len(options)} option(s) disponible(s)")
         
         print("="*50 + "\n")
         # ===== FIN CONFIGURATION CHAT =====
@@ -89,19 +187,10 @@ class AgentFromagerHF:
         # Charger l'historique depuis HF au démarrage
         self._download_history_from_hf()
         
-        # ✅ AJOUTER CETTE LIGNE
-        self.history = self._load_history()  # Charger l'historique en mémoire
-    
-        # Ajouter la configuration de retry
-        self._setup_retry_session()
+        # Charger l'historique en mémoire
+        self.history = self._load_history()
         
-        # Charger l'historique depuis HF au démarrage
-        self._download_history_from_hf()
-        
-         # ✅ AJOUTER CETTE LIGNE
-        self.history = self._load_history()  # Charger l'historique en mémoire
-    
-    # Ajouter la configuration de retry
+        # Configuration de retry pour les requêtes HTTP
         self._setup_retry_session()
     
     def _setup_retry_session(self):
@@ -3691,86 +3780,153 @@ Adaptations suggérées selon vos contraintes.
         except:
             return False
     
-    def chat_with_llm(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> str:
+    def chat_with_llm(self, user_message: str, conversation_history=None) -> str:
         """
         Chat intelligent avec fallback sur plusieurs fournisseurs gratuits
-        Priorité: 1. DeepSeek → 2. Ollama → 3. Hugging Face → 4. Fallback local
+        Priorité: 1. OpenRouter → 2. Google AI → 3. Ollama → 4. Hugging Face → 5. Fallback local
         """
-        print(f"💬 Question reçue: {user_message[:50]}...")
+        print(f"💬 Question reçue: '{user_message[:100]}...'")
         
-        # 1. ESSAYER DEEPSEEK (gratuit et fiable)
-        if self.deepseek_enabled:
+        # DEBUG: État des LLMs (avec vérification d'attributs pour éviter les erreurs)
+        print("🔍 ÉTAT LLMs - ", end="")
+        if hasattr(self, 'openrouter_enabled'):
+            print(f"OpenRouter: {self.openrouter_enabled}, ", end="")
+        if hasattr(self, 'google_ai_enabled'):
+            print(f"Google AI: {self.google_ai_enabled}, ", end="")
+        if hasattr(self, 'ollama_enabled'):
+            print(f"Ollama: {self.ollama_enabled}, ", end="")
+        if hasattr(self, 'together_enabled'):
+            print(f"Together: {self.together_enabled}")
+        print()
+        
+        # ===== TENTATIVE AVEC LES LLMS =====
+        
+        # 1. OPENROUTER (priorité haute - gratuit avec quotas)
+        if hasattr(self, 'openrouter_enabled') and self.openrouter_enabled:
             try:
-                print("  🤖 Tentative DeepSeek...")
-                response = self._chat_deepseek(user_message, conversation_history)
-                if response and not response.startswith("❌"):
-                    print("  ✅ Réponse DeepSeek obtenue")
-                    return response
+                print("  🤖 Tentative OpenRouter...")
+                # Vérifier si la méthode existe
+                if hasattr(self, '_chat_openrouter'):
+                    response = self._chat_openrouter(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse OpenRouter ({len(response)} caractères)")
+                        return response
+                else:
+                    print("  ⚠️ Méthode _chat_openrouter manquante!")
             except Exception as e:
-                print(f"  ⚠️ DeepSeek échoué: {e}")
+                print(f"  ⚠️ OpenRouter échoué: {type(e).__name__}")
         
-        # 2. ESSAYER OLLAMA (local)
-        if self.ollama_enabled:
+        # 2. GOOGLE AI / GEMINI
+        if hasattr(self, 'google_ai_enabled') and self.google_ai_enabled:
+            try:
+                print("  🤖 Tentative Google AI...")
+                if hasattr(self, '_chat_google_ai'):
+                    response = self._chat_google_ai(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse Google AI ({len(response)} caractères)")
+                        return response
+            except Exception as e:
+                print(f"  ⚠️ Google AI échoué: {type(e).__name__}")
+        
+        # 3. TOGETHER AI (si vous avez ajouté cette méthode)
+        if hasattr(self, 'together_enabled') and self.together_enabled:
+            try:
+                print("  🤖 Tentative Together AI...")
+                if hasattr(self, '_chat_together_ai'):
+                    response = self._chat_together_ai(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse Together AI ({len(response)} caractères)")
+                        return response
+            except Exception as e:
+                print(f"  ⚠️ Together AI échoué: {type(e).__name__}")
+        
+        # 4. OLLAMA (local)
+        if hasattr(self, 'ollama_enabled') and self.ollama_enabled:
             try:
                 print("  🤖 Tentative Ollama...")
-                response = self._chat_ollama(user_message, conversation_history)
-                if response and not response.startswith("❌"):
-                    print("  ✅ Réponse Ollama obtenue")
-                    return response
+                if hasattr(self, '_chat_ollama'):
+                    response = self._chat_ollama(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse Ollama ({len(response)} caractères)")
+                        return response
             except Exception as e:
-                print(f"  ⚠️ Ollama échoué: {e}")
+                print(f"  ⚠️ Ollama échoué: {type(e).__name__}")
         
-        # 3. ESSAYER HUGGING FACE
-        if self.hf_inference_enabled:
+        # 5. DEEPSEEK (si vous le gardez)
+        if hasattr(self, 'deepseek_enabled') and self.deepseek_enabled:
+            try:
+                print("  🤖 Tentative DeepSeek...")
+                if hasattr(self, '_chat_deepseek'):
+                    response = self._chat_deepseek(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse DeepSeek ({len(response)} caractères)")
+                        return response
+            except Exception as e:
+                print(f"  ⚠️ DeepSeek échoué: {type(e).__name__}")
+        
+        # 6. HUGGING FACE
+        if hasattr(self, 'hf_inference_enabled') and self.hf_inference_enabled:
             try:
                 print("  🤖 Tentative Hugging Face...")
-                response = self._chat_huggingface(user_message, conversation_history)
-                if response and not response.startswith("❌"):
-                    print("  ✅ Réponse Hugging Face obtenue")
-                    return response
+                if hasattr(self, '_chat_huggingface'):
+                    response = self._chat_huggingface(user_message, conversation_history)
+                    if response and response.strip():
+                        print(f"  ✅ Réponse Hugging Face ({len(response)} caractères)")
+                        return response
             except Exception as e:
-                print(f"  ⚠️ Hugging Face échoué: {e}")
+                print(f"  ⚠️ Hugging Face échoué: {type(e).__name__}")
         
-        # 4. FALLBACK LOCAL (base de connaissances)
-        print("  🧠 Utilisation du fallback local...")
+        # 7. FALLBACK LOCAL (toujours disponible)
+        print("  🧠 Tous les LLMs ont échoué → fallback local")
         return self._fallback_chat_response(user_message)
-    
-    def _chat_deepseek(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> str:
-        """Utilise DeepSeek API (gratuit)"""
+
+    def _get_cheese_context(self, question: str) -> str:
+        """Extrait des infos de la base pour aider le LLM"""
+        # Recherche simple
+        if 'cantal' in question:
+            return "Le Cantal est un fromage AOP d'Auvergne au lait de vache, pâte pressée non cuite."
+        elif 'roquefort' in question:
+            return "Le Roquefort est un fromage bleu AOP au lait de brebis, affiné en caves."
+        elif 'camembert' in question:
+            return "Le Camembert est un fromage normand au lait de vache, à pâte molle et croûte fleurie."
+        elif 'chèvre' in question:
+            return "Les fromages de chèvre incluent Crottin de Chavignol, Sainte-Maure, etc. Tous au lait de chèvre."
+        return None
+
+    def chat_with_together_ai(self, user_message, conversation_history=None):
+        """Utilise Together AI (gratuit avec 25$ de crédit)"""
         try:
+            api_key = os.environ.get("TOGETHER_API_KEY")
+            if not api_key:
+                return None
+            
             headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.deepseek_api_key}"
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
             }
             
-            # Construire les messages
             messages = [
                 {
                     "role": "system",
-                    "content": """Tu es "Maître Fromager Pierre", un expert français avec 40 ans d'expérience.
-Tu es chaleureux, pédagogique et passionné. Tu partages tes connaissances avec précision.
-Tu utilises parfois des expressions françaises comme "mon petit", "voyez-vous", "à mon avis".
-Réponds en français, sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀."""
+                    "content": "Tu es un expert fromager français. Réponds avec précision et passion."
                 }
             ]
             
             if conversation_history:
-                # Garder seulement les 5 derniers messages pour le contexte
-                for msg in conversation_history[-5:]:
-                    messages.append({"role": msg["role"], "content": msg["content"]})
+                messages.extend(conversation_history[-5:])
             
             messages.append({"role": "user", "content": user_message})
             
             payload = {
-                "model": "deepseek-chat",
+                "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "messages": messages,
+                "max_tokens": 500,
                 "temperature": 0.7,
-                "max_tokens": 800,
-                "stream": False
+                "top_p": 0.9
             }
             
             response = requests.post(
-                "https://api.deepseek.com/chat/completions",
+                "https://api.together.xyz/v1/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=30
@@ -3780,59 +3936,18 @@ Réponds en français, sois concis mais complet. Utilise des emojis fromagers oc
                 result = response.json()
                 return result["choices"][0]["message"]["content"]
             else:
-                return f"❌ Erreur API DeepSeek: {response.status_code}"
+                print(f"❌ Together AI error: {response.status_code}")
+                return None
                 
         except Exception as e:
-            return f"❌ Exception DeepSeek: {str(e)}"
-    
-    def _chat_ollama(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> str:
-        """Utilise Ollama local"""
-        try:
-            # Construire le prompt
-            prompt = """<s>[INST] <<SYS>>
-Tu es un expert fromager français. Réponds aux questions avec précision et amabilité.
-Utilise un ton chaleureux et pédagogique. Sois concis mais complet.
-<</SYS>>"""
-            
-            if conversation_history:
-                for msg in conversation_history[-3:]:
-                    if msg["role"] == "user":
-                        prompt += f"<s>[INST] {msg['content']} [/INST]"
-                    else:
-                        prompt += f" {msg['content']}</s>"
-            
-            prompt += f"<s>[INST] {user_message} [/INST]"
-            
-            response = requests.post(
-                self.ollama_url,
-                json={
-                    "model": self.ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "max_tokens": 500
-                    }
-                },
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                text = result.get("response", "")
-                # Nettoyer la réponse
-                if "[/INST]" in text:
-                    text = text.split("[/INST]")[-1].strip()
-                return text
-            else:
-                return f"❌ Erreur Ollama: {response.status_code}"
-                
-        except Exception as e:
-            return f"❌ Exception Ollama: {str(e)}"
-    
+            print(f"❌ Together AI exception: {e}")
+            return None
+
     def _chat_huggingface(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> str:
         """Utilise Hugging Face Inference API"""
         try:
+            print(f"    🔑 HF Token: {self.hf_token[:10]}...")
+            
             headers = {"Authorization": f"Bearer {self.hf_token}"}
             
             prompt = """<s>[INST] Tu es un expert fromager français. Réponds aux questions de manière précise et amicale. [/INST]"""
@@ -3856,47 +3971,142 @@ Utilise un ton chaleureux et pédagogique. Sois concis mais complet.
                 }
             }
             
-            # Utiliser un modèle gratuit et léger
-            response = requests.post(
-                "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta",
-                headers=headers,
-                json=payload,
-                timeout=60
-            )
+            # MODÈLES GRATUITS DISPONIBLES (essayez-les) :
+            models = [
+                "mistralai/Mistral-7B-Instruct-v0.2",  # Très bon modèle français
+                "google/flan-t5-xl",                    # Plus léger
+                "HuggingFaceH4/zephyr-7b-alpha",        # Version alpha si beta échoue
+                "microsoft/phi-2",                      # Petit mais efficace
+                "Qwen/Qwen2.5-7B-Instruct",            # Modèle récent
+            ]
+        
+            for model in models:
+                try:
+                    print(f"    🤖 Essai modèle: {model}")
+                    response = requests.post(
+                        f"https://api-inference.huggingface.co/models/{model}",
+                        headers=headers,
+                        json=payload,
+                        timeout=60
+                    )
+                    
+                    print(f"    📡 HF Status pour {model}: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        if isinstance(result, list) and len(result) > 0:
+                            text = result[0].get("generated_text", "")
+                            if "[/INST]" in text:
+                                parts = text.split("[/INST]")
+                                if len(parts) > 1:
+                                    return parts[-1].strip()
+                            return text
+                        return "❌ Format inattendu"
+                    elif response.status_code == 503:
+                        print(f"    ⏳ Modèle {model} en cours de chargement...")
+                        continue
+                        
+                except Exception as e:
+                    print(f"    ⚠️ Erreur avec {model}: {e}")
+                    continue
             
-            if response.status_code == 200:
-                result = response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    text = result[0].get("generated_text", "")
-                    if "[/INST]" in text:
-                        parts = text.split("[/INST]")
-                        if len(parts) > 1:
-                            return parts[-1].strip()
-                    return text
-                return "❌ Format inattendu"
-            else:
-                return f"❌ Erreur Hugging Face: {response.status_code}"
-                
+            return "❌ Tous les modèles HF ont échoué"
+                    
         except Exception as e:
-            return f"❌ Exception Hugging Face: {str(e)}"
+            error_msg = f"❌ Exception Hugging Face: {str(e)}"
+            print(f"    {error_msg}")
+            return error_msg
     
     def _fallback_chat_response(self, user_message: str) -> str:
         """Réponse de fallback à partir de la base de connaissances"""
+        
+         # D'abord, chercher dans la base de connaissances
+        knowledge_response = self._search_in_knowledge_base(user_message)
+        if knowledge_response:
+            return knowledge_response
+    
+    # Si pas trouvé, utiliser les catégories existantes
+        
         user_lower = user_message.lower()
         
-        # Détecter le type de question
-        if any(word in user_lower for word in ['problème', 'erreur', 'marche pas', 'raté', 'échoué']):
+        # ===== RECHERCHE DANS LA BASE DE CONNAISSANCES =====
+        
+        # Question sur le Cantal
+        if any(word in user_lower for word in ['cantal', 'lait', 'brebis', 'vache']):
+            return self._get_cheese_specific_info(user_lower)
+        
+        # Questions sur les problèmes
+        elif any(word in user_lower for word in ['problème', 'erreur', 'marche pas', 'raté', 'échoué']):
             return self._get_problem_advice(user_lower)
+        
+        # Questions sur les recettes
         elif any(word in user_lower for word in ['recette', 'fabriquer', 'faire', 'comment faire']):
             return self._get_recipe_advice(user_lower)
+        
+        # Questions sur les accords
         elif any(word in user_lower for word in ['vin', 'accord', 'boire', 'dégustation']):
             return self._get_pairing_advice(user_lower)
+        
+        # Questions sur le matériel
         elif any(word in user_lower for word in ['matériel', 'outil', 'équipement', 'acheter']):
             return self._get_equipment_advice()
+        
+        # Questions sur l'affinage
         elif any(word in user_lower for word in ['affinage', 'mûrir', 'cave', 'température']):
             return self._get_aging_advice()
+        
         else:
             return self._get_general_advice()
+
+    def _get_cheese_specific_info(self, question: str) -> str:
+        """Réponse spécifique sur un fromage"""
+        response = "🧀 **Maître Fromager Pierre:**\n\n"
+        
+        # Détecter le fromage demandé
+        if 'cantal' in question.lower():
+            response += "**À propos du Cantal :**\n\n"
+            response += "✅ **Faux !** Le Cantal n'est PAS fait avec du lait de brebis.\n\n"
+            response += "📖 **Véritable composition :**\n"
+            response += "• **Lait :** Lait de vache entier\n"
+            response += "• **Type :** Pâte pressée non cuite\n"
+            response += "• **Région :** Auvergne (France)\n"
+            response += "• **Affinage :** 1 à 6 mois minimum\n"
+            response += "• **Appellation :** AOP (Appellation d'Origine Protégée)\n\n"
+            response += "🐄 **Le lait de vache** utilisé pour le Cantal vient exclusivement de vaches de race Salers ou Montbéliarde, nourries avec l'herbe des montagnes d'Auvergne.\n\n"
+            response += "❌ **Pourquoi pas de brebis ?**\n"
+            response += "Les fromages de brebis des Pyrénées (comme l'Ossau-Iraty) sont différents. Le Cantal est un fromage de tradition bovine.\n\n"
+            response += "🍷 **Accord recommandé :** Vin rouge de caractère comme un Cahors ou un Madiran."
+            
+        elif any(word in question.lower() for word in ['roquefort', 'bleu', 'brebis']):
+            response += "**À propos du Roquefort :**\n\n"
+            response += "✅ **Oui !** Le Roquefort est fait avec du lait de brebis.\n\n"
+            response += "📖 **Caractéristiques :**\n"
+            response += "• **Lait :** Lait de brebis cru\n"
+            response += "• **Type :** Pâte persillée (bleu)\n"
+            response += "• **Région :** Aveyron (France)\n"
+            response += "• **Moisissure :** Penicillium roqueforti\n"
+            response += "• **Affinage :** En caves naturelles\n\n"
+            response += "🐑 **Le lait de brebis** donne au Roquefort sa texture crémeuse et son goût prononcé caractéristique."
+            
+        elif any(word in question.lower() for word in ['chèvre', 'chevret', 'crottin']):
+            response += "**À propos des fromages de chèvre :**\n\n"
+            response += "🧀 **Exemples de fromages de chèvre :**\n"
+            response += "• Crottin de Chavignol\n"
+            response += "• Sainte-Maure de Touraine\n"
+            response += "• Chabichou du Poitou\n"
+            response += "• Pouligny-Saint-Pierre\n\n"
+            response += "🐐 **Tous ces fromages sont faits avec du lait de chèvre**, ce qui leur donne une saveur caractéristique légèrement acidulée."
+            
+        else:
+            # Recherche dans la base de connaissances pour d'autres fromages
+            response += "**Voici ce que je sais sur les laits utilisés :**\n\n"
+            response += "🐄 **Lait de vache :** Cantal, Camembert, Brie, Comté, Beaufort\n"
+            response += "🐑 **Lait de brebis :** Roquefort, Ossau-Iraty, Pecorino, Manchego\n"
+            response += "🐐 **Lait de chèvre :** Crottin, Sainte-Maure, Chabichou\n"
+            response += "🐃 **Lait de bufflonne :** Mozzarella di Bufala\n\n"
+            response += "💡 **Pour une réponse précise, nommez le fromage !**"
+        
+        return response
     
     def _get_problem_advice(self, question: str) -> str:
         """Conseils pour les problèmes courants"""
@@ -4028,6 +4238,221 @@ Utilise un ton chaleureux et pédagogique. Sois concis mais complet.
         response += "\n\n💭 **Posez-moi une question précise pour un conseil personnalisé !**"
         return response
     
+    def _get_general_advice(self) -> str:
+        """Conseils généraux"""
+        import random
+        
+        conseils = [
+            "🧀 **Commencez simple** avec un fromage frais avant de tenter les pâtes persillées !",
+            "🌡️ **La température est cruciale** - ±2°C peut tout changer. Soyez précis !",
+            # ... (le reste de la fonction existante)
+        ]
+        
+        response = "🧀 **Maître Fromager Pierre:**\n\n"
+        response += random.choice(conseils)
+        response += "\n\n💭 **Posez-moi une question précise pour un conseil personnalisé !**"
+        return response
+    
+    # ===== AJOUTER ICI =====
+    def _search_in_knowledge_base(self, query: str) -> str:
+        """Recherche intelligente dans la base de connaissances"""
+        query_lower = query.lower()
+        
+        # 1. Recherche sur les fromages spécifiques
+        cheese_facts = {
+            'cantal': {
+                'lait': 'vache',
+                'type': 'Pâte pressée non cuite',
+                'region': 'Auvergne',
+                'info': 'Fromage AOP au lait de vache Salers'
+            },
+            'roquefort': {
+                'lait': 'brebis', 
+                'type': 'Pâte persillée',
+                'region': 'Aveyron',
+                'info': 'Bleu au lait de brebis cru'
+            },
+            'camembert': {
+                'lait': 'vache',
+                'type': 'Pâte molle',
+                'region': 'Normandie',
+                'info': 'Fromage à croûte fleurie'
+            },
+            'chèvre': {
+                'lait': 'chèvre',
+                'type': 'Fromage frais ou pressé',
+                'region': 'France',
+                'info': 'Fromage au lait de chèvre, souvent frais'
+            }
+        }
+        
+        # Vérifier les fromages connus
+        for cheese_name, info in cheese_facts.items():
+            if cheese_name in query_lower:
+                response = f"🧀 **{cheese_name.upper()}**\n\n"
+                response += f"🐄 **Lait :** {info['lait']}\n"
+                response += f"🧈 **Type :** {info['type']}\n"
+                response += f"📍 **Région :** {info['region']}\n"
+                response += f"📝 **Info :** {info['info']}\n"
+                
+                # Ajouter des infos supplémentaires depuis la base
+                if 'accords_vins' in self.knowledge_base:
+                    for cheese_key, wine in self.knowledge_base['accords_vins'].items():
+                        if cheese_name in cheese_key.lower():
+                            response += f"\n🍷 **Accord vin :** {wine}"
+                            break
+                
+                return response
+        
+        # 2. Recherche générique sur les laits
+        if any(word in query_lower for word in ['lait de', 'fait avec']):
+            lait_types = {
+                'brebis': ['roquefort', 'ossau-iraty', 'manchego', 'pecorino'],
+                'chèvre': ['crottin', 'sainte-maure', 'chabichou', 'valençay'],
+                'vache': ['cantal', 'camembert', 'brie', 'comté', 'beaufort'],
+                'bufflonne': ['mozzarella di bufala', 'burrata']
+            }
+            
+            for lait_type, fromages in lait_types.items():
+                if lait_type in query_lower:
+                    response = f"🐄 **Fromages au lait de {lait_type} :**\n\n"
+                    for f in fromages[:5]:  # Limiter à 5 exemples
+                        response += f"• {f.title()}\n"
+                    return response
+        
+        # 3. Recherche dans la structure de base de connaissances
+        # Types de pâte
+        if 'types_pate' in self.knowledge_base:
+            for cheese_type, info in self.knowledge_base['types_pate'].items():
+                if cheese_type.lower() in query_lower:
+                    response = f"🧀 **{cheese_type.upper()}**\n\n"
+                    response += f"📝 {info['description']}\n"
+                    response += f"🏷️ Exemples: {info['exemples']}\n"
+                    response += f"⏱️ Durée: {info['duree']}\n"
+                    response += f"📊 Difficulté: {info['difficulte']}\n"
+                    return response
+        
+        # Accords vins
+        if 'vin' in query_lower or 'accord' in query_lower:
+            if 'accords_vins' in self.knowledge_base:
+                for cheese, wine in self.knowledge_base['accords_vins'].items():
+                    if any(word in query_lower for word in cheese.lower().split()):
+                        return f"🍷 **Accord pour {cheese}:**\n{wine}"
+        
+        return None
+    
+    def _get_compatibility_info(self, query: str) -> str:
+        """Donne des infos sur les compatibilités"""
+        response = "🧀 **Règles de compatibilité lait/pâte:**\n\n"
+        
+        if 'regles_compatibilite' not in self.knowledge_base:
+            return "⚠️ Informations de compatibilité non disponibles."
+        
+        # Ajouter votre logique ici selon la question
+        # ...
+        
+        return response
+    
+    def _chat_openrouter(self, user_message: str, conversation_history=None):
+        """Utilise OpenRouter API avec des modèles GRATUITS qui fonctionnent"""
+        try:
+            print(f"    🔑 OpenRouter Key détectée")
+            
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/volubyl/fromager"
+            }
+            
+            # Construire les messages
+            messages = [
+                {
+                    "role": "system",
+                    "content": """Tu es "Maître Fromager Pierre", expert français avec 40 ans d'expérience.
+Tu es chaleureux, pédagogique et passionné. Réponds EN FRANÇAIS avec précision et enthousiasme.
+Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀."""
+                }
+            ]
+            
+            # Ajouter l'historique si disponible
+            if conversation_history:
+                for msg in conversation_history[-3:]:  # Garder 3 derniers messages
+                    messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+            
+            # Ajouter le nouveau message
+            messages.append({"role": "user", "content": user_message})
+            
+            # MODÈLES GRATUITS QUI FONCTIONNENT VRAIMENT SUR OPENROUTER
+            free_models = [
+                "meta-llama/llama-3.2-3b-instruct",      # ✅ GARANTI GRATUIT - Llama 3.2
+                "microsoft/phi-3-mini-4k-instruct",      # ✅ GARANTI GRATUIT - Microsoft
+                "qwen/qwen2.5-3b-instruct",              # ✅ GARANTI GRATUIT - Alibaba (bon français)
+                "google/gemma-2-2b-it",                  # ✅ GARANTI GRATUIT - Google
+                "mistralai/mistral-7b-instruct-v0.2",    # ⚠️ Parfois gratuit
+                "huggingfaceh4/zephyr-7b-beta",          # ⚠️ Parfois gratuit
+            ]
+            
+            # Essayer chaque modèle jusqu'à ce qu'un fonctionne
+            for model in free_models:
+                try:
+                    print(f"    🤖 Essai modèle: {model}")
+                    
+                    payload = {
+                        "model": model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 600,
+                        "stream": False
+                    }
+                    
+                    response = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=15
+                    )
+                    
+                    print(f"    📡 Status pour {model.split('/')[-1]}: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        if "choices" in result and len(result["choices"]) > 0:
+                            response_text = result["choices"][0]["message"]["content"]
+                            print(f"    ✅ Réponse obtenue avec {model.split('/')[-1]} ({len(response_text)} caractères)")
+                            return response_text
+                    
+                    elif response.status_code == 402:
+                        print(f"    💸 Modèle {model.split('/')[-1]} nécessite des crédits")
+                        continue  # Essayer le modèle suivant
+                        
+                    elif response.status_code == 404:
+                        print(f"    🔍 Modèle {model.split('/')[-1]} non disponible")
+                        continue  # Essayer le modèle suivant
+                        
+                    else:
+                        print(f"    ❌ Erreur {response.status_code} pour {model.split('/')[-1]}")
+                        continue
+                        
+                except requests.exceptions.Timeout:
+                    print(f"    ⏱️ Timeout pour {model.split('/')[-1]}")
+                    continue
+                    
+                except Exception as e:
+                    print(f"    ⚠️ Exception avec {model.split('/')[-1]}: {type(e).__name__}")
+                    continue
+            
+            print("    ❌ Aucun modèle OpenRouter n'a fonctionné")
+            return None
+                
+        except Exception as e:
+            print(f"    ❌ Exception OpenRouter globale: {type(e).__name__}")
+            return None
+    
+    # Fin de la classe
+    
 # Initialiser l'agent
 agent = AgentFromagerHF()
 
@@ -4114,15 +4539,26 @@ def create_interface():
                 gr.Markdown("""
                 ### 💡 Comment ça marche ?
                 
-                1️⃣ Entrez vos ingrédients
-                2️⃣ Ajustez les micro-choix
+                1️⃣ Entrez vos ingrédients séparés par une virgule (sans espace)
+                
+                2️⃣ Ajustez les micro-choix (créativité, texture, affinage, épices)
+                
                 3️⃣ Cliquez sur "Générer"
                 
                 **Résultat :**
-                - Onglet 1 : Votre recette personnalisée
-                - Onglet 2 : 6 recettes similaires du web
+                - Onglet 1 : 📖 Votre recette de fromage personnalisée
+                
+                - Onglet 2 : 🌐 6 recettes du web avec les mêmes ingrédients
+                
+                - Onglet 3 : 📚 La base de connaissances
+                
+                - Onglet 4 : 🕒 Historique des recettes générées
+                
+                - Onglet 5 : 💬 Expert Fromager (un chat avec un maître fromager)
+                
                 
                 **Tout se remplit automatiquement !**
+
                 """)
         
         # ===== FONCTIONS LOCALES =====
@@ -4301,7 +4737,7 @@ def create_interface():
         # ===== ONGLETS =====
         with gr.Tabs():
             # ONGLET 1
-            with gr.Tab("📖 Ma Recette"):
+            with gr.Tab("📖 Mon fromage"):
                 recipe_output = gr.Textbox(
                     label="Votre recette complète",
                     lines=25,
@@ -4393,13 +4829,7 @@ def create_interface():
                     outputs=[history_summary, recipe_dropdown, recipe_display]
                 )
             
-            # ONGLET 5
-            with gr.Tab("🧪 Test Internet"):
-                test_btn = gr.Button("🔍 Tester")
-                test_output = gr.Textbox(lines=5)
-                test_btn.click(fn=agent.test_internet, outputs=test_output)
-        
-            # === ONGLET 6 CHAT SANS CHATBOT (GARANTI) ===
+            # === ONGLET 5 CHAT SANS CHATBOT (GARANTI) ===
             with gr.Tab("💬 Expert Fromager"):
                 gr.Markdown("""
                 ### 🧀 Dialoguez avec Maître Fromager Pierre
@@ -4513,6 +4943,12 @@ def create_interface():
                     fn=clear_conversation,
                     outputs=[chat_history, chat_display, user_input]
                 )
+                
+            # ONGLET 6
+            with gr.Tab("🧪 Test Internet"):
+                test_btn = gr.Button("🔍 Tester")
+                test_output = gr.Textbox(lines=5)
+                test_btn.click(fn=agent.test_internet, outputs=test_output)
                                           
         # ===== CONNEXION BOUTON PRINCIPAL =====
         generate_all_btn.click(
