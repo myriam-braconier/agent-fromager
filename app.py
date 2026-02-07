@@ -4155,6 +4155,8 @@ en molécules aromatiques. Plus long = goût plus prononcé.
     🔧 MATÉRIEL NÉCESSAIRE
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {materiel}
+    
+    {unique_steps}
 
     ⚠️ PROBLÈMES COURANTS ET SOLUTIONS
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -4384,42 +4386,6 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             advice_text += "\n✨ **Spécial brebis** : Le lait de brebis est plus riche, réduisez légèrement la durée de caillage"
         
         return advice_text
-    
-    def _generate_unique_ingredients(self, ingredients, cheese_type, seed_value):
-        """Génère une liste d'ingrédients unique"""
-        self.rng.seed(seed_value)
-        
-        base = """
-    🥛 INGRÉDIENTS (Pour environ 500g de fromage)
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    """
-        # Quantités variables basées sur le seed
-        lait_qty = self.rng.choice(["1.5", "2", "2.5"])
-        presure_qty = self.rng.choice(["1.5", "2", "2.5"])
-        sel_qty = self.rng.choice(["8", "10", "12"])
-        
-        # Type de lait variable
-        lait_types = ["lait entier pasteurisé", "lait cru", "lait de ferme", "lait bio"]
-        lait_type = self.rng.choice(lait_types)
-        
-        base += f"- {lait_qty} litres de {lait_type}\n"
-        base += f"- {presure_qty}ml de présure liquide\n"
-        base += f"- {sel_qty}g de sel de mer fin\n"
-        
-        # Ajouter des variations basées sur le type
-        if cheese_type == "Pâte molle":
-            base += "- 1 yaourt nature (pour les ferments)\n"
-            base += "- 1 pincée de Penicillium candidum (optionnel pour croûte)\n"
-        elif cheese_type == "Pâte pressée":
-            base += "- Ferments lactiques mésophiles\n"
-            base += "- 5g de chlorure de calcium (pour lait pasteurisé)\n"
-        
-        # Vos ingrédients spécifiques
-        base += "\n**Vos ingrédients spécifiques :**\n"
-        for ing in ingredients[:5]:
-            base += f"• {ing.capitalize()}\n"
-        
-        return base
 
     def _generate_amateur_recipe(
         self,
@@ -6371,12 +6337,12 @@ def create_interface():
                     scale=2,
                 )
 
-            # Description des profils
-            gr.Markdown("""
-            **🧀 Amateur** : Recettes accessibles avec conseils pratiques  
-            **🏭 Producteur** : Fiches techniques précises et professionnelles  
-            **🎓 Formateur** : Supports pédagogiques avec objectifs d'apprentissage
-            """)
+                # Description des profils
+                gr.Markdown("""
+                **🧀 Amateur** : Recettes accessibles avec conseils pratiques  
+                **🏭 Producteur** : Fiches techniques précises et professionnelles  
+                **🎓 Formateur** : Supports pédagogiques avec objectifs d'apprentissage
+                """)
 
             # ===== ZONE DE SAISIE =====
             with gr.Row():
