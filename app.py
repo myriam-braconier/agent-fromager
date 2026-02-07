@@ -25,6 +25,10 @@ import pandas as pd
 import time
 from typing import List, Dict, Optional
 
+# ===== VARIABLES GLOBALES =====
+fallback_cache = None
+recipe_map = {}
+
 
 class AgentFromagerHF:
     """Agent fromager avec persistance HF Dataset"""
@@ -6754,6 +6758,8 @@ def create_interface():
             def clear_and_reset():
                 """Efface et reset"""
                 return agent_clear_history()
+            
+            fallback_cache = None
 
             # ===== ONGLETS =====
             with gr.Tabs():
@@ -6788,54 +6794,670 @@ def create_interface():
                     
                     knowledge_btn.click(fn=agent.get_knowledge_summary, outputs=knowledge_output)
 
-                # ONGLET 4 : Historique
+                # ONGLET 4 : Historique (VERSION DYNAMIQUE)
                 with gr.Tab("🕒 Historique"):
                     gr.Markdown("### 📚 Historique de vos recettes")
-
+                    
+                    # ===== VARIABLES GLOBALES =====
+                    recipe_map = {}
+                    stats_visible = False
+                    
+                    # ===== COMPTEUR DYNAMIQUE =====
+                    counter_card = gr.HTML("""
+                    <div style="
+                        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+                        color: white;
+                        padding: 15px;
+                        border-radius: 12px;
+                        text-align: center;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        margin-bottom: 10px;
+                    ">
+                        <div style="font-size: 12px; opacity: 0.9; letter-spacing: 1px;">RECETTES DISPONIBLES</div>
+                        <div style="font-size: 36px; font-weight: bold; margin: 8px 0;">Chargement...</div>
+                        <div style="font-size: 11px; opacity: 0.8; display: flex; justify-content: space-around;">
+                            <span id="personal-count">? perso</span>
+                            <span>•</span>
+                            <span id="reference-count">? réf</span>
+                        </div>
+                    </div>
+                    """)
+                    
+                    # ===== BOUTONS =====
                     with gr.Row():
-                        history_btn = gr.Button("📋 Charger", variant="primary")
+                        history_btn = gr.Button("🔄 Actualiser", variant="primary")
+                        count_btn = gr.Button("🔢 Compter", variant="secondary")
                         clear_btn = gr.Button("🗑️ Effacer", variant="stop")
-
+                    
+                    # ===== STATISTIQUES =====
+                    stats_display = gr.HTML(
+                        value="<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>"
+                    )
+                    
+                    # ===== HISTORIQUE PRINCIPAL =====
                     with gr.Row():
                         with gr.Column(scale=1):
                             history_summary = gr.Textbox(
-                                label="📊 Résumé",
+                                label="📋 Vos recettes",
                                 lines=10,
                                 interactive=False,
-                                placeholder="Cliquez sur 'Charger'...",
+                                value="Cliquez sur 'Actualiser' pour charger...",
+                                show_label=True
                             )
-
+                            
+                            show_fallback_btn = gr.Button("📖 Voir recettes de référence")
+                        
                         with gr.Column(scale=2):
+                            # dropdown de test
+
                             recipe_dropdown = gr.Dropdown(
                                 label="🍽️ Sélectionner une recette",
                                 choices=[],
                                 interactive=True,
+                                value="",
+                                allow_custom_value=False,
+                                multiselect=False,
+                                elem_id="recipe_dropdown_fixed"  # Nouvel ID
                             )
-
+                            
                             recipe_display = gr.Textbox(
                                 label="📖 Recette complète",
-                                lines=25,
+                                lines=20,
                                 interactive=False,
-                                placeholder="Sélectionnez une recette...",
+                                value="Sélectionnez une recette...",
+                                show_label=True
                             )
+                    
+                    # ===== FONCTIONS DYNAMIQUES =====
+                    # ===== VARIABLE SIMPLE POUR LE TOGGLE =====
+                    stats_visible = False
 
-                    # Connexions
+                    def toggle_stats():
+                        """Toggle propre entre 2 états seulement"""
+                        global stats_visible
+                        
+                        # Inverser l'état
+                        stats_visible = not stats_visible
+                        
+                        if stats_visible:
+                            # ÉTAT 1: Stats VISIBLES
+                            print("📊 Affichage des statistiques")
+                            result = show_stats()
+                            
+                            # RETOURNER UN SEUL OBJET gr.update() pour le bouton
+                            return [
+                                result,  # stats_display
+                                gr.update(value="👁️‍🗨️ Cacher", variant="stop")  # UN SEUL UPDATE
+                            ]
+                        
+                        else:
+                            # ÉTAT 2: Stats CACHÉES
+                            print("👁️‍🗨️ Cache les statistiques")
+                            
+                            return [
+                                "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",
+                                gr.update(value="🔢 Compter", variant="secondary")  # UN SEUL UPDATE
+                            ]
+                    
+                    def get_fallback_count():
+                        """Retourne le nombre RÉEL de recettes de référence"""
+                        try:
+                            global fallback_cache
+                            
+                            if fallback_cache is None:
+                                # Charger UNE FOIS avec un nombre grand
+                                fallback_cache = agent._get_absolute_fallback("", "", 1000)
+                            
+                            real_count = len(fallback_cache)
+                            print(f"📊 Nombre réel de recettes de référence: {real_count}")
+                            return real_count
+                            
+                        except Exception as e:
+                            print(f"❌ Erreur get_fallback_count: {e}")
+                            return 0
+                    
+                    def update_interface():
+                        """Actualise TOUTE l'interface - COMPTE RÉEL"""
+                        global stats_visible
+                        
+                        # Réinitialiser l'état
+                        stats_visible = False
+                        
+                        try:
+                            print("🔄 Début update_interface")
+                            
+                            # 1. Récupérer données
+                            history = agent.get_history()
+                            fallback_count = get_fallback_count()  # ← Nombre RÉEL
+                            
+                            print(f"📊 Histoire réelle: {len(history)} entrées")
+                            print(f"📊 Contenu histoire:")
+                            for i, entry in enumerate(history):
+                                print(f"  [{i}] ID: {entry.get('id')}, Nom: {entry.get('cheese_name', 'N/A')}")
+                            
+                            # 2. Compteur DYNAMIQUE
+                            total = len(history) + fallback_count
+                            counter_html = f"""
+                            <div style="
+                                background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+                                color: white;
+                                padding: 15px;
+                                border-radius: 12px;
+                                text-align: center;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                                margin-bottom: 10px;
+                            ">
+                                <div style="font-size: 12px; opacity: 0.9; letter-spacing: 1px;">RECETTES DISPONIBLES</div>
+                                <div style="font-size: 36px; font-weight: bold; margin: 8px 0;">{total}</div>
+                                <div style="font-size: 11px; opacity: 0.8; display: flex; justify-content: space-around;">
+                                    <span id="personal-count">{len(history)} perso</span>
+                                    <span>•</span>
+                                    <span id="reference-count">{fallback_count} réf</span>
+                                </div>
+                            </div>
+                            """
+                            
+                            # 3. Texte historique
+                            if not history:
+                                summary = "📭 **Votre historique est vide**\n\n"
+                                summary += "💡 Créez votre première recette !\n\n"
+                                summary += f"📚 **{fallback_count} recettes de référence** disponibles"
+                            else:
+                                summary = f"📚 **{len(history)} recettes personnelles**\n" + "="*40 + "\n\n"
+                                for i, entry in enumerate(reversed(history[-5:]), 1):
+                                    name = entry.get('cheese_name', f"Recette #{entry.get('id')}")
+                                    date = entry.get('date', '')[:10]
+                                    summary += f"{i}. {name}\n"
+                                    summary += f"   📅 {date}\n"
+                                    summary += "-"*30 + "\n"
+                            
+                            # 4. Dropdown
+                            choices = []
+                            global recipe_map
+                            recipe_map = {}
+                            
+                            print(f"🎯 Création dropdown à partir de {len(history)} entrées")
+                            
+                            for entry in reversed(history):
+                                entry_id = entry.get('id')
+                                entry_name = entry.get('cheese_name', f"Recette #{entry_id}")
+                                date = entry.get('date', '')[:10] if entry.get('date') else 'sans date'
+                                
+                                display_text = f"{entry_id}. {entry_name} ({date})"
+                                
+                                # Vérifier les doublons (au cas où)
+                                if display_text not in recipe_map:
+                                    choices.append(display_text)
+                                    recipe_map[display_text] = entry_id
+                                    print(f"   ➕ Ajouté: {display_text}")
+                                else:
+                                    print(f"   ⚠️ Doublon ignoré: {display_text}")
+                            
+                            print(f"✅ Dropdown créé avec {len(choices)} choix uniques")
+                            
+                            print(f"✅ Interface: {len(history)} perso + {fallback_count} réf = {total} total")
+                            
+                            return [
+                                counter_html,          # counter_card
+                                summary,               # history_summary
+                                gr.Dropdown(choices=choices, value=None),       # ← CHANGEMENT ICI !           
+                                "Sélectionnez une recette...",  # recipe_display
+                            ]
+                            
+                        except Exception as e:
+                            print(f"❌ Erreur update_interface: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            return [
+                                f"<div style='color: red;'>Erreur: {str(e)[:50]}</div>",
+                                f"Erreur: {str(e)}",
+                                [],
+                                f"Erreur: {str(e)}",
+                                "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",
+                                "🔢 Compter",
+                                "secondary"
+                            ]
+                    
+                    def show_stats():
+                        """Affiche les statistiques RÉELLES"""
+                        try:
+                            print("📊 Début show_stats")
+                            
+                            history = agent.get_history()
+                            global fallback_cache
+                            
+                            if fallback_cache is None:
+                                fallback_cache = agent._get_absolute_fallback("", "", 1000)
+                            
+                            fallback_count = len(fallback_cache)
+                            
+                            # Compter par type de lait
+                            lait_stats = {}
+                            for recipe in fallback_cache:
+                                lait = recipe.get('lait', 'mixte')
+                                lait_stats[lait] = lait_stats.get(lait, 0) + 1
+                            
+                            # Construire HTML avec chiffres RÉELS
+                            stats_html = f"""
+                            <div style="padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                                <h3 style="margin-top: 0;">📊 Statistiques RÉELLES</h3>
+                                
+                                <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                                    <div style="flex: 1; background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 32px; color: #4CAF50; font-weight: bold;">{len(history)}</div>
+                                        <div style="font-size: 12px; color: #666;">Vos créations</div>
+                                    </div>
+                                    <div style="flex: 1; background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 32px; color: #2196F3; font-weight: bold;">{fallback_count}</div>
+                                        <div style="font-size: 12px; color: #666;">Références</div>
+                                    </div>
+                                    <div style="flex: 1; background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 32px; color: #FF9800; font-weight: bold;">{len(history) + fallback_count}</div>
+                                        <div style="font-size: 12px; color: #666;">Total</div>
+                                    </div>
+                                </div>
+                                
+                                <h4 style="margin-bottom: 10px;">🥛 Répartition par type de lait</h4>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+                            """
+                            
+                            for lait, count in lait_stats.items():
+                                lait_name = lait if lait else 'mixte'
+                                emoji = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑', 'bufflonne': '🐃'}.get(lait, '🥛')
+                                stats_html += f"""
+                                <div style="padding: 10px; background: white; border-radius: 6px; text-align: center; min-width: 100px;">
+                                    <div style="font-size: 24px;">{emoji}</div>
+                                    <div style="font-size: 20px; font-weight: bold;">{count}</div>
+                                    <div style="font-size: 12px; color: #666;">{lait_name}</div>
+                                </div>
+                                """
+                            
+                            # Sources principales
+                            source_stats = {}
+                            for recipe in fallback_cache:
+                                source = recipe.get('source', 'inconnue')
+                                source_stats[source] = source_stats.get(source, 0) + 1
+                            
+                            stats_html += """
+                                </div>
+                                
+                                <h4 style="margin-bottom: 10px;">🌐 Sources principales</h4>
+                                <div style="max-height: 150px; overflow-y: auto; background: white; padding: 10px; border-radius: 6px;">
+                            """
+                            
+                            for source, count in sorted(source_stats.items(), key=lambda x: x[1], reverse=True)[:10]:
+                                stats_html += f"""
+                                <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f0f0f0;">
+                                    <span>{source}</span>
+                                    <span style="font-weight: bold;">{count}</span>
+                                </div>
+                                """
+                            
+                            stats_html += f"""
+                                </div>
+                                
+                                <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 8px; text-align: center; border: 1px solid #e0e0e0;">
+                                    <div style="font-size: 14px; color: #666;">Base de connaissances fromagère</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #333; margin-top: 5px;">
+                                        {fallback_count} recettes documentées
+                                    </div>
+                                </div>
+                            </div>
+                            """
+                            
+                            print(f"✅ Stats: {fallback_count} recettes de référence")
+                            return stats_html
+                            
+                        except Exception as e:
+                            print(f"❌ Erreur show_stats: {e}")
+                            return f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>"
+                    
+                    def show_fallback():
+                        """Affiche TOUTES les recettes de référence"""
+                        try:
+                            print("📖 Début show_fallback")
+                            
+                            global fallback_cache
+                            if fallback_cache is None:
+                                fallback_cache = agent._get_absolute_fallback("", "", 1000)
+                            
+                            real_count = len(fallback_cache)
+                            print(f"   📊 Affichage de {real_count} recettes")
+                            
+                            # Grouper par type de lait
+                            lait_groups = {}
+                            for recipe in fallback_cache:
+                                lait = recipe.get('lait', 'mixte')
+                                if lait not in lait_groups:
+                                    lait_groups[lait] = []
+                                lait_groups[lait].append(recipe)
+                            
+                            html = f"""
+                            <div style="padding: 15px; max-height: 600px; overflow-y: auto;">
+                                <h2 style="margin-top: 0;">📚 {real_count} RECETTES DE RÉFÉRENCE</h2>
+                                <p style="color: #666; margin-bottom: 20px;">
+                                    Base complète - {real_count} recettes documentées
+                                </p>
+                            """
+                            
+                            # Afficher par groupe
+                            for lait, recipes in lait_groups.items():
+                                lait_name = lait if lait else 'mixte'
+                                lait_emoji = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑'}.get(lait, '🥛')
+                                
+                                html += f"""
+                                <div style="margin-bottom: 25px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0;">
+                                    <h3 style="margin-top: 0; color: #444;">
+                                        {lait_emoji} Lait de {lait_name} ({len(recipes)} recettes)
+                                    </h3>
+                                """
+                                
+                                # Limiter à 15 recettes par groupe pour ne pas surcharger
+                                for i, recipe in enumerate(recipes[:15], 1):
+                                    html += f"""
+                                    <div style="margin-bottom: 10px; padding: 10px; border-bottom: 1px solid #f5f5f5;">
+                                        <div style="font-weight: bold; color: #333;">{i}. {recipe['title']}</div>
+                                        <div style="font-size: 13px; color: #666; margin: 5px 0;">{recipe['description'][:120]}...</div>
+                                        <div style="font-size: 12px; color: #888;">
+                                            <span>📍 {recipe['source']}</span>
+                                            <span style="margin-left: 15px;">⭐ {recipe.get('score', '?')}/10</span>
+                                            <a href="{recipe['url']}" target="_blank" style="margin-left: 15px; color: #2196F3; text-decoration: none;">
+                                                🔗 Voir
+                                            </a>
+                                        </div>
+                                    </div>
+                                    """
+                                
+                                if len(recipes) > 15:
+                                    html += f"""
+                                    <div style="text-align: center; padding: 10px; color: #666; font-size: 13px;">
+                                        ... et {len(recipes)-15} autres recettes de {lait_name}
+                                    </div>
+                                    """
+                                
+                                html += "</div>"
+                            
+                            # Résumé final
+                            total_lait = len(lait_groups)
+                            html += f"""
+                                <div style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+                                    <div style="font-size: 14px; color: #666;">RÉSUMÉ</div>
+                                    <div style="font-size: 28px; font-weight: bold; color: #333; margin: 10px 0;">{real_count}</div>
+                                    <div style="font-size: 14px; color: #666;">
+                                        recettes de référence | {total_lait} types de lait différents
+                                    </div>
+                                </div>
+                            </div>
+                            """
+                            
+                            print(f"✅ Affiché: {real_count} recettes, {len(lait_groups)} types de lait")
+                            return html
+                            
+                        except Exception as e:
+                            print(f"❌ Erreur show_fallback: {e}")
+                            return f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>"
+                    
+                    def clear_all():
+                        """Efface l'historique - VERSION MODIFIÉE POUR LE TOGGLE"""
+                        global stats_visible  # <-- AJOUTEZ CE 'global'
+                        
+                        # Réinitialiser l'état
+                        stats_visible = False
+                        
+                        try:
+                            print("🗑️ Début clear_all")
+                            result = agent.clear_history()
+                            print(f"✅ clear_all réussi: {result}")
+                            
+                            # Réinitialiser aussi le cache des stats
+                            global STATS_CACHE
+                            STATS_CACHE['visible'] = False
+                            STATS_CACHE['html'] = None  # Réinitialiser le cache aussi
+                            
+                            return [
+                                "✅ Historique effacé !",  # history_summary
+                                [],                        # recipe_dropdown
+                                "✅ Historique effacé",    # recipe_display
+                                "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",  # stats_display
+                                "🔢 Compter",              # count_btn texte
+                                "secondary"                # count_btn style
+                            ]
+                            
+                        except Exception as e:
+                            print(f"❌ Erreur clear_all: {e}")
+                            return [
+                                f"❌ Erreur: {str(e)}",
+                                [],
+                                f"Erreur: {str(e)}",
+                                f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>",
+                                "🔢 Compter",
+                                "secondary"
+                            ]
+                    
+                    def on_recipe_select(selected):
+                        """Quand une recette est sélectionnée"""
+                        
+                        print(f"🔍 recipe_display type: {type(recipe_display)}")
+                        print(f"🔍 recipe_display: {recipe_display}")
+                        
+                        #Déclarer recipe_map comme GLOBAL DES LE DEBUT
+                        global recipe_map
+                        
+                        print(f"🔍 Sélection reçue (type: {type(selected)}): {selected}")
+                        
+                        # ===== DEBUG ============
+                        print("\n" + "="*60)
+                        print("=== DEBUG COMPLET ===")
+                        print("="*60)
+                        print(f"Selected: {selected}")
+                        print(f"Type: {type(selected)}")
+                        
+                        # Gérer les listes
+                        if isinstance(selected, list):
+                            print(f"⚠️ C'est une liste! Longueur: {len(selected)}")
+                            if not selected:
+                                print("❌ Liste vide")
+                                return "Sélectionnez une recette..."
+                            selected = selected[0]
+                            print(f"✅ Premier élément extrait: {selected}")
+                        
+                        # Afficher le recipe_map AVANT recherche
+                        print(f"\n=== RECIPE_MAP (taille: {len(recipe_map)}) ===")
+                        if recipe_map:
+                            print("5 premières entrées:")
+                            for i, (key, value) in enumerate(list(recipe_map.items())[:5]):
+                                print(f"  [{i}] '{key}' -> {value}")
+                        else:
+                            print("⚠️ recipe_map est VIDE!")
+                        
+                        # Récupérer l'historique UNE SEULE FOIS pour debug
+                        history = agent.get_history()
+                        print(f"\n=== HISTORIQUE ({len(history)} entrées) ===")
+                        for i, entry in enumerate(history[:5]):  # Afficher seulement les 5 premières
+                            print(f"[{i}] ID: {entry.get('id')} (type: {type(entry.get('id'))})")
+                            print(f"    Clés disponibles: {list(entry.keys())}")
+                            
+                            # Afficher un aperçu du contenu
+                            if 'recipe_complete' in entry:
+                                content = entry['recipe_complete']
+                                preview = content[:50].replace('\n', ' ') + "..." if len(content) > 50 else content
+                                print(f"    Preview: {preview}")
+                            print()
+                        
+                        if len(history) > 5:
+                            print(f"... et {len(history) - 5} autres entrées")
+                        
+                        print("="*60 + "\n")
+                        # ===== FIN DEBUG ============
+                        
+                        if not selected:
+                            return "Sélectionnez une recette..."
+                        
+                        try:
+                            # Chercher dans le mapping
+                            recipe_id = None
+                            
+                            print(f"\n🔎 Recherche de '{selected}'...")
+                            
+                            if selected in recipe_map:
+                                recipe_id = recipe_map[selected]
+                                print(f"✅ Trouvé via recipe_map: {selected} -> ID {recipe_id}")
+                            else:
+                                # Extraire l'ID du format "ID. Nom (Date)"
+                                import re
+                                match = re.match(r'^(\d+)\.', str(selected))
+                                if match:
+                                    recipe_id = int(match.group(1))
+                                    print(f"✅ ID extrait par regex: '{selected}' -> ID {recipe_id}")
+                                else:
+                                    # Essayer d'autres patterns
+                                    print(f"⚠️ Regex échouée, tentative alternative...")
+                                    numbers = re.findall(r'\d+', str(selected))
+                                    if numbers:
+                                        recipe_id = int(numbers[0])
+                                        print(f"✅ Nombre extrait: ID {recipe_id}")
+                                    else:
+                                        return f"❌ Format invalide: '{selected}'"
+                            
+                            if recipe_id is None:
+                                return "❌ Impossible de déterminer l'ID de la recette"
+                            
+                            # ========== DEBUG CRITIQUE ==========
+                            print(f"\n🔬 RECHERCHE DÉTAILLÉE:")
+                            print(f"   ID cherché: {recipe_id} (type: {type(recipe_id)})")
+                            print(f"   ID comme string: '{str(recipe_id)}'")
+                            
+                            # Chercher la recette dans l'historique
+                            history = agent.get_history()  # Re-récupérer l'historique
+                            
+                            print(f"\n   Parcours des {len(history)} entrées...")
+                            
+                            found = False
+                            for i, entry in enumerate(history):
+                                entry_id = entry.get('id')
+                                entry_id_str = str(entry_id)
+                                
+                                # Vérifier différents types de correspondance
+                                matches = []
+                                if entry_id == recipe_id:
+                                    matches.append("MATCH EXACT (entry_id == recipe_id)")
+                                if entry_id_str == str(recipe_id):
+                                    matches.append("MATCH STRING (str(entry_id) == str(recipe_id))")
+                                if str(entry_id) == str(recipe_id):
+                                    matches.append("MATCH DOUBLE STRING (str(entry_id) == str(recipe_id))")
+                                
+                                if matches:
+                                    print(f"\n   ✅ TROUVÉ à l'index {i}!")
+                                    print(f"      Entry ID: {entry_id} (type: {type(entry_id)})")
+                                    print(f"      Type(s) de match: {', '.join(matches)}")
+                                    print(f"      Clés de l'entrée: {list(entry.keys())}")
+                                    
+                                    # Chercher le contenu
+                                    content_keys = ['recipe_complete', 'recipe', 'content', 'text', 'response']
+                                    for key in content_keys:
+                                        if key in entry:
+                                            content = entry[key]
+                                            print(f"      📄 Contenu trouvé dans clé '{key}' ({len(content)} caractères)")
+                                            found = True
+                                            
+                                            # Aperçu du contenu
+                                            preview = content[:100].replace('\n', ' ') + "..." if len(content) > 100 else content
+                                            print(f"      Preview: {preview}")
+                                            return content
+                                    
+                                    if not found:
+                                        print(f"      ⚠️ Aucune clé de contenu trouvée!")
+                                        return "⚠️ Recette sans contenu"
+                                else:
+                                    # Debug détaillé seulement pour quelques entrées
+                                    if i < 3:  # Afficher les 3 premières comparaisons
+                                        print(f"   [{i}] Entry ID: {entry_id} (vs {recipe_id}) - PAS DE MATCH")
+                            
+                            if not found:
+                                print(f"\n❌ Aucune correspondance trouvée pour ID {recipe_id}")
+                                print(f"📋 IDs présents dans l'historique: {[entry.get('id') for entry in history]}")
+                                return f"❌ Recette ID {recipe_id} non trouvée"
+                            
+                        except Exception as e:
+                            print(f"\n❌ ERREUR DÉTAILLÉE:")
+                            print(f"   Message: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            return f"❌ Erreur: {str(e)}\nSélection: '{selected}'"
+                                    
+                    # ===== CONNECTIONS =====
+                    
+                    # Bouton Actualiser
                     history_btn.click(
-                        fn=load_and_populate,
-                        outputs=[history_summary, recipe_dropdown],
+                        fn=update_interface,
+                        inputs=[],
+                        outputs=[
+                            counter_card,      # 0
+                            history_summary,   # 1
+                            recipe_dropdown,  # 3 choices
+                            recipe_display,    # 4
+                        ]
                     )
-
-                    recipe_dropdown.change(
-                        fn=show_recipe_select,
-                        inputs=[recipe_dropdown],
-                        outputs=[recipe_display],
+                    
+                    # Bouton Compter (TOGGLE)
+                    count_btn.click(
+                        fn=toggle_stats,
+                        inputs=[],
+                        outputs=[
+                            stats_display,  # Afficher/cacher HTML
+                            count_btn,      # Changer texte bouton
+                        ]
                     )
-
+                    
+                    # Bouton Effacer
                     clear_btn.click(
-                        fn=clear_and_reset,
-                        outputs=[history_summary, recipe_dropdown, recipe_display],
+                        fn=clear_all,
+                        inputs=[],
+                        outputs=[
+                            history_summary,
+                            recipe_dropdown,
+                            recipe_display,
+                        ],
+                        queue=False
                     )
+                    
+                    # Bouton Voir références
+                    show_fallback_btn.click(
+                        fn=show_fallback,
+                        inputs=[],
+                        outputs=[stats_display]
+                    )
+                    
+                    # Sélection dropdown
+                    recipe_dropdown.change(
+                        fn=on_recipe_select,
+                        inputs=[recipe_dropdown],
+                        outputs=[recipe_display]
+                    )
+                    
+                    # ===== INITIALISATION =====
+                  
+                    def init_on_load():
+                        """Initialise avec les vrais chiffres"""
+                        global stats_visible
 
+
+                        stats_visible = False  # Initialiser l'état
+                        print("⚡ Initialisation Historique")
+                        return update_interface()
+                    
+                    demo.load(
+                        fn=init_on_load,
+                        inputs=[],
+                        outputs=[
+                            counter_card,
+                            history_summary,
+                            recipe_dropdown,
+                            recipe_display,
+                        ],
+                        queue=False
+                    )
+                                                                                             
                 # ONGLET 5 : Chat
                 with gr.Tab("💬 Expert Fromager"):
                     gr.Markdown("### 🧀 Dialoguez avec Maître Fromager")
@@ -6906,12 +7528,6 @@ def create_interface():
                     btn_recipe.click(fn=lambda: get_quick_question("📝 Recette"), outputs=[user_input])
                     btn_wine.click(fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input])
                     btn_clear_chat.click(fn=clear_conversation, outputs=[chat_history, chat_display, user_input])
-
-                # ONGLET 6 : Test
-                with gr.Tab("🧪 Test Internet"):
-                    test_btn = gr.Button("🔍 Tester")
-                    test_output = gr.Textbox(lines=5)
-                    test_btn.click(fn=agent.test_internet, outputs=test_output)
 
             # ===== BOUTON GÉNÉRATION =====
             generate_all_btn.click(
@@ -7592,7 +8208,6 @@ if __name__ == "__main__":
                     choices=[],
                     interactive=True,
                     value=None
-                    interactive=True,
                 )
                 
                 recipe_display = gr.Textbox(
