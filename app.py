@@ -6515,7 +6515,8 @@ def create_interface():
 
             def load_and_populate():
                 """Charge et met à jour"""
-                return load_history()
+                summary, choices = load_history()
+                return summary, gr.Dropdown(choices=choices, value=None)
 
             def clear_and_reset():
                 """Efface et reset"""
@@ -6591,7 +6592,7 @@ def create_interface():
                         outputs=[history_summary, recipe_dropdown],
                     )
 
-                    recipe_dropdown.select(
+                    recipe_dropdown.change(
                         fn=show_recipe_select,
                         inputs=[recipe_dropdown],
                         outputs=[recipe_display],
@@ -7358,6 +7359,7 @@ if __name__ == "__main__":
                     choices=[],
                     interactive=True,
                     value=None
+                    interactive=True,
                 )
                 
                 recipe_display = gr.Textbox(
