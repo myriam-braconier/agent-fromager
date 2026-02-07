@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 # Charger les variables d'environnement depuis .env
 load_dotenv()
 
+AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "defaultpassword")
+
 print("=" * 50)
 print("🧪 MODE LOCAL - Chargement .env")
 print("=" * 50)
@@ -4153,10 +4156,6 @@ en molécules aromatiques. Plus long = goût plus prononcé.
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {materiel}
 
-    📝 ÉTAPES DE FABRICATION UNIQUES
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {unique_steps}
-
     ⚠️ PROBLÈMES COURANTS ET SOLUTIONS
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {problemes_a_eviter}
@@ -4260,64 +4259,103 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         return base
 
     def _generate_unique_steps(self, cheese_type, seed_value, creativity):
-        """Génère des étapes uniques"""
+        """Génère des étapes uniques complètes"""
         import random
         local_rng = random.Random(seed_value)
         
-        steps = ""
-        
-        # Temps variables
+        # Variables aléatoires basées sur le seed
         repos_time = local_rng.choice(["45", "50", "55", "60"])
+        temp_choice = local_rng.choice(["31", "32", "33", "34"])
+        cube_size = local_rng.choice(["1", "1.5", "2"])
         
-        # CORRECTION : Utilisez des chaînes f-string avec triple quotes correctement
+        # Déterminer le temps d'égouttage selon le type
         if "frais" in cheese_type.lower():
-            temp_choice = local_rng.choice(["31", "32", "33"])
-            steps += f"""
+            egouttage = local_rng.choice(["2-4", "3-5", "4-6"]) + " heures"
+            affinage = "Pas d'affinage nécessaire"
+        elif "molle" in cheese_type.lower():
+            egouttage = local_rng.choice(["12-18", "18-24", "24-36"]) + " heures"
+            affinage = local_rng.choice(["2-3", "3-4", "4-6"]) + " semaines"
+        else:
+            egouttage = local_rng.choice(["18-24", "24-36", "36-48"]) + " heures"
+            affinage = local_rng.choice(["3-6", "6-9", "9-12"]) + " semaines"
+        
+        steps = f"""
+    📝 ÉTAPES DE FABRICATION UNIQUES
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
     PHASE 1 : PRÉPARATION (20 minutes)
     ──────────────────────────────────────────
-    1. Stérilisez tout le matériel à l'eau bouillante
-    2. Chauffez le lait à {temp_choice}°C (±1°C)
-    3. Ajoutez la présure diluée dans 50ml d'eau froide
-    4. Mélangez doucement pendant 30 secondes
-    5. Couvrez et laissez reposer {repos_time} minutes
+    1. **Stérilisation** : Laver tout le matériel à l'eau bouillante
+    2. **Chauffage** : Verser le lait dans la casserole propre
+    3. **Température** : Chauffer doucement à {temp_choice}°C (±1°C)
+    ⚠️ Ne jamais dépasser 35°C
+    4. **Stabilisation** : Maintenir {temp_choice}°C pendant 5 minutes
+    5. **Ferments** (optionnel) : Ajouter et mélanger 1 minute
 
-    """
-        elif "molle" in cheese_type.lower():
-            cube_size = local_rng.choice(["1", "1.5", "2"])
-            steps += f"""
-    PHASE 1 : CAILLAGE LONG (90 minutes)
+    PHASE 2 : CAILLAGE ({repos_time} minutes)
     ──────────────────────────────────────────
-    1. Chauffage précis à 32°C
-    2. Ajout des ferments + repos 30 minutes
-    3. Emprésurage + repos {repos_time} minutes
-    4. Découpage en cubes de {cube_size}cm
+    6. **Présure** : Diluer dans 50ml d'eau à température ambiante
+    7. **Incorporation** : Verser en filet tout en tournant
+    8. **Mélange** : 30 secondes exactement, puis arrêter
+    9. **Repos** : Couvrir et laisser {repos_time} minutes SANS TOUCHER
+    10. **Test** : Le caillé doit se briser net
 
-    """
-        else:
-            steps += f"""
-    PHASE 1 : CAILLAGE STANDARD (60 minutes)
-    ──────────────────────────────────────────
-    1. Porter le lait à 32°C
-    2. Ajouter la présure, mélanger 30 secondes
-    3. Repos de {repos_time} minutes pour le caillage
-    4. Découper le caillé
+    PHASE 3 : DÉCOUPAGE ET BRASSAGE (15 minutes)
+    ─────────────────────────────────────────────
+    11. **Découpage** : Grille de {cube_size}cm (vertical puis horizontal)
+    12. **Repos** : 5 minutes pour laisser s'échapper le petit-lait
+    13. **Brassage** : Mélanger TRÈS doucement 10 minutes
 
+    PHASE 4 : MOULAGE ET ÉGOUTTAGE
+    ───────────────────────────────
+    14. **Moulage** : Étamine dans le moule, verser à la louche
+    15. **Égouttage** : {egouttage} à température ambiante
+    16. **Retournements** : Toutes les 4 heures pour une forme régulière
+
+    PHASE 5 : SALAGE
+    ────────────────
+    17. **Démoulage** : Sur planche propre et sèche
+    18. **Salage** : Frotter toutes les faces (2% du poids)
+    19. **Alternative** : Saumure 2-4h (300g sel/L)
+
+    PHASE 6 : AFFINAGE
+    ──────────────────
+    20. **Conditions** : Cave à 10-12°C, 85-90% humidité
+    21. **Durée** : {affinage}
+    22. **Soins** : Retourner quotidiennement la 1ère semaine
     """
-    
-        # Ajouter des étapes créatives
-        if creativity >= 2:
-            steps += "\n**🎨 VARIATION CRÉATIVE :**\n"
-            creative_options = [
-                "- Mélangez délicatement pendant 10 minutes supplémentaires",
-                "- Ajoutez une pincée de fleur de sel en surface",
-                "- Incorporer les aromates à cette étape pour une distribution homogène"
-            ]
-            selected = local_rng.sample(creative_options, k=min(creativity, len(creative_options)))
-            for opt in selected:
-                steps += f"{opt}\n"
         
-            return steps   
-
+        # Ajouter des variations créatives
+        if creativity >= 2:
+            steps += "\n**🎨 VARIATIONS CRÉATIVES :**\n"
+            
+            creative_phases = [
+                "✨ **Pré-infusion** : Faire infuser le lait avec des herbes 30 min avant chauffage",
+                "✨ **Température alternée** : 33°C pour le caillage, 30°C pour le brassage",
+                "✨ **Salage aromatisé** : Mélanger le sel avec des épices moulues",
+                "✨ **Moulage en deux temps** : Remplir à moitié, attendre 1h, compléter",
+                "✨ **Affinage accéléré** : 1ère semaine à 14°C, puis 10°C",
+            ]
+            
+            # Sélectionner selon le niveau de créativité
+            num_variations = min(creativity, 3)
+            selected = local_rng.sample(creative_phases, num_variations)
+            
+            for variation in selected:
+                steps += f"{variation}\n"
+        
+        # Conseils supplémentaires
+        steps += f"\n💡 **CONSEIL UNIQUE #{seed_value} :** "
+        conseils = [
+            f"Vérifiez la température toutes les 10 minutes pendant le chauffage",
+            f"Utilisez un minuteur pour ne pas dépasser le temps de caillage",
+            f"Notez toutes les températures et durées pour reproduire la recette",
+            f"Goûtez le petit-lait : il doit être légèrement sucré, pas amer",
+        ]
+        steps += local_rng.choice(conseils)
+        
+        return steps
+    
     def _generate_unique_advice(self, ingredients, cheese_type, seed_value):
         """Génère des conseils personnalisés"""
         import random
@@ -4382,44 +4420,6 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             base += f"• {ing.capitalize()}\n"
         
         return base
-
-    def _generate_unique_steps(self, cheese_type, seed_value, creativity):
-        """Génère des étapes uniques"""
-        self.rng.seed(seed_value)
-        
-        steps = ""
-        
-        # Temps variables
-        repos_time = self.rng.choice(["45", "50", "55", "60"])
-        egouttage_time = self.rng.choice(["4", "5", "6"])
-        
-        if cheese_type == "Fromage frais":
-            steps += f"""
-    PHASE 1 : PRÉPARATION (20 minutes)
-    ──────────────────────────────────────────
-    1. Stérilisez tout le matériel à l'eau bouillante
-    2. Chauffez le lait à {self.rng.choice(["31", "32", "33"])}°C (±1°C)
-    3. Ajoutez la présure diluée dans 50ml d'eau froide
-    4. Mélangez doucement pendant 30 secondes
-    5. Couvrez et laissez reposer {repos_time} minutes
-    """
-        elif cheese_type == "Pâte molle":
-            steps += f"""
-    PHASE 1 : CAILLAGE LONG (90 minutes)
-    ──────────────────────────────────────────
-    1. Chauffage précis à 32°C
-    2. Ajout des ferments + repos 30 minutes
-    3. Emprésurage + repos {repos_time} minutes
-    4. Découpage en cubes de {self.rng.choice(["1", "1.5", "2"])}cm
-    """
-        
-        # Ajouter des étapes créatives
-        if creativity >= 2:
-            steps += "\n**🎨 VARIATION CRÉATIVE :**\n"
-            steps += "- Mélangez délicatement pendant 10 minutes supplémentaires\n"
-            steps += "- Ajoutez une pincée de fleur de sel en surface\n"
-        
-        return steps
 
     def _generate_amateur_recipe(
         self,
@@ -6121,15 +6121,7 @@ def update_profile_description(profile):
 
     return descriptions.get(profile, "")
 
-    gr.Markdown("""
-        ---
-        <center>
-        Fait avec 🧀 et 🤖 | Hugging Face Spaces | © 2026 Braconier
-        </center>
-        """)
-
     return demo
-
 
 def generate_all(
     ingredients, cheese_type, constraints, creativity, texture, affinage, spice, profile
@@ -6280,16 +6272,24 @@ def generate_all(
             "",  # 6. Vide (Textbox)
         )
 
-
 # CREATE INTERFACE GRADIO
-def create_interface():
-    """Interface avec génération simultanée"""
+# ===== VERSION CORRIGÉE DE create_interface AVEC AUTHENTIFICATION =====
 
-    import gradio as gr  # ✅ AJOUTER CET IMPORT ICI
+print("="*60)
+print("🔍 DEBUG AUTHENTIFICATION")
+print(f"AUTH_USERNAME chargé : {AUTH_USERNAME}")
+print(f"AUTH_PASSWORD chargé : {AUTH_PASSWORD}")
+print(f"Longueur password : {len(AUTH_PASSWORD) if AUTH_PASSWORD else 0}")
+print("="*60)
+
+def create_interface():
+    """Interface avec authentification et génération simultanée"""
+
+    import gradio as gr
     import json
     import os
 
-    # Définir custom_css (ajoutez-le avant de l'utiliser)
+    # Définir custom_css
     custom_css = """
     .no-recipes {
         text-align: center;
@@ -6312,557 +6312,491 @@ def create_interface():
         overflow-y: auto;
         max-height: 500px;
     }
+    .login-box {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        background: white;
+    }
     """
-
+    
     with gr.Blocks(
-        title="🧀 Agent Fromager",
+        title="🧀 Agent Fromager - Authentification",
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
         css=custom_css,
         head="""
         <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
         """,
     ) as demo:
+        
+        # État d'authentification
+        is_authenticated = gr.State(value=False)
+    
+        # ===== ÉCRAN DE LOGIN =====
+        with gr.Column(visible=True, elem_classes="login-box") as login_screen:
+            gr.Markdown(f"""
+            # 🔐 Agent Fromager
+            ### Accès sécurisé
+            
+            **Identifiants attendus :**
+            - Utilisateur : `{AUTH_USERNAME}`
+            """)
+            
+            username_input = gr.Textbox(label="Nom d'utilisateur", placeholder="admin")
+            password_input = gr.Textbox(label="Mot de passe", type="password", placeholder="••••••••")
+            login_button = gr.Button("🔓 Se connecter", variant="primary", size="lg")
+            login_status = gr.Markdown("")
+        
+    
+        # ===== ÉCRAN PRINCIPAL =====
+        with gr.Column(visible=False) as main_screen:
+            
+            gr.HTML("""
+            <h1 style="text-align: center; color: #BF360C;">🧀 Agent Fromager Générateur de recettes</h1>
+            <h3 style="text-align: center; color: #5D4037;">Créez vos fromages avec l'IA + Recherche web automatique</h3>
+            """)
 
-        gr.HTML("""
-        <h1 style="text-align: center; color: #BF360C;">🧀 Agent Fromager Générateur de recettes</h1>
-        <h3 style="text-align: center; color: #5D4037;">Créez vos fromages avec l'IA + Recherche web automatique</h3>
-        """)
+            # Sélecteur de profil
+            gr.Markdown("## 👤 Personnalisez votre expérience")
 
-        # NOUVEAU : Sélecteur de profil en haut
-        gr.Markdown("## 👤 Personnalisez votre expérience")
+            with gr.Row():
+                profile_selector = gr.Radio(
+                    choices=["🧀 Amateur", "🏭 Producteur", "🎓 Formateur"],
+                    value="🧀 Amateur",
+                    label="Quel est votre profil ?",
+                    info="Les recettes seront adaptées à votre niveau et vos besoins",
+                    interactive=True,
+                    scale=2,
+                )
 
-        with gr.Row():
-            profile_selector = gr.Radio(
-                choices=["🧀 Amateur", "🏭 Producteur", "🎓 Formateur"],
-                value="🧀 Amateur",
-                label="Quel est votre profil ?",
-                info="Les recettes seront adaptées à votre niveau et vos besoins",
-                interactive=True,
-                scale=2,
+            # Description des profils
+            gr.Markdown("""
+            **🧀 Amateur** : Recettes accessibles avec conseils pratiques  
+            **🏭 Producteur** : Fiches techniques précises et professionnelles  
+            **🎓 Formateur** : Supports pédagogiques avec objectifs d'apprentissage
+            """)
+
+            # ===== ZONE DE SAISIE =====
+            with gr.Row():
+                with gr.Column(scale=2):
+                    ingredients_input = gr.Textbox(
+                        label="🥛 Ingrédients disponibles",
+                        placeholder="Ex: lait de chèvre, présure, sel, herbes",
+                        lines=3,
+                    )
+
+                    cheese_type_input = gr.Dropdown(
+                        choices=[
+                            "Laissez l'IA choisir",
+                            "Fromage frais",
+                            "Pâte molle",
+                            "Pâte pressée non cuite",
+                            "Pâte pressée cuite",
+                            "Pâte persillée",
+                        ],
+                        label="🧀 Type de fromage",
+                        value="Laissez l'IA choisir",
+                    )
+
+                    constraints_input = gr.Textbox(
+                        label="⚙️ Contraintes",
+                        placeholder="Ex: végétarien, rapide...",
+                        lines=2,
+                    )
+
+                    gr.Markdown("### 🎛️ Micro-choix")
+
+                    with gr.Row():
+                        creativity_slider = gr.Slider(
+                            0, 3, value=0, step=1, label="🎨 Créativité"
+                        )
+                        texture_choice = gr.Radio(
+                            ["Très crémeux", "Équilibré", "Très ferme"],
+                            value="Équilibré",
+                            label="🧈 Texture",
+                        )
+
+                    with gr.Row():
+                        affinage_slider = gr.Slider(
+                            0, 12, value=4, step=1, label="⏱️ Affinage (semaines)"
+                        )
+                        spice_choice = gr.Radio(
+                            ["Neutre", "Modéré", "Intense"],
+                            value="Neutre",
+                            label="🌶️ Épices",
+                        )
+
+                    generate_all_btn = gr.Button(
+                        "✨ Générer la recette + Recherche web",
+                        variant="primary",
+                        size="lg",
+                    )
+
+                    gr.Markdown(
+                        "⏳ *La génération + recherche web prend 10-15 secondes...*"
+                    )
+
+                with gr.Column(scale=1):
+                    gr.Markdown("""
+                    ### 💡 Comment ça marche ?
+                    
+                    1️⃣ Entrez vos ingrédients
+                    2️⃣ Ajustez les micro-choix
+                    
+                    3️⃣ Cliquez sur "Générer"
+                    
+                    **Résultat :**
+                    - Onglet 1 : 📖 Votre recette
+                    - Onglet 2 : 🌐 Recettes web
+                    - Onglet 3 : 📚 Base de connaissances
+                    - Onglet 4 : 🕒 Historique
+                    - Onglet 5 : 💬 Expert Fromager
+                    """)
+
+            # ===== FONCTIONS LOCALES =====
+            def load_history():
+                """Charge l'historique"""
+                try:
+                    if hasattr(agent, "history") and agent.history:
+                        history = agent.history
+                    elif os.path.exists(agent.recipes_file):
+                        with open(agent.recipes_file, "r", encoding="utf-8") as f:
+                            history = json.load(f)
+                    else:
+                        return "📭 Aucune recette sauvegardée", []
+
+                    if not history:
+                        return "📭 Aucune recette sauvegardée", []
+
+                    choices = []
+                    for i, entry in enumerate(history[-20:][::-1], 1):
+                        cheese_name = entry.get("cheese_name", "Sans nom")
+                        date = entry.get("date", "").split("T")[0] if entry.get("date") else ""
+                        
+                        if date:
+                            try:
+                                year, month, day = date.split("-")
+                                date_formatted = f"{day}/{month}/{year}"
+                                choice_text = f"{i}. {cheese_name} ({date_formatted})"
+                            except:
+                                choice_text = f"{i}. {cheese_name}"
+                        else:
+                            choice_text = f"{i}. {cheese_name}"
+                        
+                        choices.append(choice_text)
+
+                    summary = "╔══════════════════════════════════════════════════════════╗\n"
+                    summary += f"║   📚 HISTORIQUE : {len(history)} RECETTE(S)   \n"
+                    summary += "╚══════════════════════════════════════════════════════════╝\n\n"
+
+                    for i, entry in enumerate(history[-10:][::-1], 1):
+                        cheese_name = entry.get("cheese_name", "Sans nom")
+                        date = entry.get("date", "").split("T")[0] if entry.get("date") else "????-??-??"
+                        cheese_type = entry.get("type", "Type inconnu")
+                        
+                        summary += f"🧀 {i}. {cheese_name}\n"
+                        summary += f"    ├─ 📅 {date}\n"
+                        summary += f"    └─ 🧈 {cheese_type}\n\n"
+
+                    return summary, choices
+
+                except Exception as e:
+                    return f"❌ Erreur: {str(e)}", []
+
+            def show_recipe_select(choice):
+                """Affiche la recette sélectionnée"""
+                if not choice:
+                    return ""
+                
+                try:
+                    num_str = choice.split(".")[0].strip()
+                    position = int(num_str)
+                    
+                    if hasattr(agent, "history") and agent.history:
+                        history = agent.history
+                    elif os.path.exists(agent.recipes_file):
+                        with open(agent.recipes_file, "r", encoding="utf-8") as f:
+                            history = json.load(f)
+                    else:
+                        return "❌ Historique introuvable"
+                    
+                    reversed_history = history[-20:][::-1]
+                    
+                    if position > 0 and position <= len(reversed_history):
+                        entry = reversed_history[position - 1]
+                        return entry.get("recipe_complete", "")
+                    else:
+                        return f"❌ Recette #{position} introuvable"
+                        
+                except Exception as e:
+                    return f"❌ Erreur: {str(e)}"
+
+            def agent_clear_history():
+                """Efface l'historique"""
+                try:
+                    recipes_file = "recipes_history.json"
+                    with open(recipes_file, "w", encoding="utf-8") as f:
+                        json.dump([], f)
+                    
+                    if hasattr(agent, "history"):
+                        agent.history = []
+                    
+                    return "✅ Historique effacé", [], ""
+                except Exception as e:
+                    return f"❌ Erreur: {str(e)}", [], ""
+
+            def load_and_populate():
+                """Charge et met à jour"""
+                return load_history()
+
+            def clear_and_reset():
+                """Efface et reset"""
+                return agent_clear_history()
+
+            # ===== ONGLETS =====
+            with gr.Tabs():
+                # ONGLET 1 : Recette
+                with gr.Tab("📖 Mon fromage"):
+                    recipe_output = gr.Textbox(
+                        label="Votre recette complète",
+                        lines=25,
+                        max_lines=90,
+                        placeholder="Votre recette apparaîtra ici...",
+                        elem_id="recipe-scroll",
+                    )
+
+                # ONGLET 2 : Web
+                with gr.Tab("🌐 Recettes Web"):
+                    search_status = gr.HTML(label="Statut", value="")
+                    web_results = gr.HTML(
+                        label="Résultats",
+                        value="<div class='no-recipes'>Cliquez sur 'Générer'...</div>",
+                    )
+
+                # ONGLET 3 : Base de connaissances
+                with gr.Tab("📚 Base de connaissances"):
+                    with gr.Row():
+                        knowledge_btn = gr.Button("📖 Charger résumé", variant="primary")
+                    
+                    knowledge_output = gr.Textbox(
+                        label="🧀 SAVOIR FROMAGÈRE",
+                        lines=45,
+                        placeholder="Cliquez pour charger...",
+                    )
+                    
+                    knowledge_btn.click(fn=agent.get_knowledge_summary, outputs=knowledge_output)
+
+                # ONGLET 4 : Historique
+                with gr.Tab("🕒 Historique"):
+                    gr.Markdown("### 📚 Historique de vos recettes")
+
+                    with gr.Row():
+                        history_btn = gr.Button("📋 Charger", variant="primary")
+                        clear_btn = gr.Button("🗑️ Effacer", variant="stop")
+
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            history_summary = gr.Textbox(
+                                label="📊 Résumé",
+                                lines=10,
+                                interactive=False,
+                                placeholder="Cliquez sur 'Charger'...",
+                            )
+
+                        with gr.Column(scale=2):
+                            recipe_dropdown = gr.Dropdown(
+                                label="🍽️ Sélectionner une recette",
+                                choices=[],
+                                interactive=True,
+                            )
+
+                            recipe_display = gr.Textbox(
+                                label="📖 Recette complète",
+                                lines=25,
+                                interactive=False,
+                                placeholder="Sélectionnez une recette...",
+                            )
+
+                    # Connexions
+                    history_btn.click(
+                        fn=load_and_populate,
+                        outputs=[history_summary, recipe_dropdown],
+                    )
+
+                    recipe_dropdown.select(
+                        fn=show_recipe_select,
+                        inputs=[recipe_dropdown],
+                        outputs=[recipe_display],
+                    )
+
+                    clear_btn.click(
+                        fn=clear_and_reset,
+                        outputs=[history_summary, recipe_dropdown, recipe_display],
+                    )
+
+                # ONGLET 5 : Chat
+                with gr.Tab("💬 Expert Fromager"):
+                    gr.Markdown("### 🧀 Dialoguez avec Maître Fromager")
+                    
+                    chat_history = gr.State([])
+                    
+                    chat_display = gr.Textbox(
+                        label="Conversation",
+                        lines=15,
+                        interactive=False,
+                        elem_id="chat-display",
+                    )
+
+                    with gr.Row():
+                        user_input = gr.Textbox(
+                            label="Votre question",
+                            placeholder="Ex: Mon fromage est trop acide...",
+                            lines=3,
+                            scale=4,
+                        )
+                        send_btn = gr.Button("💬 Envoyer", variant="primary", scale=1)
+
+                    with gr.Row():
+                        btn_problem = gr.Button("🚨 Problème", size="sm")
+                        btn_recipe = gr.Button("📝 Recette", size="sm")
+                        btn_wine = gr.Button("🍷 Accord vin", size="sm")
+                        btn_clear_chat = gr.Button("🗑️ Effacer", size="sm")
+
+                    def process_question(question, history):
+                        if not question or not question.strip():
+                            return history, "", ""
+                        
+                        response = agent.chat_with_llm(question, [])
+                        history.append(f"👤 **Vous:** {question}")
+                        history.append(f"🧀 **Maître Fromager:** {response}")
+                        history.append("─" * 50)
+                        
+                        if len(history) > 15:
+                            history = history[-15:]
+                        
+                        display_text = "\n\n".join(history)
+                        return history, display_text, ""
+
+                    def get_quick_question(btn_text):
+                        questions = {
+                            "🚨 Problème": "Mon fromage a des problèmes, que faire ?",
+                            "📝 Recette": "Donne-moi une recette simple",
+                            "🍷 Accord vin": "Quel vin avec un fromage de chèvre ?",
+                        }
+                        return questions.get(btn_text, "")
+
+                    def clear_conversation():
+                        return [], "", ""
+
+                    send_btn.click(
+                        fn=process_question,
+                        inputs=[user_input, chat_history],
+                        outputs=[chat_history, chat_display, user_input],
+                    )
+
+                    user_input.submit(
+                        fn=process_question,
+                        inputs=[user_input, chat_history],
+                        outputs=[chat_history, chat_display, user_input],
+                    )
+
+                    btn_problem.click(fn=lambda: get_quick_question("🚨 Problème"), outputs=[user_input])
+                    btn_recipe.click(fn=lambda: get_quick_question("📝 Recette"), outputs=[user_input])
+                    btn_wine.click(fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input])
+                    btn_clear_chat.click(fn=clear_conversation, outputs=[chat_history, chat_display, user_input])
+
+                # ONGLET 6 : Test
+                with gr.Tab("🧪 Test Internet"):
+                    test_btn = gr.Button("🔍 Tester")
+                    test_output = gr.Textbox(lines=5)
+                    test_btn.click(fn=agent.test_internet, outputs=test_output)
+
+            # ===== BOUTON GÉNÉRATION =====
+            generate_all_btn.click(
+                fn=generate_all,
+                inputs=[
+                    ingredients_input,
+                    cheese_type_input,
+                    constraints_input,
+                    creativity_slider,
+                    texture_choice,
+                    affinage_slider,
+                    spice_choice,
+                    profile_selector,
+                ],
+                outputs=[
+                    recipe_output,
+                    search_status,
+                    web_results,
+                    history_summary,
+                    recipe_dropdown,
+                    recipe_display,
+                ],
             )
 
-        # Description des profils
-        gr.Markdown("""
-        **🧀 Amateur** : Recettes accessibles avec conseils pratiques  
-        **🏭 Producteur** : Fiches techniques précises et professionnelles  
-        **🎓 Formateur** : Supports pédagogiques avec objectifs d'apprentissage
-        """)
-
-        # ===== ZONE DE SAISIE COMMUNE EN HAUT =====
-        with gr.Row():
-            with gr.Column(scale=2):
-                ingredients_input = gr.Textbox(
-                    label="🥛 Ingrédients disponibles",
-                    placeholder="Ex: lait de chèvre, présure, sel, herbes",
-                    lines=3,
-                )
-
-                cheese_type_input = gr.Dropdown(
-                    choices=[
-                        "Laissez l'IA choisir",
-                        "Fromage frais",
-                        "Pâte molle",
-                        "Pâte pressée non cuite",
-                        "Pâte pressée cuite",
-                        "Pâte persillée",
-                    ],
-                    label="🧀 Type de fromage",
-                    value="Laissez l'IA choisir",
-                )
-
-                constraints_input = gr.Textbox(
-                    label="⚙️ Contraintes",
-                    placeholder="Ex: végétarien, rapide...",
-                    lines=2,
-                )
-
-                gr.Markdown("### 🎛️ Micro-choix")
-
-                with gr.Row():
-                    creativity_slider = gr.Slider(
-                        0, 3, value=0, step=1, label="🎨 Créativité"
-                    )
-                    texture_choice = gr.Radio(
-                        ["Très crémeux", "Équilibré", "Très ferme"],
-                        value="Équilibré",
-                        label="🧈 Texture",
-                    )
-
-                with gr.Row():
-                    affinage_slider = gr.Slider(
-                        0, 12, value=4, step=1, label="⏱️ Affinage (semaines)"
-                    )
-                    spice_choice = gr.Radio(
-                        ["Neutre", "Modéré", "Intense"],
-                        value="Neutre",
-                        label="🌶️ Épices",
-                    )
-
-                generate_all_btn = gr.Button(
-                    "✨ Générer la recette + Recherche web",
-                    variant="primary",
-                    size="lg",
-                )
-
-                gr.Markdown(
-                    "⏳ *La génération + recherche web prend 10-15 secondes...*"
-                )
-
-            with gr.Column(scale=1):
-                gr.Markdown("""
-                ### 💡 Comment ça marche ?
+            # ===== BOUTON DÉCONNEXION =====
+            gr.Markdown("---")
+            with gr.Row():
+                gr.Markdown(f"**Connecté en tant que :** `{AUTH_USERNAME}`")
+                logout_button = gr.Button("🚪 Déconnexion", variant="secondary", size="sm")
                 
-                1️⃣ Entrez vos ingrédients séparés par une virgule (sans espace)
-                
-                2️⃣ Ajustez les micro-choix (créativité, texture, affinage, épices)
-                
-                3️⃣ Cliquez sur "Générer"
-                
-                **Résultat :**
-                - Onglet 1 : 📖 Votre recette de fromage personnalisée
-                
-                - Onglet 2 : 🌐 6 recettes du web avec les mêmes ingrédients
-                
-                - Onglet 3 : 📚 La base de connaissances
-                
-                - Onglet 4 : 🕒 Historique des recettes générées
-                
-                - Onglet 5 : 💬 Expert Fromager (un chat avec un maître fromager)
-                
-                
-                **Tout se remplit automatiquement !**
-
-                """)
-
-        # ===== FONCTIONS LOCALES =====
-        def load_history():
-            """Charge l'historique avec résumé détaillé - FORMAT UNIFORME"""
-            print("🔍 DEBUG: load_history() appelé")
-
-            try:
-                # Charger l'historique
-                if hasattr(agent, "history") and agent.history:
-                    history = agent.history
-                    print(
-                        f"   → Historique depuis agent.history: {len(history)} recettes"
-                    )
-                elif os.path.exists(agent.recipes_file):
-                    with open(agent.recipes_file, "r", encoding="utf-8") as f:
-                        history = json.load(f)
-                    print(f"   → Historique depuis fichier: {len(history)} recettes")
-                else:
-                    print("   → Aucun historique trouvé")
-                    return "📭 Aucune recette sauvegardée", []
-
-                if not history:
-                    print("   → Historique vide")
-                    return "📭 Aucune recette sauvegardée", []
-
-                # ✅ CRÉER LES CHOIX AVEC FORMAT UNIFORME
-                choices = []
-                for i, entry in enumerate(
-                    history[-20:][::-1], 1
-                ):  # Ordre inverse, numérotation 1,2,3...
-                    cheese_name = entry.get("cheese_name", "Sans nom")
-                    date = (
-                        entry.get("date", "").split("T")[0] if entry.get("date") else ""
-                    )
-
-                    # FORMAT UNIFORME : "N. NOM (DD/MM/YYYY)"
-                    if date:
-                        # Convertir 2026-02-05 → 05/02/2026
-                        try:
-                            year, month, day = date.split("-")
-                            date_formatted = f"{day}/{month}/{year}"
-                            choice_text = f"{i}. {cheese_name} ({date_formatted})"
-                        except:
-                            choice_text = f"{i}. {cheese_name}"
-                    else:
-                        choice_text = f"{i}. {cheese_name}"
-
-                    choices.append(choice_text)
-
-                print(f"   ✅ Choices créés: {choices}")
-
-                # ✅ CRÉER UN RÉSUMÉ DÉTAILLÉ
-                summary = (
-                    "╔══════════════════════════════════════════════════════════╗\n"
-                )
-                summary += (
-                    f"║   📚 HISTORIQUE : {len(history)} RECETTE(S) SAUVEGARDÉE(S)   \n"
-                )
-                summary += (
-                    "╚══════════════════════════════════════════════════════════╝\n\n"
-                )
-
-                # Afficher les 10 dernières recettes
-                for i, entry in enumerate(history[-10:][::-1], 1):
-                    try:
-                        cheese_name = entry.get("cheese_name", "Sans nom")
-                        id_num = entry.get("id", 0)
-                        date = (
-                            entry.get("date", "").split("T")[0]
-                            if entry.get("date")
-                            else "????-??-??"
-                        )
-                        ingredients = entry.get("ingredients", [])
-                        cheese_type = entry.get("type", "Type inconnu")
-
-                        summary += f"🧀 {i}. {cheese_name}\n"
-                        summary += f"    ├─ ID: #{id_num}\n"
-                        summary += f"    ├─ 📅 {date}\n"
-                        summary += f"    ├─ 🧈 {cheese_type}\n"
-
-                        if ingredients:
-                            ing_str = ", ".join(ingredients[:3])
-                            if len(ingredients) > 3:
-                                ing_str += f" ... (+{len(ingredients)-3})"
-                            summary += f"    └─ 🥛 {ing_str}\n"
-                        else:
-                            summary += f"    └─ 🥛 Ingrédients non disponibles\n"
-
-                        summary += "\n"
-                    except Exception as e:
-                        print(f"   ⚠️ Erreur sur une entrée: {e}")
-                        continue
-
-                if len(history) > 10:
-                    summary += f"\n💡 {len(history)-10} recette(s) plus ancienne(s) disponible(s) dans le dropdown\n"
-
-                return summary, choices
-
-            except Exception as e:
-                print(f"❌ Erreur load_history: {e}")
-                import traceback
-
-                traceback.print_exc()
-                return f"❌ Erreur: {str(e)}", []
-
-        def show_recipe_select(choice):
-            """Affiche la recette sélectionnée - COMPATIBLE AVEC NOUVEAU FORMAT"""
-            if not choice:
-                return ""
-
-            print(f"🔍 Sélection: {choice}")
-
-            try:
-                # Extraire le numéro (format: "1. NOM (DATE)")
-                num_str = choice.split(".")[0].strip()
-                position = int(num_str)
-
-                print(f"   → Position extraite: {position}")
-
-                # Charger l'historique
-                if hasattr(agent, "history") and agent.history:
-                    history = agent.history
-                elif os.path.exists(agent.recipes_file):
-                    with open(agent.recipes_file, "r", encoding="utf-8") as f:
-                        history = json.load(f)
-                else:
-                    return "❌ Historique introuvable"
-
-                # Récupérer la recette (position est 1-indexed, liste est 0-indexed)
-                # Les recettes sont affichées en ordre inverse
-                reversed_history = history[-20:][::-1]
-
-                if position > 0 and position <= len(reversed_history):
-                    entry = reversed_history[position - 1]
-                    recipe = entry.get("recipe_complete", "")
-                    print(f"   ✅ Recette trouvée: {len(recipe)} caractères")
-                    return recipe
-                else:
-                    print(f"   ❌ Position {position} hors limites")
-                    return f"❌ Recette #{position} introuvable"
-
-            except Exception as e:
-                print(f"❌ ERREUR show_recipe_select: {e}")
-                import traceback
-
-                traceback.print_exc()
-                return f"❌ Erreur: {str(e)}"
-
-        def agent_clear_history():
-            """Efface l'historique"""
-            try:
-                import json
-                import os
-
-                # Effacer le fichier
-                recipes_file = "recipes_history.json"
-                with open(recipes_file, "w", encoding="utf-8") as f:
-                    json.dump([], f)
-
-                # Effacer en mémoire
-                if hasattr(agent, "history"):
-                    agent.history = []
-
-                print("✅ Historique effacé")
-
+            gr.Markdown("""
+            ---
+            <center>
+            Fait avec 🧀 et 🤖 | Hugging Face Spaces | © 2026 Braconier
+            </center>
+            """)
+        
+        # ===== FONCTIONS D'AUTHENTIFICATION =====
+        def authenticate(username, password):
+            """Vérifie les identifiants"""
+            if username == AUTH_USERNAME and password == AUTH_PASSWORD:
                 return (
-                    "✅ Historique effacé avec succès",
-                    [],
-                    "",
+                    gr.Column(visible=False),  # Cacher login
+                    gr.Column(visible=True),   # Montrer main
+                    "✅ Connexion réussie !",
                 )
-            except Exception as e:
-                print(f"❌ Erreur clear: {e}")
-                return (f"❌ Erreur: {str(e)}", [], "")
-
-        # ✅ AJOUTER CES DEUX FONCTIONS ICI
-        def load_and_populate():
-            """Charge ET met à jour le dropdown"""
-            summary, choices = load_history()
-            print(f"🔄 Wrapper: summary={len(summary)} chars, choices={choices}")
+            else:
+                return (
+                    gr.Column(visible=True),   # Montrer login
+                    gr.Column(visible=False),  # Cacher main
+                    "❌ Identifiants incorrects",
+                )
+        
+        def logout():
+            """Déconnecte l'utilisateur"""
             return (
-                summary,
-                choices,
-            )  # Retourner les choix directement, pas gr.Dropdown()
-
-        def clear_and_reset():
-            """Efface et reset"""
-            result = agent_clear_history()
-            # agent_clear_history retourne déjà 3 valeurs
-            return result
-
-        # ===== ONGLETS =====
-        with gr.Tabs():
-            # ONGLET 1
-            with gr.Tab("📖 Mon fromage"):
-                recipe_output = gr.Textbox(
-                    label="Votre recette complète",
-                    lines=25,
-                    max_lines=90,
-                    placeholder="Votre recette apparaîtra ici après génération...",
-                    elem_id="recipe-scroll",  # Ajouter un ID pour le CSS si besoin
-                )
-
-            # ONGLET 2
-            with gr.Tab("🌐 Recettes Web"):
-                search_status = gr.HTML(label="Statut", value="")
-                web_results = gr.HTML(
-                    label="Résultats",
-                    value="<div class='no-recipes'>Cliquez sur 'Générer' pour lancer la recherche web...</div>",
-                )
-
-            # ONGLET 3
-            with gr.Tab("📚 Base de connaissances"):
-                with gr.Row():
-                    knowledge_btn = gr.Button(
-                        "📖 Charger résumé COMPLET", variant="primary"
-                    )
-
-                knowledge_output = gr.Textbox(
-                    label="🧀 SAVOIR FROMAGÈRE COMPLET",
-                    lines=45,
-                    max_lines=60,
-                    placeholder="Cliquez pour charger TOUS les types, épices, dosages...",
-                )
-
-                knowledge_btn.click(
-                    fn=agent.get_knowledge_summary, outputs=knowledge_output
-                )
-
-            # ONGLET 4 : Historique
-            with gr.Tab("🕒 Historique"):
-                gr.Markdown("### 📚 Historique de vos recettes")
-
-                with gr.Row():
-                    history_btn = gr.Button(
-                        "📋 Charger mes recettes", variant="primary", size="lg"
-                    )
-                    clear_btn = gr.Button("🗑️ Effacer tout", variant="stop", size="lg")
-
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        history_summary = gr.Textbox(
-                            label="📊 Résumé",
-                            lines=10,
-                            interactive=False,
-                            placeholder="Cliquez sur 'Charger mes recettes' pour voir le résumé...",
-                        )
-
-                    with gr.Column(scale=2):
-                        recipe_dropdown = gr.Dropdown(
-                            label="🍽️ Sélectionner une recette",
-                            choices=[],
-                            interactive=True,
-                            value=None,
-                        )
-
-                        recipe_display = gr.Textbox(
-                            label="📖 Recette complète",
-                            lines=25,
-                            interactive=False,
-                            placeholder="Sélectionnez une recette dans la liste...",
-                        )
-
-                # === CONNEXIONS ===
-                history_btn.click(
-                    fn=load_and_populate,
-                    inputs=[],
-                    outputs=[history_summary, recipe_dropdown],
-                )
-
-                recipe_dropdown.select(
-                    fn=show_recipe_select,
-                    inputs=[recipe_dropdown],
-                    outputs=[recipe_display],
-                )
-
-                # ✅ CONNEXION DU BOUTON EFFACER
-                clear_btn.click(
-                    fn=clear_and_reset,
-                    inputs=[],
-                    outputs=[history_summary, recipe_dropdown, recipe_display],
-                )
-
-            # === ONGLET 5 CHAT SANS CHATBOT (GARANTI) ===
-            with gr.Tab("💬 Expert Fromager"):
-                gr.Markdown("""
-                ### 🧀 Dialoguez avec Maître Fromager Pierre
-                **Expert fromager avec 40 ans d'expérience**
-                
-                Posez vos questions sur la fabrication, les problèmes, les recettes...
-                """)
-
-                # État pour stocker l'historique
-                chat_history = gr.State([])
-
-                # Zone d'affichage (Textbox au lieu de Chatbot avec scrollbar)
-                chat_display = gr.Textbox(
-                    label="Conversation",
-                    lines=15,
-                    max_lines=50,
-                    interactive=False,
-                    elem_id="chat-display",
-                    show_label=True,
-                )
-
-                # Zone de saisie
-                with gr.Row():
-                    user_input = gr.Textbox(
-                        label="Votre question",
-                        placeholder="Ex: Mon fromage est trop acide, que faire ?",
-                        lines=3,
-                        scale=4,
-                        container=False,
-                    )
-                    send_btn = gr.Button("💬 Envoyer", variant="primary", scale=1)
-
-                # Boutons rapides
-                with gr.Row():
-                    gr.Markdown("**Questions rapides :**")
-
-                with gr.Row():
-                    btn_problem = gr.Button("🚨 Problème", size="sm")
-                    btn_recipe = gr.Button("📝 Recette", size="sm")
-                    btn_wine = gr.Button("🍷 Accord vin", size="sm")
-                    btn_clear = gr.Button("🗑️ Effacer", size="sm", variant="secondary")
-
-                # Fonction principale
-                def process_question(question, history):
-                    """Traite une question et retourne la réponse"""
-                    if not question or not question.strip():
-                        return history, "", ""
-
-                    print(f"💬 Question reçue: {question[:50]}...")
-
-                    # Obtenir la réponse du LLM
-                    response = agent.chat_with_llm(question, [])
-
-                    # Ajouter à l'historique
-                    history.append(f"👤 **Vous:** {question}")
-                    history.append(f"🧀 **Maître Fromager:** {response}")
-                    history.append("─" * 50)  # Séparateur
-
-                    # Garder seulement les 15 dernières entrées
-                    if len(history) > 15:
-                        history = history[-15:]
-
-                    # Créer le texte d'affichage
-                    display_text = "\n\n".join(history)
-
-                    return history, display_text, ""
-
-                # Questions rapides pré-définies
-                def get_quick_question(btn_text):
-                    questions = {
-                        "🚨 Problème": "Mon fromage a des problèmes, que faire ?",
-                        "📝 Recette": "Donne-moi une recette simple pour débutant",
-                        "🍷 Accord vin": "Quel vin avec un fromage de chèvre ?",
-                    }
-                    return questions.get(btn_text, "")
-
-                # Effacer la conversation
-                def clear_conversation():
-                    return [], "", ""
-
-                # Connexions des boutons
-                send_btn.click(
-                    fn=process_question,
-                    inputs=[user_input, chat_history],
-                    outputs=[chat_history, chat_display, user_input],
-                )
-
-                user_input.submit(
-                    fn=process_question,
-                    inputs=[user_input, chat_history],
-                    outputs=[chat_history, chat_display, user_input],
-                )
-
-                # Boutons rapides
-                btn_problem.click(
-                    fn=lambda: get_quick_question("🚨 Problème"), outputs=[user_input]
-                )
-
-                btn_recipe.click(
-                    fn=lambda: get_quick_question("📝 Recette"), outputs=[user_input]
-                )
-
-                btn_wine.click(
-                    fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input]
-                )
-
-                btn_clear.click(
-                    fn=clear_conversation,
-                    outputs=[chat_history, chat_display, user_input],
-                )
-
-            # ONGLET 6
-            with gr.Tab("🧪 Test Internet"):
-                test_btn = gr.Button("🔍 Tester")
-                test_output = gr.Textbox(lines=5)
-                test_btn.click(fn=agent.test_internet, outputs=test_output)
-
-        # ===== CONNEXION BOUTON PRINCIPAL =====
-        # Note: La fonction generate_all doit être définie ailleurs dans votre code
-        # Si elle n'existe pas, vous devez la créer
-        generate_all_btn.click(
-            fn=generate_all,
-            inputs=[
-                ingredients_input,
-                cheese_type_input,
-                constraints_input,
-                creativity_slider,
-                texture_choice,
-                affinage_slider,
-                spice_choice,
-                profile_selector,
-            ],
-            outputs=[
-                recipe_output,  # 1. La recette générée (Textbox)
-                search_status,  # 2. Statut de recherche (Textbox)
-                web_results,  # 3. Résultats web (HTML)
-                history_summary,  # 4. Historique actualisé (Textbox)
-                recipe_dropdown,  # 5. Dropdown actualisé (Dropdown)
-                recipe_display,  # 6. Effacer l'affichage précédent (Textbox)
-            ],
+                gr.Column(visible=True),   # Montrer login
+                gr.Column(visible=False),  # Cacher main
+                "",  # Effacer le message
+            )
+        
+        # ===== CONNEXIONS AUTHENTIFICATION =====
+        login_button.click(
+            fn=authenticate,
+            inputs=[username_input, password_input],
+            outputs=[login_screen, main_screen, login_status]
         )
-
+        
+        password_input.submit(
+            fn=authenticate,
+            inputs=[username_input, password_input],
+            outputs=[login_screen, main_screen, login_status]
+        )
+        
+        logout_button.click(
+            fn=logout,
+            outputs=[login_screen, main_screen, login_status]
+        )
+    
     return demo
 
 
-# ===== TESTS ===== (à ajouter vers la fin du fichier, avant le lancement)
-
+# ===== NE PAS OUBLIER EN DÉBUT DE FICHIER =====
+# AUTH_USERNAME = "admin"  # ou votre nom d'utilisateur
+# AUTH_PASSWORD = "votre_mot_de_passe_securise"
 
 def run_tests():
     """Lance des tests rapides"""
@@ -6899,10 +6833,10 @@ def run_tests():
     print("\n✅ Tests terminés!")
     print("=" * 60)
 
-
 # DÉCOMMENT la ligne suivante pour lancer les tests automatiquement :
 # run_tests()
 
+    return demo  # ⬅️ IMPORTANT : retourner l'interface
 # ========================================
 # LANCEMENT DE L'APPLICATION
 # ========================================
