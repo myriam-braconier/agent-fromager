@@ -3641,41 +3641,10 @@ class AgentFromagerHF:
     def adapt_recipe_to_profile_advanced(
         self, recipe: str, profile: str, ingredients: list, cheese_type: str
     ) -> str:
-        """Adapte la recette de manière intelligente selon le profil"""
-
-        if profile not in self.knowledge_base.get("profils_utilisateurs", {}):
-            return recipe
-
-        profile_info = self.knowledge_base["profils_utilisateurs"][profile]
-        adaptations = self.knowledge_base["adaptations_par_profil"].get(profile, {})
-
-        # 1. INTRO PERSONNALISÉE
-        recipe_lines = recipe.split("\n")
-
-        # Chercher le titre actuel (ligne avec 🧀)
-        for i, line in enumerate(recipe_lines):
-            if "🧀" in line:
-                # Insérer l'introduction adaptée après le titre
-                intro = adaptations.get("introduction", "")
-                if intro:
-                    recipe_lines.insert(i + 1, "\n" + intro + "\n")
-                break
-
-        # 2. ADAPTER LES INGRÉDIENTS
-        adapted_ingredients = self._adapt_ingredients_for_profile(
-            ingredients, profile, cheese_type
-        )
-
-        # 3. ADAPTER LES ÉTAPES
-        adapted_steps = self._adapt_steps_for_profile(recipe, profile, cheese_type)
-
-        # 4. ADAPTER LES CONSEILS
-        adapted_advice = self._adapt_advice_for_profile(profile, cheese_type)
-
-        # 5. CONSTRUIRE LA RECETTE ADAPTÉE
-        return self._build_profile_specific_recipe(
-            recipe, profile, adapted_ingredients, adapted_steps, adapted_advice
-        )
+        """Adapte la recette selon le profil utilisateur - délègue à adapt_recipe_to_profile"""
+        
+        # Utiliser la fonction de base qui fonctionne bien
+        return self.adapt_recipe_to_profile(recipe, profile)
 
     def adapt_with_llm(
         self, recipe: str, profile: str, user_context: dict = None
@@ -4183,6 +4152,12 @@ en molécules aromatiques. Plus long = goût plus prononcé.
     ╚══════════════════════════════════════════════════════════════╝
     """
 
+        # À la fin de _generate_unique_recipe() :
+        if profile:
+            recipe = self.adapt_recipe_to_profile_advanced(
+                recipe, profile, ingredients, cheese_type
+            )
+    
         return recipe
 
     def _generate_unique_cheese_name(self, ingredients, cheese_type, seed_value):
@@ -6218,7 +6193,7 @@ def generate_all(
             "",  # 2. Statut de recherche (Textbox)
             cards_html,  # 3. Cartes web (HTML)
             summary,  # 4. Historique mis à jour (Textbox)
-            choices,  # 5. Liste pour dropdown (LIST)
+            gr.Dropdown(choices=choices, value=None),  # 5. Liste pour dropdown (LIST)
             "",  # 6. Effacer l'affichage précédent (Textbox)
         )
 
