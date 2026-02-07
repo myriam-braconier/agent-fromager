@@ -6826,12 +6826,12 @@ def create_interface():
                     # ===== BOUTONS =====
                     with gr.Row():
                         history_btn = gr.Button("🔄 Actualiser", variant="primary")
-                        count_btn = gr.Button("🔢 Compter", variant="secondary")
+                        count_btn = gr.Button("🔢 Statistiques", variant="secondary")
                         clear_btn = gr.Button("🗑️ Effacer", variant="stop")
                     
                     # ===== STATISTIQUES =====
                     stats_display = gr.HTML(
-                        value="<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>"
+                        value="<div style='padding: 20px; text-align: center; color: #666;'/div>"
                     )
                     
                     # ===== HISTORIQUE PRINCIPAL =====
@@ -6852,9 +6852,9 @@ def create_interface():
 
                             recipe_dropdown = gr.Dropdown(
                                 label="🍽️ Sélectionner une recette",
-                                choices=[],
+                                choices=["→ Sélectionner parmi les recettes"],  # ← Placeholder comme premier choix
                                 interactive=True,
-                                value="",
+                                value="→ Sélectionner parmi les recettes",  # ← Sélectionné par défaut
                                 allow_custom_value=False,
                                 multiselect=False,
                                 elem_id="recipe_dropdown_fixed"  # Nouvel ID
@@ -6864,7 +6864,7 @@ def create_interface():
                                 label="📖 Recette complète",
                                 lines=20,
                                 interactive=False,
-                                value="Sélectionnez une recette...",
+                                value="",
                                 show_label=True
                             )
                     
@@ -6995,13 +6995,19 @@ def create_interface():
                             
                             print(f"✅ Dropdown créé avec {len(choices)} choix uniques")
                             
+                            choices_with_placeholder = ["Sélectionner parmi les recettes 👉"] + choices
+                            
                             print(f"✅ Interface: {len(history)} perso + {fallback_count} réf = {total} total")
                             
                             return [
-                                counter_html,          # counter_card
-                                summary,               # history_summary
-                                gr.Dropdown(choices=choices, value=None),       # ← CHANGEMENT ICI !           
-                                "Sélectionnez une recette...",  # recipe_display
+                                counter_html,
+                                summary,
+                                # ✅ CHANGEMENT : Utiliser gr.update() pour mettre à jour le Dropdown
+                                gr.update(
+                                    choices=choices_with_placeholder,              # Les choix avec placeholder
+                                    value="Sélectionner parmi les recettes 👉"     
+                                ),
+                                "Sélectionnez une recette...",
                             ]
                             
                         except Exception as e:
@@ -7236,6 +7242,10 @@ def create_interface():
                     
                     def on_recipe_select(selected):
                         """Quand une recette est sélectionnée"""
+                        
+                        # ✅ FILTRER LE PLACEHOLDER - AJOUTER CES LIGNES
+                        if not selected or selected == "Sélectionner parmi les recettes 👉" or selected.startswith("→"):
+                            return "Sélectionnez une recette dans la liste..."
                         
                         print(f"🔍 recipe_display type: {type(recipe_display)}")
                         print(f"🔍 recipe_display: {recipe_display}")
