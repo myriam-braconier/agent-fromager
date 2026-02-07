@@ -3570,24 +3570,49 @@ class AgentFromagerHF:
     
         print(f"🧀 Génération pour: {ingredients} | Type: {cheese_type} | Profil: {profile}")
         
+        # Stocker le profil actuel pour les fonctions internes
+        self.current_profile = profile
+        
         ##### VALIDATIONS ####
         # Validation des ingrédients
         valid, message = self.validate_ingredients(ingredients)
         if not valid:
             return message
         
-        ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+        ingredients_list = [ing.strip() for ing in ingredients.split(',')]  # ← DÉFINIR ICI !
         
-        # ===== VALIDATION CRITIQUE : Détecter le lait AVANT de déterminer le type =====
+        # ===== DÉTECTER LE LAIT =====
         lait = self._extract_lait_from_text(' '.join(ingredients_list))
         print(f"   🥛 Lait détecté: {lait}")
         
-        # SI l'utilisateur a CHOISI "pâte molle" EXPLICITEMENT et que c'est du chèvre/brebis → BLOQUER
-        if cheese_type != "Laissez l'IA choisir":
+        # ===== CHOISIR UN TYPE DIFFÉRENT SELON PROFIL =====
+        cheese_type_clean = cheese_type  # Valeur par défaut
+        
+        if cheese_type == "Laissez l'IA choisir":
+            # CHANGEMENT PRINCIPAL : type différent selon profil
+            if profile == "🧀 Amateur":
+                # Amateur = toujours fromage frais (simple et rapide)
+                cheese_type_clean = "Fromage frais maison"
+                
+            elif profile == "🏭 Producteur":
+                # Producteur = fromage avec valeur ajoutée
+                fromages_pro = ["Camembert affiné", "Brie de Meaux", "Tomme de vache", "Fromage à pâte pressée"]
+                import random
+                cheese_type_clean = random.choice(fromages_pro)
+                
+            elif profile == "🎓 Formateur":
+                # Formateur = fromage pédagogique
+                cheese_type_clean = "Fromage pédagogique étape par étape"
+            else:
+                # Par défaut
+                cheese_type_clean = self._determine_type_based_on_ingredients(ingredients_list)
+        
+        else:
+            # L'utilisateur a choisi un type spécifique
             cheese_type_clean = cheese_type
             
-            # Validation IMMÉDIATE si combinaison impossible
-            if lait and cheese_type_clean != "Fromage artisanal":
+            # Validation de compatibilité lait/type
+            if lait and cheese_type_clean not in ["Fromage artisanal", "Laissez l'IA choisir"]:
                 is_valid, reason = self._validate_combination(lait, cheese_type_clean)
                 if not is_valid:
                     alternatives = self._suggest_alternatives(lait, cheese_type_clean)
@@ -3605,27 +3630,22 @@ class AgentFromagerHF:
     1. Vos ingrédients (changez de lait)
     2. Votre type de fromage (choisissez-en un compatible)
     """
-    
-        # Déterminer le type si "Laissez l'IA choisir"
-        if cheese_type == "Laissez l'IA choisir":
-            cheese_type_clean = self._determine_type_based_on_ingredients(ingredients_list)
-            print(f"   🎯 Type déterminé automatiquement: {cheese_type_clean}")
-        else:
-            cheese_type_clean = cheese_type
         
-        # Double vérification de compatibilité (au cas où)
-        if lait and cheese_type_clean != "Fromage artisanal":
-            is_valid, reason = self._validate_combination(lait, cheese_type_clean)
-            if not is_valid:
-                alternatives = self._suggest_alternatives(lait, cheese_type_clean)
-                return f"**❌ Combinaison invalide**\n\n{reason}\n\n{alternatives}"
+        print(f"   🎯 Type final: {cheese_type_clean}")
         
         #### fin des validations ####
         
-        # Générer la recette
-        base_recipe = self._generate_detailed_recipe(ingredients_list, cheese_type_clean, constraints)
+        # ===== GÉNÉRER LA RECETTE (avec le profil) =====
+        # Utilisez l'argument 'creativity' comme niveau de créativité
+        base_recipe = self._generate_unique_recipe(
+            ingredients_list, 
+            cheese_type_clean, 
+            constraints,
+            creativity,  # Niveau de créativité
+            profile      # ← Passer le profil ici !
+        )
         
-        # ADAPTER AU PROFIL
+        # ADAPTER LA PRÉSENTATION
         adapted_recipe = self.adapt_recipe_to_profile_advanced(
             base_recipe, 
             profile, 
@@ -3636,8 +3656,7 @@ class AgentFromagerHF:
         # Sauvegarder dans l'historique
         self._save_to_history(ingredients_list, cheese_type_clean, constraints, adapted_recipe)
         
-        return adapted_recipe
-    
+        return adapted_recipe    
     def adapt_recipe_to_profile_advanced(
         self, recipe: str, profile: str, ingredients: list, cheese_type: str
     ) -> str:
@@ -3872,6 +3891,30 @@ class AgentFromagerHF:
 
     def _generate_detailed_recipe(self, ingredients, cheese_type, constraints):
         """Génère une recette UNIQUE enrichie avec variations"""
+        
+        # ===== RÉCUPÉRER LE PROFIL SI DISPONIBLE =====
+        profile = None
+        if hasattr(self, 'current_profile'):
+            profile = self.current_profile
+    
+        # ===== ADAPTER LES INGRÉDIENTS SELON PROFIL =====
+        if profile == "🧀 Amateur":
+            # Amateur : quantités réduites, ingrédients simples
+            lait_qty = "1 litre"  # Petit format pour test
+            presure_source = "présure liquide (en pharmacie)"
+            conseil_special = "✨ **ASTUCE DÉBUTANT** : Commencez avec 1L de lait pour tester !"
+        
+        elif profile == "🏭 Producteur":
+            # Producteur : quantités professionnelles
+            lait_qty = "10 litres"  # Format pro
+            presure_source = "présure standardisée 1:10.000"
+            conseil_special = "📊 **CALCUL RENDEMENT** : 10L de lait → ~1.2kg de fromage"
+            
+        elif profile == "🎓 Formateur":
+            # Formateur : quantités pour atelier
+            lait_qty = "5 litres"  # Format démonstration
+            presure_source = "présure diluée pour démonstration"
+            conseil_special = "🎯 **OBJECTIF PÉDAGOGIQUE** : Montrer chaque étape lentement"
 
         # ===== DOUBLE VALIDATION POST-DÉTERMINATION =====
         # Extraire le lait des ingrédients
@@ -4060,10 +4103,12 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         return recipe
 
     def _generate_unique_recipe(
-        self, ingredients, cheese_type, constraints, creativity, profile
+        self, ingredients, cheese_type, constraints, creativity, profile=None
     ):
         """Génère une recette UNIQUE enrichie avec variations"""
 
+        print(f"🎲 Génération UNIQUE avec: profil={profile}, créativité={creativity}")
+        
         # === AJOUTER DE L'ALÉATOIRE BASÉ SUR LES INGRÉDIENTS ===
         import hashlib
 
@@ -4074,57 +4119,109 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 
         print(f"🎲 Seed unique pour cette recette: {seed_value}")
 
+        # ===== VARIABLES SPÉCIFIQUES AU PROFIL =====
+        if profile:
+            print(f"   🎯 Adaptation pour profil: {profile}")
+            
+            # Récupérer les paramètres selon le profil
+            if profile == "🧀 Amateur":
+                quantite_lait = "1 litre"
+                temps_total = "24-48 heures"
+                difficulte = "Facile"
+                conseil_special = "✨ **ASTUCE DÉBUTANT** : Commencez petit pour apprendre !"
+                
+            elif profile == "🏭 Producteur":
+                quantite_lait = "10 litres" 
+                temps_total = "2-8 semaines"
+                difficulte = "Technique"
+                conseil_special = "📊 **CONSEIL PRO** : Notez tous les paramètres pour reproduire vos succès !"
+                
+            elif profile == "🎓 Formateur":
+                quantite_lait = "5 litres"
+                temps_total = "Variable selon atelier"
+                difficulte = "Pédagogique"
+                conseil_special = "🎓 **CONSEIL FORMATEUR** : Préparez des questions pour chaque étape !"
+        else:
+            # Valeurs par défaut
+            quantite_lait = "2 litres"
+            temps_total = "Variable"
+            difficulte = "Moyenne"
+            conseil_special = ""
+
         # ===== VARIATIONS UNIQUES BASÉES SUR LES INGRÉDIENTS =====
 
-        # 1. Nom créatif unique
+        # 1. Nom créatif unique (modifié selon profil)
         cheese_name = self._generate_unique_cheese_name(
             ingredients, cheese_type, seed_value
         )
+        
+        # Ajouter une mention du profil dans le nom
+        if profile:
+            if profile == "🧀 Amateur":
+                cheese_name = f"{cheese_name} (Version Débutant)"
+            elif profile == "🏭 Producteur":
+                cheese_name = f"{cheese_name} (Édition Professionnelle)"
+            elif profile == "🎓 Formateur":
+                cheese_name = f"{cheese_name} (Version Pédagogique)"
 
-        # 2. Ingrédients avec variations
+        # 2. Ingrédients avec variations (MODIFIÉ pour utiliser quantite_lait)
         unique_ingredients = self._generate_unique_ingredients(
-            ingredients, cheese_type, seed_value
+            ingredients, cheese_type, seed_value, quantite_lait  # ← PASSER quantite_lait !
         )
 
-        # 3. Étapes avec variations
-        unique_steps = self._generate_unique_steps(cheese_type, seed_value, creativity)
+        # 3. Étapes avec variations (MODIFIÉ pour utiliser les paramètres du profil)
+        unique_steps = self._generate_unique_steps(
+            cheese_type, seed_value, creativity, profile, quantite_lait  # ← AJOUTER profil et quantite_lait
+        )
 
         # 4. Conseils personnalisés
         unique_advice = self._generate_unique_advice(ingredients, cheese_type, seed_value)
+        
+        # Ajouter le conseil spécial du profil
+        if conseil_special:
+            unique_advice = f"{conseil_special}\n\n{unique_advice}"
 
         # ===== CONSTRUIRE LA RECETTE UNIQUE =====
 
-        # Récupérer les infos de base
+        # Récupérer les infos de base (MAJ avec les valeurs du profil)
         type_info = self._get_type_info(cheese_type)
+        
+        # MODIFIER la durée avec celle du profil
+        type_info_modified = type_info.copy()
+        type_info_modified['duree'] = temps_total  # ← REMPLACER par la durée du profil
+        type_info_modified['difficulte'] = difficulte  # ← REMPLACER par la difficulté du profil
+        
         temp_affinage = self._get_temperature_affinage(cheese_type)
         conservation_info = self._get_conservation_info(cheese_type)
         accord_vin = self._get_accord_vin(cheese_type)
         accord_mets = self._get_accord_mets(cheese_type)
         epices_suggestions = self._suggest_epices(ingredients, cheese_type)
         problemes_a_eviter = self._get_problemes_pertinents(cheese_type)
-        materiel = self._get_materiel_debutant()
+        
+        # Matériel selon profil (FONCTION À CRÉER)
+        materiel = self._get_materiel_by_profile(profile)  # ← NOUVELLE FONCTION !
 
         # Construire la recette avec les parties uniques
         recipe = f"""
     ╔══════════════════════════════════════════════════════════════╗
     ║                    🧀 {cheese_name.upper()}                     
-    ║                    (Recette #{seed_value})
+    ║                    (Recette #{seed_value} - {profile if profile else "Standard"})
     ╚══════════════════════════════════════════════════════════════╝
 
     📋 TYPE DE FROMAGE
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {cheese_type}
-    {type_info['description']}
-    Exemples similaires : {type_info['exemples']}
-    Difficulté : {type_info['difficulte']}
-    Durée totale : {type_info['duree']}
+    {type_info_modified['description']}
+    Exemples similaires : {type_info_modified['exemples']}
+    Difficulté : {type_info_modified['difficulte']}
+    Durée totale : {type_info_modified['duree']}
 
     {unique_ingredients}
 
     🔧 MATÉRIEL NÉCESSAIRE
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {materiel}
-    
+        
     {unique_steps}
 
     ⚠️ PROBLÈMES COURANTS ET SOLUTIONS
@@ -4148,18 +4245,45 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 
     ╔══════════════════════════════════════════════════════════════╗
     ║  Recette générée le {datetime.now().strftime('%d/%m/%Y à %H:%M')}           
-    ║  ID unique: {seed_value}                                      
+    ║  Quantité: {quantite_lait} - Profil: {profile if profile else "Standard"}                                      
     ╚══════════════════════════════════════════════════════════════╝
     """
 
-        # À la fin de _generate_unique_recipe() :
-        if profile:
-            recipe = self.adapt_recipe_to_profile_advanced(
-                recipe, profile, ingredients, cheese_type
-            )
-    
         return recipe
-
+    
+    def _get_materiel_by_profile(self, profile):
+        """Retourne le matériel adapté au profil"""
+        if profile == "🧀 Amateur":
+            return """• 1 grande casserole (3-5L)
+    • Thermomètre de cuisine
+    • Torchon propre ou étamine
+    • Saladier percé (ou moule basique)
+    • Cuillère en bois"""
+        
+        elif profile == "🏭 Producteur":
+            return """• Cuve inox 20L
+    • Thermomètre de précision (±0.5°C)
+    • Presse à fromage
+    • pH-mètre
+    • Cave d'affinage contrôlée
+    • Balance de précision (0.1g)
+    • Cahier de suivi"""
+        
+        elif profile == "🎓 Formateur":
+            return """• Matériel pour 6 participants
+    • Thermomètres ×6
+    • Moules ×6
+    • Échantillons pédagogiques
+    • Fiches d'observation
+    • Paperboard ou tableau"""
+        
+        else:
+            return """• Grande casserole inox
+    • Thermomètre
+    • Moule à fromage
+    • Étamine
+    • Louche"""    
+    
     def _generate_unique_cheese_name(self, ingredients, cheese_type, seed_value):
         """Génère un nom de fromage unique"""
         ingredients_lower = ' '.join(ingredients).lower()
@@ -4198,26 +4322,35 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         return f"{name_part} {suffix}"
 
-    def _generate_unique_ingredients(self, ingredients, cheese_type, seed_value):
+    def _generate_unique_ingredients(self, ingredients, cheese_type, seed_value, quantite_lait="2 litres"):
         """Génère une liste d'ingrédients unique"""
         import random
         local_rng = random.Random(seed_value)
     
-        base = """
-🥛 INGRÉDIENTS (Pour environ 500g de fromage)
+        base = f"""
+🥛 INGRÉDIENTS (Pour environ {quantite_lait} de lait)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
     
-        # Quantités variables basées sur le seed
-        lait_qty = local_rng.choice(["1.5", "2", "2.5"])
-        presure_qty = local_rng.choice(["1.5", "2", "2.5"])
-        sel_qty = local_rng.choice(["8", "10", "12"])
+        # Extraire la quantité numérique
+        if "1 litre" in quantite_lait:
+            lait_qty_num = 1
+        elif "5 litres" in quantite_lait:
+            lait_qty_num = 5
+        elif "10 litres" in quantite_lait:
+            lait_qty_num = 10
+        else:
+            lait_qty_num = 2  # Par défaut
+        
+        # Calculer les autres quantités proportionnellement
+        presure_qty = lait_qty_num * 1.0  # 1ml par litre
+        sel_qty = lait_qty_num * 5.0      # 5g par litre
         
         # Type de lait variable
         lait_types = ["lait entier pasteurisé", "lait cru", "lait de ferme", "lait bio"]
         lait_type = local_rng.choice(lait_types)
         
-        base += f"- {lait_qty} litres de {lait_type}\n"
+        base += f"- {lait_qty_num} litre(s) de {lait_type}\n"
         base += f"- {presure_qty}ml de présure liquide\n"
         base += f"- {sel_qty}g de sel de mer fin\n"
         
@@ -4235,8 +4368,8 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         return base
 
-    def _generate_unique_steps(self, cheese_type, seed_value, creativity):
-        """Génère des étapes uniques complètes"""
+    def _generate_unique_steps(self, cheese_type, seed_value, creativity, profile=None, quantite_lait=None):
+        """Génère des étapes uniques complètes avec adaptation au profil"""
         import random
         local_rng = random.Random(seed_value)
         
@@ -4244,6 +4377,32 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         repos_time = local_rng.choice(["45", "50", "55", "60"])
         temp_choice = local_rng.choice(["31", "32", "33", "34"])
         cube_size = local_rng.choice(["1", "1.5", "2"])
+        
+        # DÉBUT DES MODIFICATIONS : Adapter selon le profil
+        if profile == "🧀 Amateur":
+            # Amateur : simplifier et guider
+            repos_time = local_rng.choice(["40", "45", "50"])  # Plus court
+            temp_choice = "32"  # Température fixe pour simplifier
+            cube_size = "1.5"   # Taille moyenne, plus facile
+            mention_profil = "🎯 **RECETTE SIMPLIFIÉE POUR DÉBUTANT**"
+            
+        elif profile == "🏭 Producteur":
+            # Producteur : plus précis et technique
+            repos_time = local_rng.choice(["55", "60", "65"])  # Plus long
+            temp_choice = local_rng.choice(["32.0", "32.5", "33.0"])  # Plus précis
+            cube_size = local_rng.choice(["1.0", "1.2", "1.5"])  # Plus précis
+            mention_profil = "🏭 **PROTOCOLE PROFESSIONNEL**"
+            
+        elif profile == "🎓 Formateur":
+            # Formateur : pédagogique avec explications
+            repos_time = "45"  # Fixe pour la démonstration
+            temp_choice = "32"  # Fixe pour la démonstration
+            cube_size = "2"    # Plus visible pour démonstration
+            mention_profil = "🎓 **DÉMONSTRATION PÉDAGOGIQUE**"
+        
+        else:
+            mention_profil = "📝 **ÉTAPES DE FABRICATION**"
+        # FIN DES MODIFICATIONS
         
         # Déterminer le temps d'égouttage selon le type
         if "frais" in cheese_type.lower():
@@ -4256,8 +4415,9 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             egouttage = local_rng.choice(["18-24", "24-36", "36-48"]) + " heures"
             affinage = local_rng.choice(["3-6", "6-9", "9-12"]) + " semaines"
         
+        # MODIFICATION : Ajouter le profil dans le titre
         steps = f"""
-    📝 ÉTAPES DE FABRICATION UNIQUES
+    {mention_profil}
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     PHASE 1 : PRÉPARATION (20 minutes)
@@ -4302,7 +4462,28 @@ en molécules aromatiques. Plus long = goût plus prononcé.
     22. **Soins** : Retourner quotidiennement la 1ère semaine
     """
         
-        # Ajouter des variations créatives
+        # MODIFICATION : Ajouter des conseils spécifiques au profil
+        if profile == "🧀 Amateur":
+            steps += "\n💡 **CONSEILS SPÉCIAUX POUR DÉBUTANT :**\n"
+            steps += "• Ne stressez pas ! Le fromage est vivant et s'adapte.\n"
+            steps += "• Si le caillage prend plus de temps, c'est normal.\n"
+            steps += "• Goûtez à chaque étape pour comprendre l'évolution.\n"
+        
+        elif profile == "🏭 Producteur":
+            steps += "\n📊 **POINTS DE CONTRÔLE QUALITÉ :**\n"
+            steps += "• Température maintenue à ±0.5°C\n"
+            steps += "• Temps de caillage documenté\n"
+            steps += "• pH mesuré après 24h\n"
+            steps += "• Rendement calculé (poids fromage/poids lait)\n"
+        
+        elif profile == "🎓 Formateur":
+            steps += "\n🎯 **QUESTIONS PÉDAGOGIQUES À POSER :**\n"
+            steps += "• 'Que remarquez-vous pendant le chauffage ?'\n"
+            steps += "• 'Pourquoi la température est-elle cruciale ?'\n"
+            steps += "• 'Quels sont les signes d'un bon caillage ?'\n"
+            steps += "• 'Comment évolue la texture avec le temps ?'\n"
+        
+        # Ajouter des variations créatives (garder l'existant)
         if creativity >= 2:
             steps += "\n**🎨 VARIATIONS CRÉATIVES :**\n"
             
@@ -4321,7 +4502,7 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             for variation in selected:
                 steps += f"{variation}\n"
         
-        # Conseils supplémentaires
+        # Conseils supplémentaires (garder l'existant)
         steps += f"\n💡 **CONSEIL UNIQUE #{seed_value} :** "
         conseils = [
             f"Vérifiez la température toutes les 10 minutes pendant le chauffage",
@@ -4569,6 +4750,38 @@ Génère le support pédagogique."""
         print(f"  - Affinage: {affinage_duration}")
         print(f"  - Épices: {spice_intensity}")
         print(f"  - Niveau: {experience_level}")
+        
+        # ===== GÉNÉRER UNE BASE DE RECETTE DIFFÉRENTE SELON LE PROFIL =====
+        
+        # 1. AMATEUR : Recette simple et rapide
+        if experience_level == "🧀 Amateur":
+            cheese_type_clean = self._determine_amateur_cheese_type(ingredients)
+            recette_speciale = {
+                "difficulte": "Facile",
+                "duree_totale": "24-48h max",
+                "equipement": "basique",
+                "focus": "succès rapide"
+            }
+        
+        # 2. PRODUCTEUR : Recette technique et précise  
+        elif experience_level == "🏭 Producteur":
+            cheese_type_clean = self._determine_producer_cheese_type(ingredients)
+            recette_speciale = {
+                "difficulte": "Technique",
+                "duree_totale": "2-8 semaines",
+                "equipement": "professionnel",
+                "focus": "rendement optimal"
+            }
+        
+        # 3. FORMATEUR : Recette pédagogique
+        elif experience_level == "🎓 Formateur":
+            cheese_type_clean = self._determine_trainer_cheese_type(ingredients)
+            recette_speciale = {
+                "difficulte": "Pédagogique",
+                "duree_totale": "variable",
+                "equipement": "démonstration",
+                "focus": "compréhension"
+            }
 
         # Initialisation des variables
         is_valid = False
@@ -4643,6 +4856,51 @@ Génère le support pédagogique."""
             import traceback
             traceback.print_exc()
             return error_msg
+    
+    def _determine_amateur_cheese_type(self, ingredients):
+        """Pour amateur : choisit toujours un fromage FACILE et RAPIDE"""
+        ingredients_lower = ' '.join(ingredients).lower()
+    
+        # Amateur = fromage frais (toujours)
+        if "chèvre" in ingredients_lower or "chevre" in ingredients_lower:
+            return "Fromage de chèvre frais"
+        elif "brebis" in ingredients_lower:
+            return "Fromage de brebis frais"
+        elif "vache" in ingredients_lower:
+            return "Fromage frais nature"
+        else:
+            return "Fromage frais maison"
+
+    def _determine_producer_cheese_type(self, ingredients):
+        """Pour producteur : choisit un fromage avec VALEUR AJOUTÉE"""
+        ingredients_lower = ' '.join(ingredients).lower()
+    
+        # Producteur = fromage à affiner (meilleure marge)
+        if "chèvre" in ingredients_lower:
+            return "Bûche de chèvre affinée"
+        elif "brebis" in ingredients_lower:
+            return "Fromage de brebis à pâte pressée"
+        elif "vache" in ingredients_lower:
+            # Choisir aléatoirement entre différents fromages de vache
+            options = ["Camembert", "Brie", "Tomme de vache", "Fromage à pâte persillée"]
+            import random
+            return random.choice(options)
+        else:
+            return "Fromage à pâte pressée non cuite"
+
+    def _determine_trainer_cheese_type(self, ingredients):
+        """Pour formateur : choisit un fromage PÉDAGOGIQUE"""
+        ingredients_lower = ' '.join(ingredients).lower()
+        
+        # Formateur = fromage qui montre bien les étapes
+        if "chèvre" in ingredients_lower:
+            return "Fromage de chèvre cendré"  # Montre bien les étapes
+        elif "brebis" in ingredients_lower:
+            return "Fromage de brebis à pâte pressée"  # Long processus éducatif
+        elif "vache" in ingredients_lower:
+            return "Pâte molle à croûte fleurie"  # Permet de voir l'évolution
+        else:
+            return "Fromage frais (atelier découverte)"
     
     def _apply_micro_choices_to_recipe(self, recipe, texture, spice_intensity, affinage, creativity):
         """Applique les micro-choix à une recette existante"""
