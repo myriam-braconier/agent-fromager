@@ -7076,8 +7076,9 @@ def create_interface():
         title="🧀 Agent Fromager - Authentification",
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
         css=custom_css,
-        head="""
+        head=f"""
         <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
+        <style>{custom_css}</style>
         """,
     ) as demo:
         
