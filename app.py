@@ -8951,10 +8951,10 @@ if __name__ == "__main__":
     interface = create_interface()
     if interface:  # Vérifier que ce n'est pas None
         interface.launch(
-            theme=fromage_theme,  # <-- ICI
-            css=custom_css,  # <-- ICI
-            share=False,  # Optionnel
-            debug=False,  # Optionnel
+            share=True,      # ✅ OBLIGATOIRE pour Hugging Face Spaces
+            server_name="0.0.0.0",
+            server_port=7860,
+            debug=False
         )
     else:
         print("❌ Erreur: create_interface() a retourné None")
