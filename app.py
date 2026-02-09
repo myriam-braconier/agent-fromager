@@ -8950,11 +8950,15 @@ if __name__ == "__main__":
     <style>
     """
 
-    # Créer et lancer l'interface
-    demo.launch(
-        share=True,
-        server_name="0.0.0.0",
-        server_port=7860,
-        debug=False,
-        auth=(AUTH_USERNAME, AUTH_PASSWORD)  # ✅ Authentification intégrée
-    )
+    # Créer et lancer l'interface qui retourne demo
+    interface = create_interface()
+
+    if interface:
+        interface.launch(
+            share=True,
+            server_name="0.0.0.0",
+            server_port=7860,
+            debug=False
+        )
+    else:
+        print("❌ Erreur: create_interface() a retourné None")
