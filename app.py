@@ -22,17 +22,6 @@ from datetime import datetime
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
 
-try:
-    from hybrid_knowledge_system import HybridKnowledgeSystem
-    ENRICHMENT_AVAILABLE = True
-except ImportError:
-    ENRICHMENT_AVAILABLE = False
-
-try:
-    from dynamic_hybrid_system import DynamicHybridSystem
-    DYNAMIC_HYBRID_AVAILABLE = True
-except ImportError:
-    DYNAMIC_HYBRID_AVAILABLE = False
 
 # AJOUTER CES IMPORTS POUR LE CHAT
 import time
