@@ -4202,6 +4202,9 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         formatter = RecipeFormatter()
         recipe_text = formatter.format_to_text(recipe_data)
         
+        ✅ SAUVEGARDER dans le système de l'app (PAS celui du générateur)
+        self._save_to_history(ingredients, cheese_type, constraints, recipe_text)
+        
         return recipe_text
 
         
