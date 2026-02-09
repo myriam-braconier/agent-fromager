@@ -6805,7 +6805,7 @@ def view_dynamic_recipes(filter_lait=None):
     from datetime import datetime
     
     
-    history_file = "dynamic_recipes_history.json"
+    history_file = "unified_recipes_history.json" 
     all_recipes = []
     
     # 1. Charger la base statique (si elle existe)
@@ -6818,7 +6818,7 @@ def view_dynamic_recipes(filter_lait=None):
             all_recipes.extend(static_recipes)
     
     # 2. Charger l'historique dynamique (si il existe)
-    if os.path.exists("dynamic_recipes_history.json"):
+    if os.path.exists("unified_recipes_history.json"):
         with open("dynamic_recipes_history.json", 'r', encoding='utf-8') as f:
             dynamic_recipes = json.load(f)
             # Marquer comme dynamiques
