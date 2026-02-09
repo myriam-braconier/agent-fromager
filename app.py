@@ -7075,7 +7075,7 @@ def create_interface():
     with gr.Blocks(
         title="🧀 Agent Fromager - Authentification",
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
-        head="""
+        head=f"""
             <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
             {custom_css}
         """,
@@ -8951,13 +8951,10 @@ if __name__ == "__main__":
     """
 
     # Créer et lancer l'interface
-    interface = create_interface()
-    if interface:  # Vérifier que ce n'est pas None
-        interface.launch(
-            share=True,      # ✅ OBLIGATOIRE pour Hugging Face Spaces
-            server_name="0.0.0.0",
-            server_port=7860,
-            debug=False
-        )
-    else:
-        print("❌ Erreur: create_interface() a retourné None")
+    demo.launch(
+        share=True,
+        server_name="0.0.0.0",
+        server_port=7860,
+        debug=False,
+        auth=(AUTH_USERNAME, AUTH_PASSWORD)  # ✅ Authentification intégrée
+    )
