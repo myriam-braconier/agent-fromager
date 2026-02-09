@@ -38,7 +38,7 @@ except ImportError:
 import time
 from typing import List, Dict, Optional
 
-from llm_recipe_generator import LLMRecipeGenerator
+
 from unified_recipe_generator_v2_fixed import UnifiedRecipeGeneratorV2, RecipeFormatter
 
 # ===== VARIABLES GLOBALES =====
