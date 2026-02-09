@@ -1,4 +1,3 @@
-# app.py - LIGNES 1-10
 import os
 from dotenv import load_dotenv
 
@@ -12,6 +11,8 @@ print("=" * 50)
 print("🧪 MODE LOCAL - Chargement .env")
 print("=" * 50)
 
+import time
+import random
 import requests
 import random
 import gradio as gr
@@ -21,9 +22,24 @@ from datetime import datetime
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
 
+try:
+    from hybrid_knowledge_system import HybridKnowledgeSystem
+    ENRICHMENT_AVAILABLE = True
+except ImportError:
+    ENRICHMENT_AVAILABLE = False
+
+try:
+    from dynamic_hybrid_system import DynamicHybridSystem
+    DYNAMIC_HYBRID_AVAILABLE = True
+except ImportError:
+    DYNAMIC_HYBRID_AVAILABLE = False
+
 # AJOUTER CES IMPORTS POUR LE CHAT
 import time
 from typing import List, Dict, Optional
+
+from llm_recipe_generator import LLMRecipeGenerator
+from unified_recipe_generator_v2_fixed import UnifiedRecipeGeneratorV2, RecipeFormatter
 
 # ===== VARIABLES GLOBALES =====
 fallback_cache = None
@@ -284,8 +300,58 @@ class AgentFromagerHF:
         except:
             return False
 
-    # ===== FONCTION PRINCIPALE MISE À JOUR =====
+    def generate_llm_recipes():
+        from llm_recipe_generator import generate_complete_knowledge_base
+        
+        try:
+            generate_complete_knowledge_base(agent)
+            return "✅ Recettes générées avec succès ! Consultez llm_generated_recipes.json"
+        except Exception as e:
+            return f"❌ Erreur: {str(e)}"
+
     def search_web_recipes(
+        self, ingredients: str, cheese_type: str, max_results: int = 6
+) -> list:
+        """Recherche hybride DYNAMIQUE : Web scraping + LLM"""
+    
+        print("\n" + "="*60)
+        print("🔍 RECHERCHE HYBRIDE DYNAMIQUE")
+        print("="*60)
+        print(f"📝 Ingrédients: {ingredients}")
+        print(f"🧀 Type: {cheese_type}")
+        print(f"🔢 Résultats demandés: {max_results}")
+        
+        # ===== PRIORITÉ 1 : SYSTÈME HYBRIDE =====
+        if globals().get('DYNAMIC_HYBRID_AVAILABLE', False):
+            try:
+                print("\n🎯 Activation du système hybride dynamique...")
+                hybrid = DynamicHybridSystem(self)
+                
+                recipes = hybrid.generate_recipes_for_ingredients(
+                    ingredients=ingredients,
+                    cheese_type=cheese_type,
+                    count=max_results
+                )
+                
+                if recipes and len(recipes) > 0:
+                    print(f"✅ Système hybride : {len(recipes)} recettes générées")
+                    return recipes
+                else:
+                    print("⚠️ Système hybride : aucune recette générée")
+                    
+            except Exception as e:
+                print(f"❌ Erreur système hybride: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("⚠️ Système hybride non disponible, utilisation méthode classique")
+        
+        # ===== PRIORITÉ 2 : FALLBACK CLASSIQUE =====
+        print("\n🔄 Fallback sur recherche classique...")
+        return self._search_web_recipes_classic(ingredients, cheese_type, max_results)
+
+    # ===== FONCTION PRINCIPALE MISE À JOUR =====
+    def _search_web_recipes_classic(
         self, ingredients: str, cheese_type: str, max_results: int = 6
     ) -> list:
         """Recherche web - GARANTIT au moins 6 résultats"""
@@ -300,7 +366,7 @@ class AgentFromagerHF:
             import random
 
             query = f"recette fromage {ingredients}"
-            if cheese_type and cheese_type != "Laissez l'IA choisir":
+            if cheese_type and cheese_type != "Laissez l'IA choisir ou pas !":
                 query = f"recette {cheese_type} {ingredients}"
 
             print(f"🔍 Recherche garantie: {query} (minimum {min_required} résultats)")
@@ -551,25 +617,80 @@ class AgentFromagerHF:
             )
 
         return similar_recipes
-
+    
+    # ====== Avec LLM =========
     def _get_absolute_fallback(self, ingredients, cheese_type, min_required):
-        """Fallback NEUTRE - respecte le type de lait demandé"""
+        """Fallback NEUTRE - utilise la base enrichie si disponible"""
+        
+        import os
+        import json
+        
         print(f"🚨 FALLBACK ABSOLU activé pour {min_required} résultats")
-
+        
+        # ===== ESSAYER D'ABORD LA BASE ENRICHIE =====
+        enriched_file = "complete_knowledge_base.json"
+        
+        if os.path.exists(enriched_file):
+            print("📚 Chargement de la base enrichie...")
+            try:
+                with open(enriched_file, 'r', encoding='utf-8') as f:
+                    enriched_recipes = json.load(f)
+                
+                if enriched_recipes and len(enriched_recipes) > 0:
+                    print(f"✅ Base enrichie chargée : {len(enriched_recipes)} recettes")
+                    
+                    # Détecter le type de lait demandé
+                    lait_demande = self._detect_lait_from_ingredients(ingredients)
+                    
+                    selected_recipes = []
+                    
+                    # Filtrer par lait si demandé
+                    if lait_demande:
+                        filtered = [r for r in enriched_recipes if r.get('lait') == lait_demande]
+                        if filtered:
+                            print(f"   🎯 {len(filtered)} recettes pour lait de {lait_demande}")
+                            # Trier par score
+                            sorted_recipes = sorted(filtered, key=lambda x: x.get('score', 0), reverse=True)
+                            selected_recipes = sorted_recipes[:min_required]
+                    
+                    # Si pas assez de recettes avec le lait demandé, compléter avec d'autres
+                    if len(selected_recipes) < min_required:
+                        needed = min_required - len(selected_recipes)
+                        print(f"   📥 Besoin de {needed} recettes supplémentaires")
+                        
+                        # Prendre les meilleures recettes qui ne sont pas déjà sélectionnées
+                        already_selected_urls = {r.get('url', '') for r in selected_recipes}
+                        remaining = [r for r in enriched_recipes if r.get('url', '') not in already_selected_urls]
+                        
+                        # Trier par score
+                        sorted_remaining = sorted(remaining, key=lambda x: x.get('score', 0), reverse=True)
+                        selected_recipes.extend(sorted_remaining[:needed])
+                    
+                    if len(selected_recipes) >= min_required:
+                        print(f"✅ Retour de {len(selected_recipes)} recettes depuis la base enrichie")
+                        return selected_recipes[:min_required]
+                        
+            except Exception as e:
+                print(f"⚠️ Erreur chargement base enrichie: {e}")
+                print("   → Fallback sur base classique")
+        
+        # ===== SI PAS DE BASE ENRICHIE, UTILISER L'ANCIEN SYSTÈME =====
+        print("📋 Utilisation de la base classique (statique)")
+        
         # Détecter le type de lait demandé (si spécifié)
         lait_demande = self._detect_lait_from_ingredients(ingredients)
         if lait_demande:
             print(f"   🥛 Lait demandé détecté: {lait_demande}")
 
-        # ===== 1. BASE DE RECETTES NEUTRES (sans mention de lait spécifique) =====
+        # ===== 1. BASE DE RECETTES NEUTRES =====
         neutral_recipes = [
             {
                 "title": "Fromage frais maison facile",
-                "url": "https://www.marmiton.org/recettes/recette_fromage-frais-maison_337338.aspx",
+                "url": "https://www.marmiton.org/cuisine-fait-maison/faire-son-fromage-frais-maison-avec-1-seul-ingredient-c-est-possible-et-economique-s4067211.html",
                 "description": "Recette de fromage frais basique",
                 "source": "marmiton.org",
                 "score": 8,
-                "lait": None,  # Neutre, peut être adapté
+                "lait": None,
             },
             {
                 "title": "Recette de mozzarella maison",
@@ -577,7 +698,7 @@ class AgentFromagerHF:
                 "description": "Mozzarella fraîche en quelques heures",
                 "source": "regal.fr",
                 "score": 7,
-                "lait": "bufflonne",  # Spécifique mais différent
+                "lait": "bufflonne",
             },
             {
                 "title": "Brie maison traditionnel",
@@ -585,7 +706,7 @@ class AgentFromagerHF:
                 "description": "Brie à croûte fleurie fait maison",
                 "source": "femmeactuelle.fr",
                 "score": 6,
-                "lait": "vache",  # Brie est toujours au lait de vache
+                "lait": "vache",
             },
             {
                 "title": "Fromage à pâte pressée",
@@ -593,7 +714,7 @@ class AgentFromagerHF:
                 "description": "Techniques de pressage pour fromages durs",
                 "source": "750g.com",
                 "score": 6,
-                "lait": None,  # Technique générique
+                "lait": None,
             },
             {
                 "title": "Ricotta maison au petit-lait",
@@ -601,7 +722,7 @@ class AgentFromagerHF:
                 "description": "Ricotta crémeuse à partir de petit-lait",
                 "source": "cuisine.journaldesfemmes.fr",
                 "score": 7,
-                "lait": None,  # Peut être fait avec n'importe quel petit-lait
+                "lait": None,
             },
             {
                 "title": "Faisselle maison en 24h",
@@ -609,7 +730,7 @@ class AgentFromagerHF:
                 "description": "Faisselle crémeuse à déguster nature",
                 "source": "marmiton.org",
                 "score": 7,
-                "lait": None,  # Neutre
+                "lait": None,
             },
         ]
 
@@ -698,52 +819,33 @@ class AgentFromagerHF:
         # ===== 3. SÉLECTION INTELLIGENTE =====
         selected_recipes = []
 
-        # A. Si un lait est spécifiquement demandé → prendre les recettes spécifiques
         if lait_demande and lait_demande in lait_specific_recipes:
             print(f"   🎯 Sélection spécifique pour lait de {lait_demande}")
             selected_recipes = lait_specific_recipes[lait_demande][:min_required]
 
-        # B. Sinon, ou si pas assez → ajouter des recettes neutres
         if len(selected_recipes) < min_required:
             needed = min_required - len(selected_recipes)
             print(f"   📥 Besoin de {needed} recettes supplémentaires (neutres)")
 
-            # Filtrer les neutres pour éviter les incohérences
             for recipe in neutral_recipes:
                 if len(selected_recipes) >= min_required:
                     break
 
-                # Vérifier la cohérence
                 is_coherent = True
 
                 if lait_demande and recipe["lait"]:
-                    # Si on demande un lait spécifique, éviter les recettes avec d'autres laits
-                    if lait_demande == "brebis" and recipe["lait"] in [
-                        "chèvre",
-                        "vache",
-                    ]:
+                    if lait_demande == "brebis" and recipe["lait"] in ["chèvre", "vache"]:
                         is_coherent = False
-                    elif lait_demande == "chèvre" and recipe["lait"] in [
-                        "brebis",
-                        "vache",
-                    ]:
+                    elif lait_demande == "chèvre" and recipe["lait"] in ["brebis", "vache"]:
                         is_coherent = False
-                    elif lait_demande == "vache" and recipe["lait"] in [
-                        "brebis",
-                        "chèvre",
-                    ]:
+                    elif lait_demande == "vache" and recipe["lait"] in ["brebis", "chèvre"]:
                         is_coherent = False
 
-                if is_coherent and recipe["url"] not in [
-                    r["url"] for r in selected_recipes
-                ]:
+                if is_coherent and recipe["url"] not in [r["url"] for r in selected_recipes]:
                     selected_recipes.append(recipe)
 
-        # C. Si TOUJOURS pas assez → dernier recours (très neutre)
         if len(selected_recipes) < min_required:
-            print(
-                f"   🚨 Dernier recours: {min_required - len(selected_recipes)} manquants"
-            )
+            print(f"   🚨 Dernier recours: {min_required - len(selected_recipes)} manquants")
 
             ultra_neutral = [
                 {
@@ -769,27 +871,12 @@ class AgentFromagerHF:
                     break
                 selected_recipes.append(recipe)
 
-        # ===== 4. FINALISATION =====
-        # Garantir le nombre exact
         selected_recipes = selected_recipes[:min_required]
-
-        # Vérifier la cohérence finale
-        lait_trouves = set()
-        for r in selected_recipes:
-            if r["lait"]:
-                lait_trouves.add(r["lait"])
 
         print(f"✅ Fallback: {len(selected_recipes)} résultats")
 
-        if len(lait_trouves) == 1:
-            print(f"   🎯 Tous au lait de: {list(lait_trouves)[0]}")
-        elif len(lait_trouves) > 1:
-            print(f"   ⚠️ Mélange de laits: {lait_trouves}")
-        else:
-            print(f"   ✅ Recettes neutres (pas de lait spécifique)")
-
         return selected_recipes
-
+    
     def _detect_lait_from_ingredients(self, ingredients):
         """Détecte le type de lait depuis les ingrédients"""
         if not ingredients:
@@ -933,8 +1020,8 @@ class AgentFromagerHF:
         static_recipes = [
             {
                 "title": "Recette de fromage frais maison",
-                "url": "https://www.marmiton.org/recettes/recette_fromage-frais-maison_337338.aspx",
-                "description": "Recette simple de fromage frais avec lait et présure",
+                "url": "https://www.marmiton.org/recettes/un-yaourt-grec-et-10-minutes-de-preparation-suffisent-a-realiser-votre-propre-fromage-frais-maison-c-est-bluffant-s4117237.html",
+                "description": "Recette simple de fromage frais avec yahourt",
                 "source": "marmiton.org",
                 "score": 8,
             },
@@ -1954,76 +2041,6 @@ class AgentFromagerHF:
         except Exception as e:
             return f"❌ Erreur d'accès Internet:\n{str(e)}"
 
-    def search_web_recipes(
-        self, ingredients: str, cheese_type: str, max_results: int = 6
-    ) -> list:
-        """Recherche RÉELLE sur le web pour des recettes de fromage"""
-
-        print(f"🔍 RECHERCHE RÉELLE WEB: {ingredients}")
-
-        all_recipes = []
-
-        try:
-            from urllib.parse import quote
-
-            # Construire une requête optimisée
-            query = self._build_search_query(ingredients, cheese_type)
-            print(f"📝 Requête: {query}")
-
-            # ===== 1. ESSAYER SERPAPI (si clé disponible) =====
-            serpapi_results = self._try_serpapi_search(query, max_results)
-            if serpapi_results:
-                all_recipes.extend(serpapi_results)
-                print(f"✅ SerpAPI: {len(serpapi_results)} résultats")
-
-            # ===== 2. ESSAYER CUSTOM SEARCH JSON API (Google) =====
-            google_results = self._try_google_custom_search(query, max_results)
-            if google_results:
-                all_recipes.extend(google_results)
-                print(f"✅ Google Custom Search: {len(google_results)} résultats")
-
-            # ===== 3. ESSAYER DUCKDUCKGO HTML (fallback) =====
-            if len(all_recipes) < max_results:
-                ddg_results = self._try_duckduckgo_html(
-                    query, max_results - len(all_recipes)
-                )
-                if ddg_results:
-                    all_recipes.extend(ddg_results)
-                    print(f"✅ DuckDuckGo HTML: {len(ddg_results)} résultats")
-
-            # ===== 4. TRAITEMENT DES RÉSULTATS =====
-            if all_recipes:
-                # Filtrer et nettoyer
-                cleaned = self._clean_web_results(all_recipes, ingredients)
-
-                # Prendre les meilleurs
-                final = cleaned[:max_results]
-
-                print(f"🎯 TOTAL: {len(final)} résultats RÉELS du web")
-
-                # Afficher pour debug
-                for i, r in enumerate(final, 1):
-                    print(
-                        f"   {i}. {r.get('title', '')[:60]}... ({r.get('source', '?')})"
-                    )
-
-                return final
-
-            # ===== 5. SI AUCUN RÉSULTAT =====
-            print("⚠️ Aucun résultat web trouvé")
-            return self._get_fallback_with_real_urls(
-                ingredients, cheese_type, max_results
-            )
-
-        except Exception as e:
-            print(f"❌ Erreur recherche web: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return self._get_fallback_with_real_urls(
-                ingredients, cheese_type, max_results
-            )
-
     def _build_search_query(self, ingredients, cheese_type):
         """Construit une requête SIMPLE et EFFICACE pour DuckDuckGo"""
 
@@ -2301,14 +2318,36 @@ class AgentFromagerHF:
         return []
 
     def _clean_web_results(self, recipes, ingredients):
-        """Nettoie et filtre les résultats web"""
+        """Nettoie et filtre les résultats web pour garder UNIQUEMENT les recettes de FROMAGE"""
+        
+        # Mots-clés OBLIGATOIRES pour qu'une recette soit considérée comme du fromage
+        fromage_keywords = [
+            'fromage', 'cheese', 'mozzarella', 'cheddar', 'brie', 'camembert',
+            'roquefort', 'comté', 'gruyère', 'emmental', 'parmesan',
+            'chèvre', 'brebis', 'vache', 'bufflonne',
+            'lait caillé', 'caillé', 'présure', 'affinage', 'croûte',
+            'pâte molle', 'pâte pressée', 'pâte persillée',
+            'faisselle', 'ricotta', 'mascarpone', 'cottage', 'feta'
+        ]
+        
+        # Mots-clés INTERDITS (recettes qui NE SONT PAS du fromage)
+        forbidden_keywords = [
+            'tarte', 'gâteau', 'cake', 'cookie', 'biscuit', 'crêpe', 'pancake',
+            'pain', 'brioche', 'viennoiserie', 'pâtisserie',
+            'chocolat', 'marron', 'châtaigne', 'fruit', 'confiture',
+            'viande', 'poisson', 'poulet', 'boeuf', 'porc',
+            'salade', 'soupe', 'potage', 'légume',
+            'dessert', 'glace', 'sorbet', 'mousse au chocolat',
+            'crème brûlée', 'flan', 'tiramisu'
+        ]
+        
         cleaned = []
         seen_urls = set()
 
         for recipe in recipes:
             try:
-                # Vérifier les champs obligatoires
-                if not recipe.get("title") or not recipe.get("url"):
+                # Vérifier URL unique
+                if not recipe.get("url"):
                     continue
 
                 # Normaliser URL
@@ -2321,22 +2360,35 @@ class AgentFromagerHF:
                     continue
                 seen_urls.add(norm_url)
 
-                # Vérifier pertinence avec les ingrédients
+                # Texte complet de la recette
                 recipe_text = (
-                    recipe["title"] + " " + recipe.get("description", "")
+                    recipe.get("title", "") + " " + recipe.get("description", "")
                 ).lower()
+                
+                # ✅ FILTRE 1 : Vérifier qu'il y a AU MOINS un mot-clé fromage
+                has_fromage_keyword = any(keyword in recipe_text for keyword in fromage_keywords)
+                
+                # ❌ FILTRE 2 : Vérifier qu'il n'y a AUCUN mot interdit
+                has_forbidden_keyword = any(keyword in recipe_text for keyword in forbidden_keywords)
+                
+                # ❌ REJETER si pas de mot fromage OU si mot interdit
+                if not has_fromage_keyword or has_forbidden_keyword:
+                    print(f"   ❌ REJETÉ: {recipe.get('title', '')[:60]} (pas du fromage)")
+                    continue
+                
+                # ✅ C'est bien une recette de fromage !
+                
+                # Calculer score de pertinence
                 ingredients_lower = ingredients.lower()
-
                 score = recipe.get("score", 5)
 
-                # Bonus pour correspondance
+                # Bonus pour correspondance avec ingrédients demandés
                 for ing in ingredients_lower.split(","):
                     ing = ing.strip()
                     if len(ing) > 3 and ing in recipe_text:
                         score += 1
 
                 recipe["score"] = min(10, score)
-
                 cleaned.append(recipe)
 
             except Exception as e:
@@ -2345,6 +2397,8 @@ class AgentFromagerHF:
 
         # Trier par score
         cleaned.sort(key=lambda x: x.get("score", 0), reverse=True)
+        
+        print(f"   ✅ {len(cleaned)} recettes de fromage validées (sur {len(recipes)} initiales)")
 
         return cleaned
 
@@ -2356,8 +2410,8 @@ class AgentFromagerHF:
         real_recipes = [
             {
                 "title": "Fromage frais maison facile",
-                "url": "https://www.marmiton.org/recettes/recette_fromage-frais-maison_337338.aspx",
-                "description": "Recette simple de fromage frais avec lait et présure",
+                "url": "https://www.marmiton.org/recettes/un-yaourt-grec-et-10-minutes-de-preparation-suffisent-a-realiser-votre-propre-fromage-frais-maison-c-est-bluffant-s4117237.html",
+                "description": "Recette simple de fromage frais avec yahourt",
                 "source": "marmiton.org",
                 "score": 8,
                 "real": True,
@@ -2516,9 +2570,9 @@ class AgentFromagerHF:
             "chèvre": [
                 {
                     "title": "Fromage de chèvre frais maison",
-                    "url": "https://www.marmiton.org/recettes/recette_fromage-chevre-frais_337338.aspx",
+                    "url": "https://www.lacuisineauvillage.fr/comment-fabriquer-son-fromage-frais-de-chevre-maison-techniques-villageoises-et-bienfaits-pour-la-sante/",
                     "description": "Chèvre frais à déguster dans les 3 jours",
-                    "source": "marmiton.org",
+                    "source": "lacuisineauvillage.fr",
                     "score": 9,
                     "type": "chèvre",
                 },
@@ -3641,7 +3695,7 @@ class AgentFromagerHF:
         
         # ===== GÉNÉRER LA RECETTE (avec le profil) =====
         # Utilisez l'argument 'creativity' comme niveau de créativité
-        base_recipe = self._generate_unique_recipe(
+        base_recipe = self._generate_unique_recipe_hybrid(
             ingredients_list, 
             cheese_type_clean, 
             constraints,
@@ -4106,155 +4160,124 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 """
         return recipe
 
-    def _generate_unique_recipe(
+    def _generate_unique_recipe_hybrid(
         self, ingredients, cheese_type, constraints, creativity, profile=None
     ):
-        """Génère une recette UNIQUE enrichie avec variations"""
-
-        print(f"🎲 Génération UNIQUE avec: profil={profile}, créativité={creativity}")
+        """Génère une recette UNIQUE avec système unifié V2"""
         
-        # === AJOUTER DE L'ALÉATOIRE BASÉ SUR LES INGRÉDIENTS ===
-        import hashlib
+        print(f"🎲 Génération avec système unifié V2: profil={profile}, créativité={creativity}")
+        
+        # Utiliser le générateur unifié V2
+        generator = UnifiedRecipeGeneratorV2(self)
+        
+        recipe_data = generator.generate_recipe(
+            ingredients=ingredients,
+            cheese_type=cheese_type,
+            creativity=creativity,
+            profile=profile or "🧀 Amateur",
+            constraints=constraints
+        )
+        
+        # Formater en texte
+        formatter = RecipeFormatter()
+        recipe_text = formatter.format_to_text(recipe_data)
+        
+        return recipe_text
 
-        # Créer une "signature" unique basée sur les ingrédients
-        ingredients_hash = hashlib.md5(",".join(ingredients).encode()).hexdigest()[:8]
-        seed_value = int(ingredients_hash, 16) % 1000
-        self.rng.seed(seed_value)  # Réinitialiser le générateur aléatoire
-
-        print(f"🎲 Seed unique pour cette recette: {seed_value}")
-
-        # ===== VARIABLES SPÉCIFIQUES AU PROFIL =====
-        if profile:
-            print(f"   🎯 Adaptation pour profil: {profile}")
-            
-            # Récupérer les paramètres selon le profil
-            if profile == "🧀 Amateur":
-                quantite_lait = "1 litre"
-                temps_total = "24-48 heures"
-                difficulte = "Facile"
-                conseil_special = "✨ **ASTUCE DÉBUTANT** : Commencez petit pour apprendre !"
-                
-            elif profile == "🏭 Producteur":
-                quantite_lait = "10 litres" 
-                temps_total = "2-8 semaines"
-                difficulte = "Technique"
-                conseil_special = "📊 **CONSEIL PRO** : Notez tous les paramètres pour reproduire vos succès !"
-                
-            elif profile == "🎓 Formateur":
-                quantite_lait = "5 litres"
-                temps_total = "Variable selon atelier"
-                difficulte = "Pédagogique"
-                conseil_special = "🎓 **CONSEIL FORMATEUR** : Préparez des questions pour chaque étape !"
+        
+    def _format_llm_recipe_to_text(self, recipe_data: dict, profile: str, constraints: str) -> str:
+        """
+        Convertit une recette JSON du LLM en format texte formaté
+        
+        Args:
+            recipe_data: Dict avec keys: title, description, ingredients, etapes, etc.
+            profile: Profil utilisateur (Amateur, Producteur, Formateur)
+            constraints: Contraintes spécifiques de l'utilisateur
+        
+        Returns:
+            Recette formatée en texte
+        """
+        
+        # Extraire les données du JSON
+        title = recipe_data.get('title', 'Fromage Maison')
+        description = recipe_data.get('description', '')
+        lait = recipe_data.get('lait', 'vache')
+        type_pate = recipe_data.get('type_pate', 'Fromage frais')
+        ingredients = recipe_data.get('ingredients', [])
+        etapes = recipe_data.get('etapes', [])
+        duree_totale = recipe_data.get('duree_totale', 'Variable')
+        difficulte = recipe_data.get('difficulte', 'Moyenne')
+        score = recipe_data.get('score', 8)
+        
+        # Formater les ingrédients
+        ingredients_text = "\n".join([f"  • {ing}" for ing in ingredients])
+        
+        # Formater les étapes
+        etapes_text = "\n\n".join(etapes)
+        
+        # Conseils selon profil
+        if profile == "🧀 Amateur":
+            conseil_profil = "✨ **ASTUCE DÉBUTANT** : Cette recette a été générée par IA pour être accessible aux débutants !"
+        elif profile == "🏭 Producteur":
+            conseil_profil = "📊 **CONSEIL PRO** : Adaptez les quantités selon votre production et notez les rendements !"
+        elif profile == "🎓 Formateur":
+            conseil_profil = "🎓 **CONSEIL FORMATEUR** : Utilisez cette recette comme base pédagogique et encouragez les questions !"
         else:
-            # Valeurs par défaut
-            quantite_lait = "2 litres"
-            temps_total = "Variable"
-            difficulte = "Moyenne"
-            conseil_special = ""
-
-        # ===== VARIATIONS UNIQUES BASÉES SUR LES INGRÉDIENTS =====
-
-        # 1. Nom créatif unique (modifié selon profil)
-        cheese_name = self._generate_unique_cheese_name(
-            ingredients, cheese_type, seed_value
-        )
+            conseil_profil = ""
         
-        # Ajouter une mention du profil dans le nom
-        if profile:
-            if profile == "🧀 Amateur":
-                cheese_name = f"{cheese_name} (Version Débutant)"
-            elif profile == "🏭 Producteur":
-                cheese_name = f"{cheese_name} (Édition Professionnelle)"
-            elif profile == "🎓 Formateur":
-                cheese_name = f"{cheese_name} (Version Pédagogique)"
-
-        # 2. Ingrédients avec variations (MODIFIÉ pour utiliser quantite_lait)
-        unique_ingredients = self._generate_unique_ingredients(
-            ingredients, cheese_type, seed_value, quantite_lait  # ← PASSER quantite_lait !
-        )
-
-        # 3. Étapes avec variations (MODIFIÉ pour utiliser les paramètres du profil)
-        unique_steps = self._generate_unique_steps(
-            cheese_type, seed_value, creativity, profile, quantite_lait  # ← AJOUTER profil et quantite_lait
-        )
-
-        # 4. Conseils personnalisés
-        unique_advice = self._generate_unique_advice(ingredients, cheese_type, seed_value)
-        
-        # Ajouter le conseil spécial du profil
-        if conseil_special:
-            unique_advice = f"{conseil_special}\n\n{unique_advice}"
-
-        # ===== CONSTRUIRE LA RECETTE UNIQUE =====
-
-        # Récupérer les infos de base (MAJ avec les valeurs du profil)
-        type_info = self._get_type_info(cheese_type)
-        
-        # MODIFIER la durée avec celle du profil
-        type_info_modified = type_info.copy()
-        type_info_modified['duree'] = temps_total  # ← REMPLACER par la durée du profil
-        type_info_modified['difficulte'] = difficulte  # ← REMPLACER par la difficulté du profil
-        
-        temp_affinage = self._get_temperature_affinage(cheese_type)
-        conservation_info = self._get_conservation_info(cheese_type)
-        accord_vin = self._get_accord_vin(cheese_type)
-        accord_mets = self._get_accord_mets(cheese_type)
-        epices_suggestions = self._suggest_epices(ingredients, cheese_type)
-        problemes_a_eviter = self._get_problemes_pertinents(cheese_type)
-        
-        # Matériel selon profil (FONCTION À CRÉER)
-        materiel = self._get_materiel_by_profile(profile)  # ← NOUVELLE FONCTION !
-
-        # Construire la recette avec les parties uniques
-        recipe = f"""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                    🧀 {cheese_name.upper()}                     
-    ║                    (Recette #{seed_value} - {profile if profile else "Standard"})
-    ╚══════════════════════════════════════════════════════════════╝
-
-    📋 TYPE DE FROMAGE
+        # Ajouter les contraintes si présentes
+        contraintes_text = ""
+        if constraints and constraints.strip():
+            contraintes_text = f"""
+    ⚙️ CONTRAINTES RESPECTÉES
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {cheese_type}
-    {type_info_modified['description']}
-    Exemples similaires : {type_info_modified['exemples']}
-    Difficulté : {type_info_modified['difficulte']}
-    Durée totale : {type_info_modified['duree']}
-
-    {unique_ingredients}
-
-    🔧 MATÉRIEL NÉCESSAIRE
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {materiel}
-        
-    {unique_steps}
-
-    ⚠️ PROBLÈMES COURANTS ET SOLUTIONS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {problemes_a_eviter}
-
-    📦 CONSERVATION
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {conservation_info}
-
-    🍷 DÉGUSTATION ET ACCORDS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    **Accords vins** : {accord_vin}
-    **Accords mets** : {accord_mets}
-
-    💡 CONSEILS PERSONNALISÉS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {unique_advice}
-
-    {self._add_constraints_note(constraints)}
-
-    ╔══════════════════════════════════════════════════════════════╗
-    ║  Recette générée le {datetime.now().strftime('%d/%m/%Y à %H:%M')}           
-    ║  Quantité: {quantite_lait} - Profil: {profile if profile else "Standard"}                                      
-    ╚══════════════════════════════════════════════════════════════╝
+    {constraints}
     """
+        
+        # Construire la recette complète
+        recipe_formatted = f"""
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                    🤖 {title.upper()}                     
+    ║                    (Généré par IA - Profil: {profile})
+    ║                    ⭐ Score: {score}/10
+    ╚══════════════════════════════════════════════════════════════╝
 
-        return recipe
-    
+    📝 DESCRIPTION
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    {description}
+
+    📋 INFORMATIONS
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    🥛 Lait : {lait.capitalize()}
+    🧀 Type de pâte : {type_pate}
+    ⏱️ Durée totale : {duree_totale}
+    📊 Difficulté : {difficulte}
+
+    🛒 INGRÉDIENTS
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    {ingredients_text}
+
+    👨‍🍳 ÉTAPES DE FABRICATION
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    {etapes_text}
+    {contraintes_text}
+
+    💡 CONSEILS IA
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    {conseil_profil}
+
+    🤖 Cette recette a été générée par intelligence artificielle en fonction de vos 
+    ingrédients et votre profil. N'hésitez pas à l'adapter selon votre expérience !
+
+    ⚠️ RAPPEL : Toujours respecter les règles d'hygiène strictes en fabrication fromagère.
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ✨ Bon fromage ! Cette recette unique a été créée spécialement pour vous.
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    """
+        
+        return recipe_formatted
+
     def _get_materiel_by_profile(self, profile):
         """Retourne le matériel adapté au profil"""
         if profile == "🧀 Amateur":
@@ -4832,7 +4855,7 @@ Génère le support pédagogique."""
             # ===== FIN VALIDATION =====
             
             # Générer une recette UNIQUE
-            recipe = self._generate_unique_recipe(
+            recipe = self._generate_unique_recipe_hybrid(
                 ingredients_list, 
                 cheese_type_clean, 
                 constraints,
@@ -5717,7 +5740,7 @@ Adaptations suggérées selon vos contraintes.
             payload = {
                 "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "messages": messages,
-                "max_tokens": 500,
+                "max_tokens": 2000,
                 "temperature": 0.7,
                 "top_p": 0.9,
             }
@@ -6231,7 +6254,7 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
                         "model": model,
                         "messages": messages,
                         "temperature": 0.7,
-                        "max_tokens": 600,
+                        "max_tokens": 2000,
                         "stream": False,
                     }
 
@@ -6474,9 +6497,511 @@ def generate_all(
             [],  # 5. Liste vide pour dropdown (LIST)
             "",  # 6. Vide (Textbox)
         )
+# ===== Enrichissement de la base de connaissance ========
+def enrich_knowledge_base():
+    """
+    Enrichit la base de connaissances avec scraping + LLM
+    
+    ⚠️ NOTE : Cette fonction utilise l'ANCIEN système d'enrichissement statique.
+    Le NOUVEAU système hybride dynamique fonctionne automatiquement lors de
+    la génération de recettes (pas besoin de ce bouton).
+    """
+    
+    # Vérifier si le fichier de l'ancien système existe
+    import os
+    if not os.path.exists("hybrid_knowledge_system.py"):
+        return """ℹ️ ANCIEN SYSTÈME DÉSACTIVÉ
 
+Le système d'enrichissement statique n'est plus nécessaire.
+
+✅ LE NOUVEAU SYSTÈME HYBRIDE DYNAMIQUE EST ACTIF !
+
+Il fonctionne automatiquement quand vous générez une recette :
+- Scraping web ciblé selon vos ingrédients
+- Génération LLM pour combler les manques
+- Enrichissement automatique des recettes
+
+👉 Pour tester : Allez dans "Mode créatif" et générez une recette
+   avec "lait de chèvre, présure, thym"
+
+📊 Vérifiez la console pour voir :
+   🔍 RECHERCHE HYBRIDE DYNAMIQUE
+   📥 PHASE 1 : Recherche web ciblée
+   🤖 PHASE 2 : Génération LLM
+"""
+    
+    # Si le fichier existe, essayer d'utiliser l'ancien système
+    try:
+        from hybrid_knowledge_system import HybridKnowledgeSystem
+        system = HybridKnowledgeSystem(agent)
+        
+        # Configuration légère pour commencer
+        print("🚀 Démarrage enrichissement...")
+        
+        # 1. Scraping de quelques URLs
+        urls = [
+            "https://cuisine.journaldesfemmes.fr/recette/315921-fromage-blanc-maison",
+        ]
+        scraped = system.enricher.enrich_from_urls(urls)
+        
+        # 2. Génération LLM (juste 5 recettes pour tester)
+        config = [
+            ("vache", "Pâte pressée cuite", 2),
+            ("chèvre", "Fromage frais", 2),
+            ("brebis", "Pâte pressée non cuite", 1),
+        ]
+        generated = system.generator.generate_batch(config)
+        
+        # 3. Fusion et sauvegarde
+        all_recipes = scraped + generated
+        unique = system._deduplicate_recipes(all_recipes)
+        
+        import json
+        with open("complete_knowledge_base.json", 'w', encoding='utf-8') as f:
+            json.dump(unique, f, indent=2, ensure_ascii=False)
+        
+        result = f"""✅ ENRICHISSEMENT TERMINÉ !
+
+📊 Résumé :
+- {len(scraped)} recettes scrappées
+- {len(generated)} recettes générées par LLM
+- {len(unique)} recettes uniques au total
+
+📁 Sauvegardé dans : complete_knowledge_base.json
+
+💡 La base enrichie sera automatiquement utilisée
+   lors de la prochaine génération de recette !
+"""
+        return result
+        
+    except ImportError:
+        return """ℹ️ ANCIEN SYSTÈME NON DISPONIBLE
+
+Le fichier hybrid_knowledge_system.py existe mais ne peut pas être importé.
+
+✅ LE NOUVEAU SYSTÈME HYBRIDE DYNAMIQUE EST ACTIF !
+
+Il génère des recettes à la volée selon vos besoins :
+- Pas besoin de pré-générer une base statique
+- Adaptation automatique aux ingrédients
+- Scraping + LLM en temps réel
+
+👉 Testez en générant une recette avec des ingrédients spécifiques
+"""
+        
+    except Exception as e:
+        import traceback
+        return f"""❌ Erreur dans l'ancien système d'enrichissement
+
+Détails : {str(e)}
+
+Traceback :
+{traceback.format_exc()}
+
+───────────────────────────────────────
+
+ℹ️ MAIS LE NOUVEAU SYSTÈME HYBRIDE EST DISPONIBLE !
+
+L'ancien système statique a échoué, mais le nouveau système
+hybride dynamique devrait fonctionner normalement.
+
+👉 Testez en générant une recette dans "Mode créatif"
+"""
+
+def view_knowledge_base():
+    """Affiche le contenu de la base enrichie avec TOUS les détails"""
+    import os
+    import json
+    
+    if not os.path.exists("complete_knowledge_base.json"):
+        return """
+        <div style="padding: 40px; text-align: center; background: #FFF8E1; border-radius: 12px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">📭</div>
+            <h3 style="color: #F57C00;">Aucune base enrichie trouvée</h3>
+            <p style="color: #666;">Le système hybride dynamique génère des recettes à la volée !</p>
+            <p style="color: #999; font-size: 14px;">Générez une recette pour voir le système en action.</p>
+        </div>
+        """
+    
+    try:
+        with open("complete_knowledge_base.json", 'r', encoding='utf-8') as f:
+            recipes = json.load(f)
+        
+        # Statistiques
+        by_lait = {}
+        for r in recipes:
+            lait = r.get('lait', 'unknown')
+            by_lait[lait] = by_lait.get(lait, 0) + 1
+        
+        # Construire HTML
+        html = f"""
+        <div style="padding: 20px; background: linear-gradient(135deg, #FFF8E1 0%, #FFE0B2 100%); border-radius: 12px;">
+            <h2 style="color: #E65100; margin-top: 0;">
+                📚 BASE DE CONNAISSANCES ENRICHIE
+            </h2>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="color: #F57C00; margin-top: 0;">📊 Statistiques</h3>
+                <div style="font-size: 32px; font-weight: bold; color: #FF8F00; text-align: center; margin: 20px 0;">
+                    {len(recipes)} recettes
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
+        """
+        
+        # Stats par type de lait
+        emoji_map = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑', 'bufflonne': '🐃'}
+        for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
+            emoji = emoji_map.get(lait, '❓')
+            html += f"""
+                <div style="background: #FFF3E0; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #FFE0B2;">
+                    <div style="font-size: 36px;">{emoji}</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #E65100;">{count}</div>
+                    <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
+                </div>
+            """
+        
+        html += """
+                </div>
+            </div>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="color: #F57C00; margin-top: 0;">📖 Recettes détaillées</h3>
+                <div style="max-height: 600px; overflow-y: auto;">
+        """
+        
+        # Afficher TOUTES les recettes avec TOUS les détails
+        for i, recipe in enumerate(recipes, 1):
+            title = recipe.get('title', 'Sans titre')
+            description = recipe.get('description', 'Pas de description')
+            url = str(recipe.get('url') or recipe.get('source') or '#') 
+            source_type = recipe.get('source_type', 'unknown')
+            lait = recipe.get('lait', 'non spécifié')
+            type_pate = recipe.get('type_pate', 'non spécifié')
+            score = recipe.get('score', '?')
+            difficulte = recipe.get('difficulte', 'Non spécifiée')
+            duree = recipe.get('duree_totale', 'Non spécifiée')
+            
+            # Récupérer les ingrédients et étapes
+            ingredients = recipe.get('ingredients', [])
+            etapes = recipe.get('etapes', [])
+            
+            icon = '🌐' if source_type == 'scraped' else '🤖'
+            lait_emoji = emoji_map.get(lait, '❓')
+            
+            # Couleur selon le type
+            bg_color = '#E8F5E9' if source_type == 'scraped' else '#E3F2FD'
+            
+            # Lien
+            if url.startswith('http'):
+                lien_html = f'<a href="{url}" target="_blank" style="color: #FF8F00; text-decoration: none; font-weight: bold;">🔗 Voir la source</a>'
+            else:
+                lien_html = '<span style="color: #666; font-size: 12px;">📄 Recette générée</span>'
+
+            html += f"""
+                <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #FF8F00; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-weight: bold; font-size: 18px; color: #3E2723; margin-bottom: 8px;">
+                            {icon} {i}. {title}
+                        </div>
+                        <div style="color: #666; font-size: 14px; margin-bottom: 12px; font-style: italic;">
+                            {description}
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px;">
+                        <div><strong>Type de lait:</strong> {lait_emoji} {lait}</div>
+                        <div><strong>Type de pâte:</strong> {type_pate}</div>
+                        <div><strong>Difficulté:</strong> {difficulte}</div>
+                        <div><strong>Durée:</strong> {duree}</div>
+                        <div><strong>Score:</strong> ⭐ {score}/10</div>
+                        <div>{lien_html}</div>
+                    </div>
+            """
+            
+            # Afficher les ingrédients si présents
+            if ingredients and len(ingredients) > 0:
+                html += """
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <strong style="color: #F57C00;">🥛 Ingrédients:</strong>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                """
+                for ing in ingredients[:10]:  # Max 10 ingrédients affichés
+                    html += f'<li style="margin: 4px 0; color: #555;">{ing}</li>'
+                if len(ingredients) > 10:
+                    html += f'<li style="color: #999; font-style: italic;">... et {len(ingredients) - 10} autres</li>'
+                html += """
+                        </ul>
+                    </div>
+                """
+            
+            # Afficher les étapes si présentes
+            if etapes and len(etapes) > 0:
+                html += """
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <strong style="color: #F57C00;">📋 Étapes:</strong>
+                        <ol style="margin: 8px 0; padding-left: 20px;">
+                """
+                for etape in etapes[:8]:  # Max 8 étapes affichées
+                    html += f'<li style="margin: 6px 0; color: #555;">{etape}</li>'
+                if len(etapes) > 8:
+                    html += f'<li style="color: #999; font-style: italic;">... et {len(etapes) - 8} autres étapes</li>'
+                html += """
+                        </ol>
+                    </div>
+                """
+            
+            html += """
+                </div>
+            """
+        
+        html += """
+                </div>
+            </div>
+        </div>
+        """
+        
+        return html
+        
+    except Exception as e:
+        import traceback
+        return f"""
+        <div style="padding: 20px; background: #FFEBEE; border-radius: 8px;">
+            <h3 style="color: #C62828;">❌ Erreur de lecture</h3>
+            <pre style="background: white; padding: 10px; border-radius: 4px; overflow: auto;">
+{str(e)}
+
+{traceback.format_exc()}
+            </pre>
+        </div>
+        """
+ 
+def view_dynamic_recipes(filter_lait=None):
+    """Affiche TOUTES les recettes : statiques + dynamiques"""
+    import os
+    import json
+    from datetime import datetime
+    
+    
+    history_file = "dynamic_recipes_history.json"
+    all_recipes = []
+    
+    # 1. Charger la base statique (si elle existe)
+    if os.path.exists("complete_knowledge_base.json"):
+        with open("complete_knowledge_base.json", 'r', encoding='utf-8') as f:
+            static_recipes = json.load(f)
+            # Marquer comme statiques
+            for r in static_recipes:
+                r['is_static'] = True
+            all_recipes.extend(static_recipes)
+    
+    # 2. Charger l'historique dynamique (si il existe)
+    if os.path.exists("dynamic_recipes_history.json"):
+        with open("dynamic_recipes_history.json", 'r', encoding='utf-8') as f:
+            dynamic_recipes = json.load(f)
+            # Marquer comme dynamiques
+            for r in dynamic_recipes:
+                r['is_static'] = False
+            all_recipes.extend(dynamic_recipes)
+    
+    # Filtrer par type de lait
+    if filter_lait and filter_lait != "Tous":
+        recipes = [r for r in all_recipes if r.get('lait') == filter_lait]
+    else:
+        recipes = all_recipes
+    
+    if not os.path.exists(history_file):
+        return """
+        <div style="padding: 40px; text-align: center; background: #E3F2FD; border-radius: 12px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">📭</div>
+            <h3 style="color: #1565C0;">Aucune recette générée pour le moment</h3>
+            <p style="color: #666;">
+                Allez dans "Mode créatif" et générez votre première recette !<br>
+                Le système hybride dynamique créera des recettes adaptées à vos ingrédients.
+            </p>
+        </div>
+        """
+    
+    try:
+        
+        # Filtrer par type de lait si demandé
+        if filter_lait and filter_lait != "Tous":
+            recipes = [r for r in all_recipes if r.get('lait') == filter_lait]
+        else:
+            recipes = all_recipes
+        
+        # Statistiques
+        by_lait = {}
+        for r in all_recipes:
+            lait = r.get('lait', 'non spécifié')
+            by_lait[lait] = by_lait.get(lait, 0) + 1
+        
+        # Construire HTML
+        
+        html = f"""
+        <div style="padding: 20px; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); border-radius: 12px;">
+            <h2 style="color: #1565C0; margin-top: 0;">
+                🎯 RECETTES GÉNÉRÉES DYNAMIQUEMENT
+            </h2>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="color: #1976D2; margin-top: 0;">📊 Statistiques</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                    <div style="text-align: center; background: #E3F2FD; padding: 20px; border-radius: 8px;">
+                        <div style="font-size: 48px; font-weight: bold; color: #1565C0;">
+                            {len(all_recipes)}
+                        </div>
+                        <div style="color: #666; font-size: 14px;">Recettes totales</div>
+                    </div>
+                    <div style="text-align: center; background: #C8E6C9; padding: 20px; border-radius: 8px;">
+                        <div style="font-size: 48px; font-weight: bold; color: #2E7D32;">
+                            {len(recipes)}
+                        </div>
+                        <div style="color: #666; font-size: 14px;">Filtrées ({filter_lait or 'Tous'})</div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+        """
+        
+        # Stats par type de lait
+        emoji_map = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑', 'bufflonne': '🐃'}
+        for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
+            emoji = emoji_map.get(lait, '❓')
+            html += f"""
+                <div style="background: #FFF3E0; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #FFE0B2;">
+                    <div style="font-size: 36px;">{emoji}</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #E65100;">{count}</div>
+                    <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
+                </div>
+            """
+        
+        html += """
+                </div>
+            </div>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h3 style="color: #1976D2; margin-top: 0;">📖 Recettes générées</h3>
+                <div style="max-height: 600px; overflow-y: auto;">
+        """
+        
+        # Afficher les recettes (les plus récentes en premier)
+        for i, recipe in enumerate(reversed(recipes), 1):
+            title = recipe.get('title', 'Sans titre')
+            description = recipe.get('description', 'Pas de description')
+            lait = recipe.get('lait', 'non spécifié')
+            type_pate = recipe.get('type_pate', 'non spécifié')
+            source_type = recipe.get('source_type', 'unknown')
+            generated_at = recipe.get('generated_at', '')
+            requested_ingredients = recipe.get('requested_ingredients', '')
+            
+            recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link')
+            
+            # TOUTES les variables définies AVANT
+            bg_color = '#E8F5E9' if source_type == 'scraped' else '#E3F2FD'
+            icon = '🔗' if recipe_url else ('🌐' if source_type == 'scraped' else '🤖')
+            lait_emoji = emoji_map.get(lait, '❓')
+            
+            # Date
+            try:
+                dt = datetime.fromisoformat(generated_at)
+                date_str = dt.strftime('%d/%m/%Y %H:%M')
+            except:
+                date_str = 'Date inconnue'
+            
+            ingredients = recipe.get('ingredients', [])
+            etapes = recipe.get('etapes', [])
+            
+            # ✅ DÉBUT du div principal
+            html += f"""
+                <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-weight: bold; font-size: 18px; color: #1565C0; margin-bottom: 8px;">
+                            {icon} {title}
+                        </div>
+                        {f"""
+                        <div style="margin-bottom: 12px;">
+                            <a href="{recipe_url}" target="_blank" 
+                            style="display: inline-block; padding: 8px 16px; background: linear-gradient(45deg, #4CAF50, #45a049); 
+                                    color: white; text-decoration: none; border-radius: 20px; font-size: 14px; font-weight: bold;
+                                    box-shadow: 0 2px 4px rgba(76,175,80,0.3);">
+                                🚀 Accéder à la recette complète
+                            </a>
+                        </div>
+                        """ if recipe_url else ""}
+                        <div style="color: #666; font-size: 14px; font-style: italic;">
+                            {description}
+                        </div>
+                    </div>
+                    
+                    <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <div><strong>📅 Généré le:</strong> {date_str}</div>
+                            <div><strong>Type de lait:</strong> {lait_emoji} {lait}</div>
+                            <div><strong>Type de pâte:</strong> {type_pate}</div>
+                            <div><strong>Source:</strong> {source_type}</div>
+                        </div>
+                        <div style="margin-top: 10px; padding: 10px; background: rgba(255,235,59,0.2); border-radius: 6px;">
+                            <strong>🧪 Ingrédients demandés:</strong> {requested_ingredients}
+                        </div>
+                    </div>
+            """
+            
+            # ✅ Ingrédients DANS le div principal
+            if ingredients and len(ingredients) > 0:
+                html += """
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <strong style="color: #1976D2;">🥛 Ingrédients:</strong>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                """
+                for ing in ingredients[:10]:
+                    html += f'<li style="margin: 4px 0; color: #555;">{ing}</li>'
+                if len(ingredients) > 10:
+                    html += f'<li style="color: #999; font-style: italic;">... et {len(ingredients) - 10} autres</li>'
+                html += """
+                        </ul>
+                    </div>
+                """
+            
+            # ✅ Étapes DANS le div principal
+            if etapes and len(etapes) > 0:
+                html += """
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                        <strong style="color: #1976D2;">📋 Étapes:</strong>
+                        <ol style="margin: 8px 0; padding-left: 20px;">
+                """
+                for etape in etapes[:8]:
+                    html += f'<li style="margin: 6px 0; color: #555;">{etape}</li>'
+                if len(etapes) > 8:
+                    html += f'<li style="color: #999; font-style: italic;">... et {len(etapes) - 8} autres étapes</li>'
+                html += """
+                        </ol>
+                    </div>
+                """
+            
+            # ✅ FIN du div principal
+            html += """
+                    </div>
+                """
+
+        
+        return html
+        
+    except Exception as e:
+        import traceback
+        return f"""
+        <div style="padding: 20px; background: #FFEBEE; border-radius: 8px;">
+            <h3 style="color: #C62828;">❌ Erreur de lecture</h3>
+            <pre style="background: white; padding: 10px; border-radius: 4px; overflow: auto;">
+{str(e)}
+
+{traceback.format_exc()}
+            </pre>
+        </div>
+        """ 
+        
 # CREATE INTERFACE GRADIO
-# ===== VERSION CORRIGÉE DE create_interface AVEC AUTHENTIFICATION =====
+# ===== create_interface AVEC AUTHENTIFICATION =====
 
 print("="*60)
 print("🔍 DEBUG AUTHENTIFICATION")
@@ -6793,9 +7318,174 @@ def create_interface():
                     )
                     
                     knowledge_btn.click(fn=agent.get_knowledge_summary, outputs=knowledge_output)
+                                                                            
+                # ONGLET 4 : Chat
+                with gr.Tab("💬 Expert Fromager"):
+                    gr.Markdown("### 🧀 Dialoguez avec Maître Fromager")
+                    
+                    chat_history = gr.State([])
+                    
+                    chat_display = gr.Textbox(
+                        label="Conversation",
+                        lines=15,
+                        interactive=False,
+                        elem_id="chat-display",
+                    )
 
-                # ONGLET 4 : Historique (VERSION DYNAMIQUE)
-                with gr.Tab("🕒 Historique"):
+                    with gr.Row():
+                        user_input = gr.Textbox(
+                            label="Votre question",
+                            placeholder="Ex: Mon fromage est trop acide...",
+                            lines=3,
+                            scale=4,
+                        )
+                        send_btn = gr.Button("💬 Envoyer", variant="primary", scale=1)
+
+                    with gr.Row():
+                        btn_problem = gr.Button("🚨 Problème", size="sm")
+                        btn_recipe = gr.Button("📝 Recette", size="sm")
+                        btn_wine = gr.Button("🍷 Accord vin", size="sm")
+                        btn_clear_chat = gr.Button("🗑️ Effacer", size="sm")
+
+                    def process_question(question, history):
+                        if not question or not question.strip():
+                            return history, "", ""
+                        
+                        response = agent.chat_with_llm(question, [])
+                        history.append(f"👤 **Vous:** {question}")
+                        history.append(f"🧀 **Maître Fromager:** {response}")
+                        history.append("─" * 50)
+                        
+                        if len(history) > 15:
+                            history = history[-15:]
+                        
+                        display_text = "\n\n".join(history)
+                        return history, display_text, ""
+
+                    def get_quick_question(btn_text):
+                        questions = {
+                            "🚨 Problème": "Mon fromage a des problèmes, que faire ?",
+                            "📝 Recette": "Donne-moi une recette simple",
+                            "🍷 Accord vin": "Quel vin avec un fromage de chèvre ?",
+                        }
+                        return questions.get(btn_text, "")
+
+                    def clear_conversation():
+                        return [], "", ""
+
+                    send_btn.click(
+                        fn=process_question,
+                        inputs=[user_input, chat_history],
+                        outputs=[chat_history, chat_display, user_input],
+                    )
+
+                    user_input.submit(
+                        fn=process_question,
+                        inputs=[user_input, chat_history],
+                        outputs=[chat_history, chat_display, user_input],
+                    )
+
+                    btn_problem.click(fn=lambda: get_quick_question("🚨 Problème"), outputs=[user_input])
+                    btn_recipe.click(fn=lambda: get_quick_question("📝 Recette"), outputs=[user_input])
+                    btn_wine.click(fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input])
+                    btn_clear_chat.click(fn=clear_conversation, outputs=[chat_history, chat_display, user_input])
+
+                # ONGLET 5 : enrichissement de la base de connaissances
+                # with gr.Tab("🤖 Base de connaissances enrichie"):
+                #     gr.Markdown("""
+                #     ## 🧠 Enrichissement intelligent de la base
+                    
+                #     Utilisez le **scraping web** et la **génération LLM** pour enrichir 
+                #     automatiquement votre base de connaissances avec de nouvelles recettes.
+                    
+                #     ### Comment ça fonctionne ?
+                #     1. 🌐 **Scraping** : Extrait des recettes depuis des sites de cuisine
+                #     2. 🤖 **LLM** : Génère des recettes originales et réalistes
+                #     3. 💾 **Fusion** : Combine et déduplique automatiquement
+                #     4. ✅ **Utilisation** : La base enrichie est utilisée automatiquement
+                    
+                #     ### ⚠️ Prérequis
+                #     - Un LLM configuré (OpenRouter, Google AI, Together AI, etc.)
+                #     - Connexion internet pour le scraping
+                #     """)
+
+                # with gr.Row():
+                #     with gr.Column():
+                #         enrich_btn = gr.Button(
+                #             "🚀 Enrichir la base de connaissances",
+                #             variant="primary",
+                #             size="lg"
+                #         )
+                        
+                #         view_btn = gr.Button(
+                #             "📊 Voir la base actuelle",
+                #             variant="secondary"
+                #         )
+                    
+                #     with gr.Column():
+                #         knowledge_output = gr.HTML(
+                #         label="Résultat"
+                #     )
+                
+                # gr.Markdown("""
+                # ---
+                # ### 💡 Conseil
+                # Lancez l'enrichissement une fois, puis testez la génération de recettes.
+                # Les nouvelles recettes de la base enrichie seront utilisées automatiquement !
+                # """)
+                
+                # Connexions
+                # enrich_btn.click(
+                #     fn=enrich_knowledge_base,
+                #     outputs=knowledge_output
+                # )
+                
+                # view_btn.click(
+                #     fn=view_knowledge_base,
+                #     outputs=knowledge_output
+                # )
+
+            # ONGLET 5 : Recettes dynamiques
+            with gr.Tab("🎯 Recettes dynamiques"):
+                gr.Markdown("""
+                ### 🎯 Historique des recettes générées dynamiquement
+                
+                Consultez toutes les recettes créées par le système hybride dynamique.
+                Ces recettes sont **adaptées aux ingrédients** que vous avez demandés !
+                """)
+                
+                with gr.Row():
+                    filter_lait_dropdown = gr.Dropdown(
+                        label="Filtrer par type de lait",
+                        choices=["Tous", "vache", "chèvre", "brebis", "bufflonne"],
+                        value="Tous"
+                    )
+                    refresh_btn = gr.Button("🔄 Actualiser", variant="secondary")
+                
+                dynamic_recipes_output = gr.HTML(label="Recettes dynamiques")
+                
+                # Charger au démarrage
+                filter_lait_dropdown.change(
+                    fn=view_dynamic_recipes,
+                    inputs=[filter_lait_dropdown],
+                    outputs=dynamic_recipes_output
+                )
+                
+                refresh_btn.click(
+                    fn=view_dynamic_recipes,
+                    inputs=[filter_lait_dropdown],
+                    outputs=dynamic_recipes_output
+                )
+                
+                # Afficher au chargement
+                gr.on(
+                    triggers=[demo.load],
+                    fn=lambda: view_dynamic_recipes(None),
+                    outputs=dynamic_recipes_output
+                )
+                
+            # ONGLET 7 : Historique (VERSION DYNAMIQUE)
+            with gr.Tab("🕒 Historique"):
                     gr.Markdown("### 📚 Historique de vos recettes")
                     
                     # ===== VARIABLES GLOBALES =====
@@ -6915,8 +7605,17 @@ def create_interface():
                         except Exception as e:
                             print(f"❌ Erreur get_fallback_count: {e}")
                             return 0
+                        
+                     
                     
                     def update_interface():
+                        """Évite les boucles au démarrage"""
+                        # Vérifie si c'est le 1er appel (Gradio passe info)
+                        import threading
+                        if not hasattr(update_interface, 'first_run'):
+                            update_interface.first_run = False
+                            return
+                        
                         """Actualise TOUTE l'interface - COMPTE RÉEL"""
                         global stats_visible
                         
@@ -7450,11 +8149,16 @@ def create_interface():
                     def init_on_load():
                         """Initialise avec les vrais chiffres"""
                         global stats_visible
-
-
                         stats_visible = False  # Initialiser l'état
                         print("⚡ Initialisation Historique")
-                        return update_interface()
+                        # Appelle update_interface MAIS retourne les 4 valeurs attendues
+                        result = update_interface()
+                        return [
+                            "",                           # counter_card (HTML)
+                            "",                           # history_summary (Texte) 
+                            "→ Sélectionner parmi les recettes",  # recipe_dropdown ✅ EXACT
+                            ""                            # recipe_display (Texte)
+    ]
                     
                     demo.load(
                         fn=init_on_load,
@@ -7467,77 +8171,7 @@ def create_interface():
                         ],
                         queue=False
                     )
-                                                                                             
-                # ONGLET 5 : Chat
-                with gr.Tab("💬 Expert Fromager"):
-                    gr.Markdown("### 🧀 Dialoguez avec Maître Fromager")
-                    
-                    chat_history = gr.State([])
-                    
-                    chat_display = gr.Textbox(
-                        label="Conversation",
-                        lines=15,
-                        interactive=False,
-                        elem_id="chat-display",
-                    )
-
-                    with gr.Row():
-                        user_input = gr.Textbox(
-                            label="Votre question",
-                            placeholder="Ex: Mon fromage est trop acide...",
-                            lines=3,
-                            scale=4,
-                        )
-                        send_btn = gr.Button("💬 Envoyer", variant="primary", scale=1)
-
-                    with gr.Row():
-                        btn_problem = gr.Button("🚨 Problème", size="sm")
-                        btn_recipe = gr.Button("📝 Recette", size="sm")
-                        btn_wine = gr.Button("🍷 Accord vin", size="sm")
-                        btn_clear_chat = gr.Button("🗑️ Effacer", size="sm")
-
-                    def process_question(question, history):
-                        if not question or not question.strip():
-                            return history, "", ""
-                        
-                        response = agent.chat_with_llm(question, [])
-                        history.append(f"👤 **Vous:** {question}")
-                        history.append(f"🧀 **Maître Fromager:** {response}")
-                        history.append("─" * 50)
-                        
-                        if len(history) > 15:
-                            history = history[-15:]
-                        
-                        display_text = "\n\n".join(history)
-                        return history, display_text, ""
-
-                    def get_quick_question(btn_text):
-                        questions = {
-                            "🚨 Problème": "Mon fromage a des problèmes, que faire ?",
-                            "📝 Recette": "Donne-moi une recette simple",
-                            "🍷 Accord vin": "Quel vin avec un fromage de chèvre ?",
-                        }
-                        return questions.get(btn_text, "")
-
-                    def clear_conversation():
-                        return [], "", ""
-
-                    send_btn.click(
-                        fn=process_question,
-                        inputs=[user_input, chat_history],
-                        outputs=[chat_history, chat_display, user_input],
-                    )
-
-                    user_input.submit(
-                        fn=process_question,
-                        inputs=[user_input, chat_history],
-                        outputs=[chat_history, chat_display, user_input],
-                    )
-
-                    btn_problem.click(fn=lambda: get_quick_question("🚨 Problème"), outputs=[user_input])
-                    btn_recipe.click(fn=lambda: get_quick_question("📝 Recette"), outputs=[user_input])
-                    btn_wine.click(fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input])
-                    btn_clear_chat.click(fn=clear_conversation, outputs=[chat_history, chat_display, user_input])
+                 
 
             # ===== BOUTON GÉNÉRATION =====
             generate_all_btn.click(
@@ -7692,6 +8326,21 @@ if __name__ == "__main__":
     # 🎨 CSS PERSONNALISÉ - Design fromager gourmand
     custom_css = """
     <style>
+            .recipe-link {
+        display: inline-block; 
+        padding: 10px 20px; 
+        background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+        color: white; 
+        text-decoration: none; 
+        border-radius: 25px; 
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        transition: all 0.3s ease;
+    }
+    .recipe-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102,126,234,0.6);
+    }
         /* ===== GLOBAL ===== */
         * {
             font-family: 'Quicksand', sans-serif !important;
@@ -7713,7 +8362,7 @@ if __name__ == "__main__":
             left: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            background: linear-gradient(135deg, rgba(255, 249, 230, 0.92) 0%, rgba(255, 229, 180, 0.32) 100%) !important;
+            background: linear-gradient(135deg, rgba(255, 249, 230, 0.32) 0%, rgba(255, 229, 180, 0.32) 100%) !important;
             pointer-events: none !important;
             z-index: 0 !important;
         }
@@ -7724,9 +8373,11 @@ if __name__ == "__main__":
             z-index: 1 !important;
         }
 
-        /* ===== TEXTE MARKDOWN - LISIBLE ===== */
         .prose, .markdown, p, li, span, label, .gr-box, div {
-            color: #3E2723 !important;
+        color: #3E2723 !important;
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        line-height: 1.6 !important;
         }
         
         /* En-tête avec ombre fromagère */
@@ -7739,7 +8390,7 @@ if __name__ == "__main__":
         /* Texte dans les zones d'information */
         .gr-prose p, .gr-prose li {
             color: #4E342E !important;
-            font-size: 1.05em !important;
+            font-size: 18px !important;
         }
         
         /* Labels des champs */
@@ -7772,15 +8423,16 @@ if __name__ == "__main__":
         
         .svelte-llgaql,
         .tab-nav button {
+            font-size: 22px !important;          /* taille fixe */
+            line-height: 1.2 !important;         /* ajuster la hauteur de ligne */
+            font-weight: 700 !important;         /* gras total */
+            padding: 16px 36px !important;       /* plus d’espace */
+            margin: 0 6px !important;
+            border-radius: 12px 12px 0 0 !important;
             background: #FFF3E0 !important;
             color: #5D4037 !important;
             border: 2px solid #FFE0B2 !important;
-            font-weight: 600 !important;
-            transition: all 0.3s ease !important;
-            font-size: 1.6em !important;           /* ← AJOUTÉ */
-            padding: 14px 28px !important;         /* ← MODIFIÉ */
-            margin: 0 4px !important;
-            border-radius: 12px 12px 0 0 !important;
+            transform: none !important; 
         }
         
         .tab-nav button:hover {
@@ -7794,6 +8446,7 @@ if __name__ == "__main__":
             color: white !important;
             border-color: #E65100 !important;
             box-shadow: 0 4px 12px rgba(230, 81, 0, 0.3) !important;
+            transform: none !important;
         }
         
         /* ===== DROPDOWN / MENU DÉROULANT - CORRECTION COMPLÈTE ===== */
@@ -8210,7 +8863,7 @@ if __name__ == "__main__":
         # Dans l'onglet "🕒 Historique", modifier recipe_display :
 
         with gr.Tab("🕒 Historique"):
-            # ... (code existant) ...
+            # ... (code à créer) ...
             
             with gr.Column(scale=2):
                 recipe_dropdown = gr.Dropdown(
@@ -8229,7 +8882,7 @@ if __name__ == "__main__":
                     elem_id="history-recipe-display"
                 )
 
-        # 5. AJOUTER LE CSS POUR L'HISTORIQUE (ajouter dans custom_css)
+        # 5. AJOUTER LE CSS POUR L'HISTORIQUE
             /* Ascenseur pour la recette dans l'historique */
             #history-recipe-display textarea,
             #history-recipe-display .gr-textarea {
