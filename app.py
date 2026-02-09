@@ -7075,12 +7075,13 @@ def create_interface():
     with gr.Blocks(
         title="🧀 Agent Fromager - Authentification",
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
-        css=custom_css,
-        head=f"""
-        <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
-        <style>{custom_css}</style>
+        head="""
+            <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
         """,
     ) as demo:
+    
+    
+        gr.HTML(f"<style>{custom_css}</style>", visible=False)
         
         # État d'authentification
         is_authenticated = gr.State(value=False)
