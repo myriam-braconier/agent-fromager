@@ -6819,7 +6819,7 @@ def view_dynamic_recipes(filter_lait=None):
     
     # 2. Charger l'historique dynamique (si il existe)
     if os.path.exists("unified_recipes_history.json"):
-        with open("dynamic_recipes_history.json", 'r', encoding='utf-8') as f:
+        with open("unified_recipes_history.json"), 'r', encoding='utf-8') as f:
             dynamic_recipes = json.load(f)
             # Marquer comme dynamiques
             for r in dynamic_recipes:
