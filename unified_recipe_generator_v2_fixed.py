@@ -162,7 +162,7 @@ class UnifiedRecipeGeneratorV2:
         recipe_data['ingredients_input'] = ingredients
         recipe_data['cheese_type_input'] = cheese_type
         
-        self._save_to_history(recipe_data)
+        # self._save_to_history(recipe_data)
         
         print("\n" + "="*70)
         print(f"✅ RECETTE GÉNÉRÉE (mode: {recipe_data['generation_mode']})")
