@@ -8349,7 +8349,6 @@ if __name__ == "__main__":
 
     # 🎨 CSS PERSONNALISÉ - Design fromager gourmand
     custom_css = """
-    <style>
             .recipe-link {
         display: inline-block; 
         padding: 10px 20px; 
@@ -8946,7 +8945,6 @@ if __name__ == "__main__":
         .recipe-card {
             animation: fadeInUp 0.6s ease-out;
         }
-    </style>
     """
 
     # Créer et lancer l'interface
