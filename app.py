@@ -8373,7 +8373,7 @@ if __name__ == "__main__":
         
         /* Fond général avec texture fromage */
         .gradio-container {
-            background-image: url('https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920') !important;
+            background-image: url('/file=photo-1452195100486-9cc805987862') !important;
             background-size: cover !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
