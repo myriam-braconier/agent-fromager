@@ -1712,54 +1712,70 @@ class AgentFromagerHF:
             print(f"❌ Erreur get_history: {e}")
             return []
 
-    def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-        """Sauvegarde une recette dans l'historique"""
+    def _save_to_history(self, ingredients, cheese_type, constraints, recipe_text_or_data):
+        """Sauvegarde une recette dans l'historique (compatible ancien/nouveau)"""
         try:
             history = self._load_history()
-
-            recipe_lines = recipe.split("\n")
-            cheese_name = "Fromage personnalisé"
-            for line in recipe_lines:
-                if "🧀" in line and len(line) < 100:
-                    cheese_name = (
-                        line.replace("🧀", "").replace("═", "").replace("║", "").strip()
-                    )
-                    break
-
+            
+            # Déterminer si c'est du texte ou des données structurées
+            if isinstance(recipe_text_or_data, dict):
+                # Nouveau format (recipe_data)
+                recipe_text = RecipeFormatter.format_to_text(recipe_text_or_data)
+                cheese_name = recipe_text_or_data.get('title', 'Fromage personnalisé')
+                generation_mode = recipe_text_or_data.get('generation_mode', 'unknown')
+            else:
+                # Ancien format (texte)
+                recipe_text = recipe_text_or_data
+                
+                # Parser le titre depuis le texte
+                recipe_lines = recipe_text.split("\n")
+                cheese_name = "Fromage personnalisé"
+                
+                for line in recipe_lines:
+                    if "║" in line and len(line) < 200 and len(line) > 10:
+                        cleaned = line.replace("║", "").replace("═", "").replace("╔", "").replace("╚", "").strip()
+                        # Retirer les icônes et garder juste le texte
+                        import re
+                        # Retirer les emojis et parenthèses
+                        cleaned = re.sub(r'[📋🤖🌐📚]', '', cleaned)
+                        cleaned = re.sub(r'\(.*?\)', '', cleaned).strip()
+                        
+                        if cleaned and len(cleaned) > 3:
+                            cheese_name = cleaned
+                            break
+                
+                generation_mode = 'classic'
+            
             entry = {
                 "id": len(history) + 1,
                 "date": datetime.now().isoformat(),
+                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "cheese_name": cheese_name,
                 "ingredients": ingredients,
-                "type": cheese_type,
+                "cheese_type": cheese_type,
                 "constraints": constraints,
-                "recipe_complete": recipe,
-                "recipe_preview": recipe[:300] + "..." if len(recipe) > 300 else recipe,
+                "recipe_complete": recipe_text,
+                "recipe_preview": recipe_text[:300] + "..." if len(recipe_text) > 300 else recipe_text,
+                "generation_mode": generation_mode
             }
-
+            
             history.append(entry)
-
-            # Sauvegarder localement
+            
             with open(self.recipes_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
-
-            # ✅ AJOUTER CETTE LIGNE : Mettre à jour l'historique en mémoire
+            
             self.history = history
-
-            # Upload vers HF
-            sync_success = self._upload_history_to_hf()
-
-            if sync_success:
-                print(f"✅ Recette #{entry['id']} sauvegardée et synchronisée")
-            else:
-                print(f"⚠️  Recette #{entry['id']} sauvegardée localement")
-
+            self._upload_history_to_hf()
+            
+            print(f"✅ Recette #{entry['id']} sauvegardée : {cheese_name}")
             return True
-
+            
         except Exception as e:
             print(f"❌ Erreur sauvegarde: {e}")
+            import traceback
+            traceback.print_exc()
             return False
-
+        
     def get_knowledge_summary(self):
         """Retourne un résumé complet de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
@@ -1972,35 +1988,50 @@ class AgentFromagerHF:
         """Retourne l'historique formaté pour affichage"""
         try:
             history = self._load_history()
-
+            
             if not history:
                 return "📭 Aucune recette sauvegardée pour le moment."
-
+            
             display = f"📚 **{len(history)} recette(s) sauvegardée(s)**\n\n"
             display += "---\n\n"
-
-            for entry in reversed(history[-10:]):  # 10 dernières recettes
-                display += f"**#{entry['id']}** | 📅 {entry['timestamp']}\n"
-                display += f"🧀 Type: {entry['cheese_type']}\n"
-
-                ing = entry["ingredients"]
+            
+            for entry in reversed(history[-10:]):  # 10 dernières
+                # ✅ AFFICHER LE TITRE
+                cheese_name = entry.get('cheese_name', 'Fromage personnalisé')
+                display += f"🧀 **{cheese_name}**\n"
+                display += f"**#{entry['id']}** | 📅 {entry.get('timestamp', entry.get('date', 'N/A'))}\n"
+                display += f"🏷️ Type: {entry.get('cheese_type', entry.get('type', 'N/A'))}\n"
+                
+                ing = entry.get("ingredients", [])
                 if isinstance(ing, list):
-                    ing = ", ".join(str(i) for i in ing)  # ✅ CORRECT !
+                    ing = ", ".join(str(i) for i in ing)
                 elif isinstance(ing, str):
-                    ing = ing[:50]  # Limite si déjà string
-
+                    ing = ing[:50]
+                
                 display += f"🥛 Ingrédients: {ing[:50]}...\n"
-
+                
+                # Afficher le mode de génération si disponible
+                mode = entry.get('generation_mode')
+                if mode:
+                    mode_labels = {
+                        'llm_pure_with_knowledge': '🤖 LLM pur',
+                        'enriched_base': '📚 Base enrichie',
+                        'web_enriched': '🌐 Web enrichi',
+                        'static_knowledge': '📋 Base statique',
+                        'classic': '📝 Classique'
+                    }
+                    display += f"🎨 Mode: {mode_labels.get(mode, mode)}\n"
+                
                 if entry.get("constraints"):
                     display += f"⚙️ Contraintes: {entry['constraints']}\n"
-
+                
                 display += "\n---\n\n"
-
+            
             return display
-
+            
         except Exception as e:
             return f"❌ Erreur lecture historique: {e}"
-
+    
     def clear_history(self):
         """Efface tout l'historique"""
         try:
