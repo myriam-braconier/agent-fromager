@@ -7077,6 +7077,7 @@ def create_interface():
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
         head="""
             <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
+            {custom_css}
         """,
     ) as demo:
     
@@ -8349,6 +8350,7 @@ if __name__ == "__main__":
 
     # 🎨 CSS PERSONNALISÉ - Design fromager gourmand
     custom_css = """
+    <style>
             .recipe-link {
         display: inline-block; 
         padding: 10px 20px; 
@@ -8945,6 +8947,7 @@ if __name__ == "__main__":
         .recipe-card {
             animation: fadeInUp 0.6s ease-out;
         }
+    <style>
     """
 
     # Créer et lancer l'interface
