@@ -44,6 +44,7 @@ fallback_cache = None
 recipe_map = {}
 STATS_CACHE = {'visible': False, 'html': None}
 stats_visible = False
+DYNAMIC_HYBRID_AVAILABLE = True  
 
 
 class AgentFromagerHF:
@@ -325,30 +326,116 @@ class AgentFromagerHF:
         if globals().get('DYNAMIC_HYBRID_AVAILABLE', False):
             try:
                 print("\n🎯 Activation du système hybride dynamique...")
-                hybrid = DynamicHybridSystem(self)
                 
-                recipes = hybrid.generate_recipes_for_ingredients(
+                # ===== ÉTAPE 1 : SCRAPING WEB (PRIORITAIRE) =====
+                print("🌐 Phase 1 : Scraping web...")
+                scraped_recipes = self._search_web_recipes_classic(
                     ingredients=ingredients,
                     cheese_type=cheese_type,
-                    count=max_results
+                    max_results=max_results
                 )
                 
-                if recipes and len(recipes) > 0:
-                    print(f"✅ Système hybride : {len(recipes)} recettes générées")
-                    return recipes
-                else:
-                    print("⚠️ Système hybride : aucune recette générée")
+                print(f"✅ Scraping terminé : {len(scraped_recipes)} recettes trouvées")
+
+                # ===== NOUVEAU : SAUVEGARDER LES RECETTES SCRAPÉES =====
+                self._save_scraped_recipes_to_unified_history(
+                    scraped_recipes, 
+                    ingredients, 
+                    cheese_type
+                )
+                # ===== FIN NOUVEAU =====
+
+                # Compter les recettes scrapées (avec URL)
+                real_scraped = [r for r in scraped_recipes if r.get('url') and r.get('source_type') == 'scraped']
+                
+                # Compter les recettes scrapées (avec URL)
+                real_scraped = [r for r in scraped_recipes if r.get('url') and r.get('source_type') == 'scraped']
+                print(f"   📊 Dont {len(real_scraped)} vraiment scrapées du web")
+                
+                # ===== ÉTAPE 2 : COMPLÉTER AVEC IA SI BESOIN =====
+                if len(scraped_recipes) < max_results:
+                    needed = max_results - len(scraped_recipes)
+                    print(f"🤖 Phase 2 : Génération IA pour {needed} recettes manquantes...")
                     
+                    generator = UnifiedRecipeGeneratorV2(self)
+                    recipe_data = generator.generate_recipe(
+                        ingredients=ingredients.split(','),
+                        cheese_type=cheese_type,
+                        creativity=1,
+                        profile="🧀 Amateur",
+                        constraints=""
+                    )
+                    
+                    if recipe_data:
+                        # Marquer comme générée par IA
+                        recipe_data['source_type'] = 'generated'
+                        recipe_data['url'] = None
+                        scraped_recipes.append(recipe_data)
+                        print(f"✅ Ajout d'1 recette générée par IA")
+                
+                print(f"🎯 TOTAL : {len(scraped_recipes)} recettes (scraping + IA)")
+                return scraped_recipes
+                
             except Exception as e:
                 print(f"❌ Erreur système hybride: {e}")
                 import traceback
                 traceback.print_exc()
+                # Continuer avec le fallback classique
         else:
             print("⚠️ Système hybride non disponible, utilisation méthode classique")
+
         
         # ===== PRIORITÉ 2 : FALLBACK CLASSIQUE =====
         print("\n🔄 Fallback sur recherche classique...")
         return self._search_web_recipes_classic(ingredients, cheese_type, max_results)
+
+    def _save_scraped_recipes_to_unified_history(self, recipes, ingredients, cheese_type):
+        """Sauvegarde les recettes scrapées dans unified_recipes_history.json"""
+        import os
+        import json
+        from datetime import datetime
+        
+        history_file = "unified_recipes_history.json"
+        
+        # Charger l'historique existant
+        if os.path.exists(history_file):
+            with open(history_file, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        else:
+            history = []
+        
+        # Ajouter chaque recette scrapée
+        for recipe in recipes:
+            # Vérifier que c'est bien une recette scrapée (avec URL)
+            if recipe.get('url') and recipe.get('source_type') == 'scraped':
+                
+                # Créer l'entrée pour l'historique
+                history_entry = {
+                    'title': recipe.get('title', 'Recette sans titre'),
+                    'description': recipe.get('description', ''),
+                    'url': recipe['url'],
+                    'source_url': recipe['url'],
+                    'source_type': 'scraped',
+                    'lait': self._extract_lait_from_text(ingredients),
+                    'type_pate': cheese_type,
+                    'ingredients': recipe.get('ingredients', []),
+                    'etapes': recipe.get('etapes', []),
+                    'requested_ingredients': ingredients,
+                    'generated_at': datetime.now().isoformat(),
+                    'date_creation': datetime.now().isoformat(),
+                    'score': recipe.get('score', 7),
+                }
+                
+                # Vérifier si déjà présente (éviter doublons)
+                if not any(h.get('url') == recipe['url'] for h in history):
+                    history.append(history_entry)
+                    print(f"💾 Sauvegardé: {history_entry['title'][:50]}")
+        
+        # Sauvegarder dans le fichier
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ {len([r for r in recipes if r.get('source_type') == 'scraped'])} recettes scrapées sauvegardées dans {history_file}")
 
     # ===== FONCTION PRINCIPALE MISE À JOUR =====
     def _search_web_recipes_classic(
@@ -374,7 +461,7 @@ class AgentFromagerHF:
             # ===== PHASE 1: MOTEURS PRINCIPAUX (rapides) =====
             primary_engines = [
                 ("Google", self._search_google),
-                ("Bing", self._search_bing),
+                # ("Bing", self._search_bing),
                 ("Ecosia", self._search_ecosia),
             ]
 
@@ -418,9 +505,9 @@ class AgentFromagerHF:
             print(f"⚠️ Seulement {len(all_recipes)} résultats, Phase 2...")
 
             secondary_engines = [
-                ("Qwant", self._search_qwant),
-                ("DuckDuckGo Lite", self._search_duckduckgo_lite),
-                ("Yandex", self._search_yandex),
+                # ("Qwant", self._search_qwant),
+                ("DuckDuckGo Lite", self._search_simple_ddg),
+                # ("Yandex", self._search_yandex),
             ]
 
             for engine_name, engine_func in secondary_engines:
@@ -2920,154 +3007,78 @@ class AgentFromagerHF:
 
     # ===== MOTEURS DE RECHERCHE INDIVIDUELS =====
 
-    def _search_google(self, query, max_results):
-        """Recherche Google via DuckDuckGo API (plus fiable)"""
+    def _search_google(self, query, max_results=5):
+        """Recherche Google via SerpAPI"""
         try:
-            from urllib.parse import quote
-            import requests
-
-            # Utiliser DuckDuckGo Instant Answer API (moins restrictive)
-            url = f"https://api.duckduckgo.com/?q={quote(query)}&format=json&no_html=1&skip_disambig=1"
-
-            headers = {
-                "User-Agent": "Mozilla/5.0 (compatible; FromagerBot/1.0; +https://github.com/volubyl/fromager)"
+            print(f"🔍 DEBUG Google - Query: {query}")
+            print(f"🔑 DEBUG Google - API Key présente: {bool(self.serpapi_key)}")
+            
+            params = {
+                "q": query,
+                "num": max_results,
+                "api_key": self.serpapi_key
             }
+            
+            print(f"📤 DEBUG Google - Params: {params}")
+            
+            response = requests.get(
+                "https://serpapi.com/search",
+                params=params,
+                timeout=10
+            )
+            
+            print(f"📥 DEBUG Google - Status: {response.status_code}")
+            print(f"📥 DEBUG Google - Response text (100 chars): {response.text[:100]}")
+            
+            
+            # ===== AJOUTER CES LIGNES =====
+            data = response.json()
+            print(f"🔍 DEBUG - Clés dans response: {list(data.keys())}")
 
-            response = requests.get(url, headers=headers, timeout=10)
-
+            if 'organic_results' in data:
+                print(f"📊 DEBUG - Nombre de résultats organiques: {len(data['organic_results'])}")
+                if len(data['organic_results']) > 0:
+                    print(f"📝 DEBUG - Premier résultat: {data['organic_results'][0]}")
+            else:
+                print(f"⚠️ DEBUG - Pas de 'organic_results' dans la réponse!")
+                print(f"📋 DEBUG - Response complète: {data}")
+                
+            # ===== PARSING GOOGLE/SERPAPI =====
             if response.status_code == 200:
-                data = response.json()
                 recipes = []
 
                 # 1. Résultats instantanés (Instant Answer)
-                if "Abstract" in data and data["Abstract"]:
-                    if any(
-                        kw in data["Abstract"].lower()
-                        for kw in ["fromage", "cheese", "recette"]
-                    ):
-                        recipes.append(
-                            {
-                                "title": (
-                                    data["Heading"]
-                                    if "Heading" in data
-                                    else "Recette de fromage"
-                                ),
-                                "url": (
-                                    data["AbstractURL"]
-                                    if "AbstractURL" in data
-                                    else "https://duckduckgo.com"
-                                ),
-                                "description": data["Abstract"][:200],
-                                "source": "duckduckgo.com",
-                                "score": 8,
-                                "engine": "ddg_api",
-                            }
-                        )
-
-                # 2. Liens externes (Related Topics)
-                if "RelatedTopics" in data:
-                    for topic in data["RelatedTopics"][: max_results * 2]:
-                        if "Text" in topic and "FirstURL" in topic:
-                            text = topic["Text"]
-                            url = topic["FirstURL"]
-
-                            if any(
-                                kw in text.lower()
-                                for kw in ["fromage", "cheese", "recette", "recipe"]
-                            ):
-                                # Extraire titre
-                                title = (
-                                    text.split(".")[0][:80]
-                                    if "." in text
-                                    else text[:80]
-                                )
-
-                                recipes.append(
-                                    {
-                                        "title": title,
-                                        "url": url,
-                                        "description": text[:150],
-                                        "source": self._extract_domain(url),
-                                        "score": 7,
-                                        "engine": "ddg_api",
-                                    }
-                                )
-
-                return recipes
-
+                # Parser les résultats organiques de Google
+            if 'organic_results' in data:
+                for result in data['organic_results'][:max_results]:
+                    # Extraire les infos
+                    title = result.get('title', 'Recette sans titre')
+                    url = result.get('link', '')
+                    snippet = result.get('snippet', '')
+                    
+                    # Créer la recette
+                    recipe = {
+                        'title': title[:100],
+                        'url': url,
+                        'description': snippet[:200],
+                        'source': self._extract_domain(url) if url else 'google.com',
+                        'source_type': 'scraped',  # ← IMPORTANT : marquer comme scrapé
+                        'score': 8,
+                        'engine': 'google_serpapi',
+                    }
+                    
+                    recipes.append(recipe)
+                    print(f"  ✅ Ajouté: {title[:50]}")
+            
+            print(f"🎯 Google retourne {len(recipes)} recettes")
+            return recipes
+            
         except Exception as e:
-            print(f"⚠️ Google/DuckDuckGo error: {e}")
-
-        return []
-
-    def _search_bing(self, query, max_results):
-        """Recherche Bing SIMPLIFIÉE"""
-        try:
-            from urllib.parse import quote
-            import requests
-
-            url = f"https://www.bing.com/search?q={quote(query)}"
-
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            }
-
-            response = requests.get(url, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                import re
-
-                recipes = []
-                html = response.text
-
-                # Pattern Bing simple
-                pattern = r'<li[^>]*class="[^"]*b_algo[^"]*"[^>]*>(.*?)</li>'
-                matches = re.findall(
-                    pattern, html, re.DOTALL | re.IGNORECASE
-                )  # CORRECTION ICI
-
-                for match in matches[: max_results * 2]:
-                    try:
-                        # Titre dans h2
-                        title_match = re.search(
-                            r"<h2[^>]*>(.*?)</h2>", match, re.IGNORECASE
-                        )
-                        if not title_match:
-                            continue
-
-                        title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip()
-
-                        # Lien
-                        link_match = re.search(
-                            r'<a[^>]+href="([^"]+)"[^>]*>', match, re.IGNORECASE
-                        )
-                        if not link_match:
-                            continue
-
-                        url = link_match.group(1)
-
-                        if url and "http" in url and "bing" not in url:
-                            if any(kw in title.lower() for kw in ["fromage", "cheese"]):
-                                recipes.append(
-                                    {
-                                        "title": title[:100],
-                                        "url": url,
-                                        "description": "Recette trouvée via Bing",
-                                        "source": self._extract_domain(url),
-                                        "score": 8,
-                                        "engine": "bing",
-                                    }
-                                )
-                    except:
-                        continue
-
-                return recipes
-
-        except Exception as e:
-            print(f"⚠️ Bing error: {e}")
-
-        return []
-
+            print(f"⚠️ Google error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+        
     def _search_ecosia(self, query, max_results):
         """Recherche Ecosia ULTRA simple"""
         try:
@@ -3443,7 +3454,7 @@ class AgentFromagerHF:
             return False
      
      
-    def _save_to_complete_kb(self, entry, cheese_name, cheese_type, ingredients, recipe):
+    def _save_to_complete_kb(self, entry, cheese_name, cheese_type, ingredients, recipe, source_type="user_generated", url=None):
         """Sauvegarde aussi dans complete_knowledge_base.json pour l'affichage"""
         try:
             import os
@@ -3460,10 +3471,10 @@ class AgentFromagerHF:
             
             # Créer l'entrée pour complete_knowledge_base
             kb_entry = {
-                "title": cheese_name,  # ← Titre propre SANS numéro ni date
-                "description": f"Recette personnalisée - {cheese_type}",
-                "source_type": "user_generated",
-                "url": "",
+                "title": cheese_name,
+                "description": f"Recette {cheese_type}",
+                "source_type": source_type,  # ← Utiliser le vrai type
+                "url": url,  # ← Utiliser la vraie URL
                 "lait": self._extract_lait_from_text(' '.join(ingredients)),
                 "type_pate": cheese_type,
                 "score": 10,
@@ -3471,7 +3482,8 @@ class AgentFromagerHF:
                 "duree_totale": "Variable",
                 "ingredients": ingredients,
                 "etapes": self._extract_steps_from_recipe(recipe),
-                "date_creation": entry["date"]
+                "date_creation": entry["date"],
+                "generated_at": entry["date"]
             }
             
             kb.append(kb_entry)
@@ -3480,11 +3492,10 @@ class AgentFromagerHF:
             with open(kb_file, 'w', encoding='utf-8') as f:
                 json.dump(kb, f, indent=2, ensure_ascii=False)
             
-            print(f"✅ Recette ajoutée à complete_knowledge_base.json")
+            print(f"✅ Recette ajoutée à complete_knowledge_base.json (source: {source_type})")
             
         except Exception as e:
-            print(f"⚠️ Erreur sauvegarde complete_kb: {e}")
-       
+            print(f"⚠️ Erreur sauvegarde complete_kb: {e}")     
        
     def _extract_steps_from_recipe(self, recipe):
         """Extrait les étapes de la recette pour l'affichage"""
@@ -6953,12 +6964,14 @@ def view_dynamic_recipes(filter_lait=None):
                 for r in dynamic_recipes:
                     # Vérifier que la recette a au minimum un titre ET des ingrédients/étapes
                     has_content = (
-                        r.get('title') and 
-                        r.get('ingredients') and 
-                        r.get('etapes') and
-                        len(r.get('ingredients', [])) > 0 and
-                        len(r.get('etapes', [])) > 0
+                        r.get('title') and (
+                            # Soit c'est une recette scrapée avec URL
+                            (r.get('source_type') == 'scraped' and r.get('url')) or
+                            # Soit c'est une recette complète avec ingrédients et étapes
+                            (r.get('ingredients') and r.get('etapes') and 
+                            len(r.get('ingredients', [])) > 0 and len(r.get('etapes', [])) > 0)
                     )
+                )
                     
                     if has_content:
                         r['is_static'] = False
@@ -7041,7 +7054,7 @@ def view_dynamic_recipes(filter_lait=None):
                 <h3 style="color: #1976D2; margin-top: 0;">📖 Recettes générées</h3>
                 <div style="max-height: 600px; overflow-y: auto;">
         """
-        
+
         # Afficher les recettes (les plus récentes en premier)
         for i, recipe in enumerate(reversed(recipes), 1):
             title = recipe.get('title', 'Sans titre')
@@ -7049,10 +7062,33 @@ def view_dynamic_recipes(filter_lait=None):
             lait = recipe.get('lait', 'non spécifié')
             type_pate = recipe.get('type_pate', 'non spécifié')
             source_type = recipe.get('source_type', 'unknown')
-            generated_at = recipe.get('generated_at', '')
+            generated_at = recipe.get('generated_at') or recipe.get('date_creation') or recipe.get('date')
+            if generated_at:
+                try:
+                    # Essayer de parser la date ISO
+                    dt = datetime.fromisoformat(generated_at.replace('Z', '+00:00'))
+                    date_str = dt.strftime('%d/%m/%Y %H:%M')
+                except Exception as e:
+                    # Si ça échoue, afficher tel quel
+                    date_str = str(generated_at)[:19] if len(str(generated_at)) > 19 else str(generated_at)
+            else:
+                date_str = 'Date inconnue'
+
+            # URL - ignorer les URLs vides
+            recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link')
+            if recipe_url == "" or recipe_url == "None":
+                recipe_url = None
+                
             requested_ingredients = recipe.get('requested_ingredients', '')
             
-            recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link')
+            # URL - VERSION CORRIGÉE
+            recipe_url = (
+                recipe.get('url') or 
+                recipe.get('source_url') or 
+                recipe.get('link') or 
+                recipe.get('source') or
+                None
+            )
             
             bg_color = '#E8F5E9' if source_type == 'scraped' else '#E3F2FD'
             icon = '🔗' if recipe_url else ('🌐' if source_type == 'scraped' else '🤖')
@@ -7068,22 +7104,30 @@ def view_dynamic_recipes(filter_lait=None):
             ingredients = recipe.get('ingredients', [])
             etapes = recipe.get('etapes', [])
             
+            # ===== PRÉPARER LE LIEN AVANT =====
+            if recipe_url:
+                link_html = f"""
+                    <div style="margin-bottom: 12px;">
+                        <a href="{recipe_url}" target="_blank" 
+                        style="display: inline-block; padding: 8px 16px; background: linear-gradient(45deg, #4CAF50, #45a049); 
+                                color: white; text-decoration: none; border-radius: 20px; font-size: 14px; font-weight: bold;
+                                box-shadow: 0 2px 4px rgba(76,175,80,0.3);">
+                            🚀 Accéder à la recette complète
+                        </a>
+                    </div>
+                """
+            else:
+                link_html = ""
+                
+            # ===== FIN PRÉPARATION LIEN =====
+            
             html += f"""
                 <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="margin-bottom: 15px;">
                         <div style="font-weight: bold; font-size: 18px; color: #1565C0; margin-bottom: 8px;">
                             {icon} {title}
                         </div>
-                        {f'''
-                        <div style="margin-bottom: 12px;">
-                            <a href="{recipe_url}" target="_blank" 
-                            style="display: inline-block; padding: 8px 16px; background: linear-gradient(45deg, #4CAF50, #45a049); 
-                                    color: white; text-decoration: none; border-radius: 20px; font-size: 14px; font-weight: bold;
-                                    box-shadow: 0 2px 4px rgba(76,175,80,0.3);">
-                                🚀 Accéder à la recette complète
-                            </a>
-                        </div>
-                        ''' if recipe_url else ""}
+                        {link_html}
                         <div style="color: #666; font-size: 14px; font-style: italic;">
                             {description}
                         </div>
@@ -7137,12 +7181,7 @@ def view_dynamic_recipes(filter_lait=None):
             html += """
                 </div>
             """
-        
-        html += """
-                </div>
-            </div>
-        </div>
-        """
+      
         
         return html
         
@@ -7158,6 +7197,7 @@ def view_dynamic_recipes(filter_lait=None):
             </pre>
         </div>
         """        
+
 # CREATE INTERFACE GRADIO
 # ===== create_interface AVEC AUTHENTIFICATION =====
 
