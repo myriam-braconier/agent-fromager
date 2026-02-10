@@ -1,0 +1,59 @@
+[
+  {
+    "title": "FROMAGE AUX FLEUR DE BASILIC",
+    "description": "Recette personnalisée - Pâte molle",
+    "source_type": "user_generated",
+    "url": "",
+    "lait": "vache",
+    "type_pate": "Pâte molle",
+    "score": 10,
+    "difficulte": "Personnalisée",
+    "duree_totale": "Variable",
+    "ingredients": [
+      "vache",
+      "basilic"
+    ],
+    "etapes": [
+      "1 litre de lait vache",
+      "10g de sel",
+      "1 feuille de basilic frais",
+      "Lait échauffé à 30°C : Mélangez le lait échauffé avec le sel et le basilic frais.",
+      "Fermentation : Laissez la mélange fermenter pendant 45 minutes à 1 heure.",
+      "Égouttage : Égouttez le lait avec un chiffon pour éliminer l'excess de liquide.",
+      "Étirement : Étirez la pâte avec un moule ou un moule à fromage pendant 30 minutes.",
+      "Affinage : Placez la pâte dans une cave à fromage avec une température de 10-12°C et une humidité de 90-95% pendant 1 semaine.",
+      "Étiquetage et conservation : Étiquetez le fromage et conservez-le dans la cave à fromage pendant au moins 2 semaines."
+    ],
+    "date_creation": "2026-02-10T16:09:18.568555"
+  },
+  {
+    "title": "FROMAGE AUX FLEUR DE BASILIC",
+    "description": "Recette personnalisée - Pâte molle",
+    "source_type": "user_generated",
+    "url": "",
+    "lait": "vache",
+    "type_pate": "Pâte molle",
+    "score": 10,
+    "difficulte": "Personnalisée",
+    "duree_totale": "Variable",
+    "ingredients": [
+      "vache",
+      "basilic"
+    ],
+    "etapes": [
+      "1 litre de lait vache",
+      "10g de sel",
+      "1 feuille de basilic frais",
+      "Lait échauffé à 30°C : Mélangez le lait échauffé avec le sel et le basilic frais.",
+      "Fermentation : Laissez la mélange fermenter pendant 45 minutes à 1 heure.",
+      "Égouttage : Égouttez le lait avec un chiffon pour éliminer l'excess de liquide.",
+      "Étirement : Étirez la pâte avec un moule ou un moule à fromage pendant 30 minutes.",
+      "Affinage : Placez la pâte dans une cave à fromage avec une température de 10-12°C et une humidité de 90-95% pendant 1 semaine.",
+      "Étiquetage et conservation : Étiquetez le fromage et conservez-le dans la cave à fromage pendant au moins 2 semaines.",
+      "Enrober de cendres végétales",
+      "Incorporer des noix concassées dans le caillé",
+      "Infuser le lait avec du thé Earl Grey"
+    ],
+    "date_creation": "2026-02-10T16:09:19.229905"
+  }
+]
