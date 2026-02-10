@@ -7056,55 +7056,41 @@ def view_dynamic_recipes(filter_lait=None):
         """
 
         # Afficher les recettes (les plus récentes en premier)
+        # Afficher les recettes (les plus récentes en premier)
         for i, recipe in enumerate(reversed(recipes), 1):
             title = recipe.get('title', 'Sans titre')
             description = recipe.get('description', 'Pas de description')
             lait = recipe.get('lait', 'non spécifié')
             type_pate = recipe.get('type_pate', 'non spécifié')
             source_type = recipe.get('source_type', 'unknown')
+            requested_ingredients = recipe.get('requested_ingredients', '')
+            
+            # ===== DATE (UNE SEULE FOIS) =====
             generated_at = recipe.get('generated_at') or recipe.get('date_creation') or recipe.get('date')
             if generated_at:
                 try:
-                    # Essayer de parser la date ISO
-                    dt = datetime.fromisoformat(generated_at.replace('Z', '+00:00'))
+                    dt = datetime.fromisoformat(str(generated_at).replace('Z', '+00:00'))
                     date_str = dt.strftime('%d/%m/%Y %H:%M')
                 except Exception as e:
-                    # Si ça échoue, afficher tel quel
                     date_str = str(generated_at)[:19] if len(str(generated_at)) > 19 else str(generated_at)
             else:
                 date_str = 'Date inconnue'
-
-            # URL - ignorer les URLs vides
-            recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link')
-            if recipe_url == "" or recipe_url == "None":
+            
+            # ===== URL (UNE SEULE FOIS) =====
+            recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link') or recipe.get('source')
+            if recipe_url in ["", "None", None]:
                 recipe_url = None
-                
-            requested_ingredients = recipe.get('requested_ingredients', '')
             
-            # URL - VERSION CORRIGÉE
-            recipe_url = (
-                recipe.get('url') or 
-                recipe.get('source_url') or 
-                recipe.get('link') or 
-                recipe.get('source') or
-                None
-            )
-            
+            # ===== STYLE ET ICÔNES =====
             bg_color = '#E8F5E9' if source_type == 'scraped' else '#E3F2FD'
             icon = '🔗' if recipe_url else ('🌐' if source_type == 'scraped' else '🤖')
             lait_emoji = emoji_map.get(lait, '❓')
             
-            # Date
-            try:
-                dt = datetime.fromisoformat(generated_at)
-                date_str = dt.strftime('%d/%m/%Y %H:%M')
-            except:
-                date_str = 'Date inconnue'
-            
+            # ===== INGRÉDIENTS ET ÉTAPES =====
             ingredients = recipe.get('ingredients', [])
             etapes = recipe.get('etapes', [])
             
-            # ===== PRÉPARER LE LIEN AVANT =====
+            # ===== PRÉPARER LE LIEN HTML =====
             if recipe_url:
                 link_html = f"""
                     <div style="margin-bottom: 12px;">
@@ -7118,9 +7104,8 @@ def view_dynamic_recipes(filter_lait=None):
                 """
             else:
                 link_html = ""
-                
-            # ===== FIN PRÉPARATION LIEN =====
             
+            # ===== DÉBUT CARTE RECETTE =====
             html += f"""
                 <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="margin-bottom: 15px;">
@@ -7146,7 +7131,7 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
             """
             
-            # Ingrédients
+            # ===== INGRÉDIENTS =====
             if ingredients and len(ingredients) > 0:
                 html += """
                     <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
@@ -7162,20 +7147,25 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
                 """
             
-            # Étapes
+            # ===== ÉTAPES =====
             if etapes and len(etapes) > 0:
                 html += """
                     <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
                         <strong style="color: #1976D2;">📋 Étapes:</strong>
                         <ol style="margin: 8px 0; padding-left: 20px;">
                 """
-                # CHANGEMENT : Afficher TOUTES les étapes au lieu de [:8]
-                for etape in etapes:  # ← Enlevé [:8]
+                # TOUTES les étapes au lieu de [:8]
+                for etape in etapes:
                     html += f'<li style="margin: 6px 0; color: #555;">{etape}</li>'
                 html += """
                         </ol>
                     </div>
                 """
+            
+            # ===== FIN CARTE RECETTE (IMPORTANT !) =====
+            html += """
+                </div>
+            """
       
         
         return html
