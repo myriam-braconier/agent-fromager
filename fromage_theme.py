@@ -62,6 +62,9 @@ def create_fromage_theme():
 # (Seulement ce qui ne peut pas être fait avec le thème)
 
 minimal_css = """
+body, .gradio-container {
+    background: linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%) !important;
+}
 /* FORCER ABSOLUMENT TOUT LE TEXTE EN NOIR */
 body, body *, 
 .gradio-container, .gradio-container *,
