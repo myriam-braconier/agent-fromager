@@ -65,7 +65,7 @@ minimal_css = """
 /* FORCER ABSOLUMENT TOUT LE TEXTE EN NOIR */
 body, body *, 
 .gradio-container, .gradio-container *,
-div, p, li, ul, ol, h1, h2, h3, h4, h5, h6, span
+div, p, li, ul, ol, h1, h2, h3, h4, h5, h6, span,
 .markdown-body, .prose, .gr-markdown, .gr-html,
 .recipe-card, #recipe-scroll {
     color: #3E2723 !important;
