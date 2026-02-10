@@ -7746,7 +7746,6 @@ def create_interface():
                             return 0
                         
                      
-                    
                     def update_interface():
                         """Actualise TOUTE l'interface - COMPTE RÉEL"""
                         global stats_visible
