@@ -7169,18 +7169,13 @@ def view_dynamic_recipes(filter_lait=None):
                         <strong style="color: #1976D2;">📋 Étapes:</strong>
                         <ol style="margin: 8px 0; padding-left: 20px;">
                 """
-                for etape in etapes[:8]:
+                # CHANGEMENT : Afficher TOUTES les étapes au lieu de [:8]
+                for etape in etapes:  # ← Enlevé [:8]
                     html += f'<li style="margin: 6px 0; color: #555;">{etape}</li>'
-                if len(etapes) > 8:
-                    html += f'<li style="color: #999; font-style: italic;">... et {len(etapes) - 8} autres étapes</li>'
                 html += """
                         </ol>
                     </div>
                 """
-            
-            html += """
-                </div>
-            """
       
         
         return html
