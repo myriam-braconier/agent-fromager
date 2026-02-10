@@ -6600,6 +6600,9 @@ def generate_all(
 
         # ===== 5. RETOURNER TOUT (6 ÉLÉMENTS) =====
         # MAINTENANT : Il faut que votre callback Gradio ATTENDE 6 éléments !
+        
+        choices_avec_placeholder = ["→ Sélectionner parmi les recettes"]
+        
         return (
             recipe,  # 1. La recette générée (Textbox)
             "",  # 2. Statut de recherche (Textbox)
@@ -6910,46 +6913,13 @@ def view_dynamic_recipes(filter_lait=None):
     from datetime import datetime
     
     all_recipes = []
-    history_file = "unified_recipes_history.json" 
-   
+    history_file = "unified_recipes_history.json"
     
-    # 1. Charger la base statique (si elle existe)
-    if os.path.exists("complete_knowledge_base.json"):
-        with open("complete_knowledge_base.json", 'r', encoding='utf-8') as f:
-            static_recipes = json.load(f)
-            # Marquer comme statiques
-            for r in static_recipes:
-                r['is_static'] = True
-            all_recipes.extend(static_recipes)
+    # Vérifier si au moins un fichier existe
+    has_static = os.path.exists("complete_knowledge_base.json")
+    has_dynamic = os.path.exists(history_file)
     
-    # 2. Charger l'historique dynamique UNIFIÉ (nouveau système V2)
-    if os.path.exists("unified_recipes_history.json"):
-        with open("unified_recipes_history.json", 'r', encoding='utf-8') as f:
-            dynamic_recipes = json.load(f)
-            # ✅ FILTRE : Ignorer les recettes incomplètes
-            for r in dynamic_recipes:
-                # Vérifier que la recette a au minimum un titre ET des ingrédients/étapes
-                has_content = (
-                    r.get('title') and 
-                    r.get('ingredients') and 
-                    r.get('etapes') and
-                    len(r.get('ingredients', [])) > 0 and
-                    len(r.get('etapes', [])) > 0
-                )
-                
-                if has_content:
-                    r['is_static'] = False
-                    all_recipes.append(r)
-                else:
-                    print(f"⚠️ Recette incomplète ignorée: {r.get('title', 'Sans titre')}")
-    
-    # Filtrer par type de lait
-    if filter_lait and filter_lait != "Tous":
-        recipes = [r for r in all_recipes if r.get('lait') == filter_lait]
-    else:
-        recipes = all_recipes
-    
-    if not os.path.exists(history_file):
+    if not has_static and not has_dynamic:
         return """
         <div style="padding: 40px; text-align: center; background: #E3F2FD; border-radius: 12px;">
             <div style="font-size: 48px; margin-bottom: 20px;">📭</div>
@@ -6962,6 +6932,55 @@ def view_dynamic_recipes(filter_lait=None):
         """
     
     try:
+        # 1. Charger la base statique (si elle existe)
+        if has_static:
+            with open("complete_knowledge_base.json", 'r', encoding='utf-8') as f:
+                static_recipes = json.load(f)
+                # Marquer comme statiques
+                for r in static_recipes:
+                    r['is_static'] = True
+                all_recipes.extend(static_recipes)
+                print(f"✅ {len(static_recipes)} recettes statiques chargées")
+        
+        # 2. Charger l'historique dynamique UNIFIÉ (nouveau système V2)
+        if has_dynamic:
+            with open(history_file, 'r', encoding='utf-8') as f:
+                dynamic_recipes = json.load(f)
+                print(f"📥 {len(dynamic_recipes)} recettes dynamiques trouvées")
+                
+                # ✅ FILTRE : Ignorer les recettes incomplètes
+                valid_count = 0
+                for r in dynamic_recipes:
+                    # Vérifier que la recette a au minimum un titre ET des ingrédients/étapes
+                    has_content = (
+                        r.get('title') and 
+                        r.get('ingredients') and 
+                        r.get('etapes') and
+                        len(r.get('ingredients', [])) > 0 and
+                        len(r.get('etapes', [])) > 0
+                    )
+                    
+                    if has_content:
+                        r['is_static'] = False
+                        all_recipes.append(r)
+                        valid_count += 1
+                    else:
+                        print(f"⚠️ Recette incomplète ignorée: {r.get('title', 'Sans titre')}")
+                
+                print(f"✅ {valid_count} recettes dynamiques valides ajoutées")
+        
+        # Si aucune recette valide
+        if len(all_recipes) == 0:
+            return """
+            <div style="padding: 40px; text-align: center; background: #FFF3E0; border-radius: 12px;">
+                <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                <h3 style="color: #F57C00;">Aucune recette valide trouvée</h3>
+                <p style="color: #666;">
+                    Les recettes existantes sont incomplètes.<br>
+                    Générez une nouvelle recette pour commencer !
+                </p>
+            </div>
+            """
         
         # Filtrer par type de lait si demandé
         if filter_lait and filter_lait != "Tous":
@@ -6976,7 +6995,6 @@ def view_dynamic_recipes(filter_lait=None):
             by_lait[lait] = by_lait.get(lait, 0) + 1
         
         # Construire HTML
-        
         html = f"""
         <div style="padding: 20px; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); border-radius: 12px;">
             <h2 style="color: #1565C0; margin-top: 0;">
@@ -7036,7 +7054,6 @@ def view_dynamic_recipes(filter_lait=None):
             
             recipe_url = recipe.get('url') or recipe.get('source_url') or recipe.get('link')
             
-            # TOUTES les variables définies AVANT
             bg_color = '#E8F5E9' if source_type == 'scraped' else '#E3F2FD'
             icon = '🔗' if recipe_url else ('🌐' if source_type == 'scraped' else '🤖')
             lait_emoji = emoji_map.get(lait, '❓')
@@ -7051,14 +7068,13 @@ def view_dynamic_recipes(filter_lait=None):
             ingredients = recipe.get('ingredients', [])
             etapes = recipe.get('etapes', [])
             
-            # ✅ DÉBUT du div principal
             html += f"""
                 <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="margin-bottom: 15px;">
                         <div style="font-weight: bold; font-size: 18px; color: #1565C0; margin-bottom: 8px;">
                             {icon} {title}
                         </div>
-                        {f"""
+                        {f'''
                         <div style="margin-bottom: 12px;">
                             <a href="{recipe_url}" target="_blank" 
                             style="display: inline-block; padding: 8px 16px; background: linear-gradient(45deg, #4CAF50, #45a049); 
@@ -7067,7 +7083,7 @@ def view_dynamic_recipes(filter_lait=None):
                                 🚀 Accéder à la recette complète
                             </a>
                         </div>
-                        """ if recipe_url else ""}
+                        ''' if recipe_url else ""}
                         <div style="color: #666; font-size: 14px; font-style: italic;">
                             {description}
                         </div>
@@ -7086,7 +7102,7 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
             """
             
-            # ✅ Ingrédients DANS le div principal
+            # Ingrédients
             if ingredients and len(ingredients) > 0:
                 html += """
                     <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
@@ -7102,7 +7118,7 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
                 """
             
-            # ✅ Étapes DANS le div principal
+            # Étapes
             if etapes and len(etapes) > 0:
                 html += """
                     <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
@@ -7118,11 +7134,15 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
                 """
             
-            # ✅ FIN du div principal
             html += """
-                    </div>
-                """
-
+                </div>
+            """
+        
+        html += """
+                </div>
+            </div>
+        </div>
+        """
         
         return html
         
@@ -7137,8 +7157,7 @@ def view_dynamic_recipes(filter_lait=None):
 {traceback.format_exc()}
             </pre>
         </div>
-        """ 
-        
+        """        
 # CREATE INTERFACE GRADIO
 # ===== create_interface AVEC AUTHENTIFICATION =====
 
@@ -7312,11 +7331,12 @@ def create_interface():
                     3️⃣ Cliquez sur "Générer"
                     
                     **Résultat :**
-                    - Onglet 1 : 📖 Votre recette
+                    - Onglet 1 : 📖 Ma recette
                     - Onglet 2 : 🌐 Recettes web
                     - Onglet 3 : 📚 Base de connaissances
-                    - Onglet 4 : 🕒 Historique
-                    - Onglet 5 : 💬 Expert Fromager
+                    - Onglet 4 : 💬 Expert Fromager
+                    - Onglet 5 : 🎯 Recettes Dynamiques
+                    - Onglet 6 : 🕒 Historique
                     """)
 
             # ===== FONCTIONS LOCALES =====
@@ -7425,7 +7445,7 @@ def create_interface():
             # ===== ONGLETS =====
             with gr.Tabs():
                 # ONGLET 1 : Recette
-                with gr.Tab("📖 Mon fromage"):
+                with gr.Tab("📖 Ma recette"):
                     recipe_output = gr.Textbox(
                         label="Votre recette complète",
                         lines=25,
@@ -7826,6 +7846,8 @@ def create_interface():
                             
                             print(f"✅ Interface: {len(history)} perso + {fallback_count} réf = {total} total")
                             
+                            choices_avec_placeholder = ["→ Sélectionner parmi les recettes"] 
+
                             return [
                                 counter_html,
                                 summary,
