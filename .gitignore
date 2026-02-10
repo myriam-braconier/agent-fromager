@@ -12,4 +12,5 @@ env/
 .idea/
 *.egg-info/
 dist/
-build/
+build/complete_knowledge_base.json
+recipes_history.json
