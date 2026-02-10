@@ -11,28 +11,39 @@ print("=" * 50)
 print("🧪 MODE LOCAL - Chargement .env")
 print("=" * 50)
 
+# IMPORTS
 import time
 import random
 import requests
 import random
-import gradio as gr
 import json
-import os
+import gradio as gr
 from datetime import datetime
+from typing import List, Dict, Optional
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
 
 
-# AJOUTER CES IMPORTS POUR LE CHAT
-import time
-from typing import List, Dict, Optional
+# AJOUTER CES IMPORTS PERSONNALISES
+from unified_recipe_generator_v2_with_batch import UnifiedRecipeGeneratorV2, RecipeFormatter
+from fromage_theme import create_fromage_theme, minimal_css
 
+# ===== FONCTION UTILITAIRE =====
+def nettoyer_titre(titre):
+    """Enlève le numéro et la date du titre d'un fromage"""
+    import re
+    # Enlever "101. " au début
+    titre = re.sub(r'^\d+\.\s*', '', titre)
+    # Enlever " (2026-02-10)" à la fin
+    titre = re.sub(r'\s*\(\d{4}-\d{2}-\d{2}\)$', '', titre)
+    return titre
 
-from unified_recipe_generator_v2_fixed import UnifiedRecipeGeneratorV2, RecipeFormatter
 
 # ===== VARIABLES GLOBALES =====
 fallback_cache = None
 recipe_map = {}
+STATS_CACHE = {'visible': False, 'html': None}
+stats_visible = False
 
 
 class AgentFromagerHF:
@@ -1712,59 +1723,38 @@ class AgentFromagerHF:
             print(f"❌ Erreur get_history: {e}")
             return []
 
-    def _save_to_history(self, ingredients, cheese_type, constraints, recipe_text_or_data):
-        """Sauvegarde une recette dans l'historique (compatible ancien/nouveau)"""
+    def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
+        """Sauvegarde dans l'historique LOCAL ET HF"""
         try:
             history = self._load_history()
             
-            # Déterminer si c'est du texte ou des données structurées
-            if isinstance(recipe_text_or_data, dict):
-                # Nouveau format (recipe_data)
-                recipe_text = RecipeFormatter.format_to_text(recipe_text_or_data)
-                cheese_name = recipe_text_or_data.get('title', 'Fromage personnalisé')
-                generation_mode = recipe_text_or_data.get('generation_mode', 'unknown')
-            else:
-                # Ancien format (texte)
-                recipe_text = recipe_text_or_data
-                
-                # Parser le titre depuis le texte
-                recipe_lines = recipe_text.split("\n")
-                cheese_name = "Fromage personnalisé"
-                
-                for line in recipe_lines:
-                    if "║" in line and len(line) < 200 and len(line) > 10:
-                        cleaned = line.replace("║", "").replace("═", "").replace("╔", "").replace("╚", "").strip()
-                        # Retirer les icônes et garder juste le texte
-                        import re
-                        # Retirer les emojis et parenthèses
-                        cleaned = re.sub(r'[📋🤖🌐📚]', '', cleaned)
-                        cleaned = re.sub(r'\(.*?\)', '', cleaned).strip()
-                        
-                        if cleaned and len(cleaned) > 3:
-                            cheese_name = cleaned
-                            break
-                
-                generation_mode = 'classic'
+            # ===== EXTRACTION DU NOM DU FROMAGE =====
+            cheese_name = self._extract_cheese_name(recipe)
+            print(f"📝 Nom final sauvegardé: '{cheese_name}'")
             
+            # ===== CRÉATION DE L'ENTRÉE =====
             entry = {
                 "id": len(history) + 1,
                 "date": datetime.now().isoformat(),
                 "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "cheese_name": cheese_name,
                 "ingredients": ingredients,
-                "cheese_type": cheese_type,
+                "type": cheese_type,
                 "constraints": constraints,
-                "recipe_complete": recipe_text,
-                "recipe_preview": recipe_text[:300] + "..." if len(recipe_text) > 300 else recipe_text,
-                "generation_mode": generation_mode
+                "recipe_complete": recipe,
+                "recipe_preview": recipe[:300] + "..." if len(recipe) > 300 else recipe
             }
             
+            # ===== SAUVEGARDE =====
             history.append(entry)
+            history = history[-100:]  # Garder les 100 dernières recettes
             
             with open(self.recipes_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
             
             self.history = history
+            
+            # Upload vers HuggingFace si configuré
             self._upload_history_to_hf()
             
             print(f"✅ Recette #{entry['id']} sauvegardée : {cheese_name}")
@@ -1776,6 +1766,51 @@ class AgentFromagerHF:
             traceback.print_exc()
             return False
         
+    def _extract_cheese_name(self, recipe):
+        """Extrait le nom du fromage de la recette"""
+        import re
+        print("🆕 NOUVELLE VERSION _extract_cheese_name appelée")
+        
+        recipe_lines = recipe.split("\n")
+        print(f"📊 Nombre de lignes: {len(recipe_lines)}")
+        
+        # Le titre est TOUJOURS à la ligne 2
+        if len(recipe_lines) > 2:
+            title_line = recipe_lines[2]
+            print(f"🔍 Ligne [2]: {repr(title_line)}")
+            
+            if "║" in title_line:
+                # Nettoyer : enlever ║
+                name = title_line.replace("║", "").strip()
+                print(f"  Après suppression ║: {repr(name)}")
+                
+                # Enlever TOUS les emojis (y compris 📋)
+                name = re.sub(r'[\U0001F300-\U0001F9FF]', '', name).strip()
+                print(f"  Après suppression emojis: {repr(name)}")
+                
+                # ===== MODIFICATION ICI : Enlever le code (#...) =====
+                name = re.sub(r'\s*\(#\d+\)\s*$', '', name).strip()
+                print(f"  Après suppression code: {repr(name)}")
+                # ===== FIN MODIFICATION =====
+                
+                print(f"  Longueur: {len(name)}")
+                print(f"  Contient '(' dans name nettoyé: {('(' in name)}")
+                print(f"  Contient 'Profil:': {('Profil:' in name)}")
+                
+                # ===== CHANGEMENT : vérifier dans 'name' au lieu de 'title_line' =====
+                if name and len(name) > 3 and "(" not in name and "Profil:" not in name:
+                    print(f"✅ Titre extrait ligne [2]: '{name}'")
+                    return name
+                else:
+                    print(f"❌ Conditions non remplies")
+            else:
+                print(f"❌ Pas de ║ dans la ligne")
+        else:
+            print(f"❌ Pas assez de lignes")
+        
+        print("⚠️ Titre par défaut utilisé")
+        return "Fromage personnalisé"
+    
     def get_knowledge_summary(self):
         """Retourne un résumé complet de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
@@ -3350,21 +3385,19 @@ class AgentFromagerHF:
             except:
                 return []
         return []
-
+    
     def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
         """Sauvegarde dans l'historique LOCAL ET HF"""
+        print("🔵 DÉBUT _save_to_history") 
         try:
             history = self._load_history()
-
-            recipe_lines = recipe.split("\n")
-            cheese_name = "Fromage personnalisé"
-            for line in recipe_lines:
-                if "🧀" in line and len(line) < 100:
-                    cheese_name = (
-                        line.replace("🧀", "").replace("═", "").replace("║", "").strip()
-                    )
-                    break
-
+            print(f"📚 Historique chargé: {len(history)} recettes")
+            
+            # ===== EXTRACTION DU NOM =====
+            cheese_name = self._extract_cheese_name(recipe)
+            print(f"📝 Nom final sauvegardé: '{cheese_name}'")
+            
+            # ===== CRÉATION DE L'ENTRÉE =====
             entry = {
                 "id": len(history) + 1,
                 "date": datetime.now().isoformat(),
@@ -3375,16 +3408,22 @@ class AgentFromagerHF:
                 "recipe_complete": recipe,
                 "recipe_preview": recipe[:300] + "..." if len(recipe) > 300 else recipe,
             }
-
+            
+            print(f"✅ Entrée créée: ID={entry['id']}, Nom='{cheese_name}'")
+            
             history.append(entry)
             history = history[-100:]
-
+            
+            print(f"💾 Sauvegarde de {len(history)} recettes dans {self.recipes_file}")
             with open(self.recipes_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
-
+            
+            # ===== NOUVEAU : SAUVEGARDER AUSSI DANS complete_knowledge_base.json =====
+            self._save_to_complete_kb(entry, cheese_name, cheese_type, ingredients, recipe)
+            # ===== FIN NOUVEAU =====
+            
             # ✅ FORCE RETRY HF (3 tentatives)
             import time
-
             for i in range(3):
                 sync_success = self._upload_history_to_hf()
                 if sync_success:
@@ -3394,13 +3433,78 @@ class AgentFromagerHF:
                 time.sleep(1)
             else:
                 print(f"⚠️  Recette #{entry['id']} sauvegardée localement (HF échoué)")
-
+            
             return True
-
+            
         except Exception as e:
-            print(f"❌ Erreur sauvegarde: {e}")
+            print(f"❌ ERREUR _save_to_history: {e}")
+            import traceback
+            traceback.print_exc()
             return False
-
+     
+     
+    def _save_to_complete_kb(self, entry, cheese_name, cheese_type, ingredients, recipe):
+        """Sauvegarde aussi dans complete_knowledge_base.json pour l'affichage"""
+        try:
+            import os
+            import json
+            
+            kb_file = "complete_knowledge_base.json"
+            
+            # Charger la base existante
+            if os.path.exists(kb_file):
+                with open(kb_file, 'r', encoding='utf-8') as f:
+                    kb = json.load(f)
+            else:
+                kb = []
+            
+            # Créer l'entrée pour complete_knowledge_base
+            kb_entry = {
+                "title": cheese_name,  # ← Titre propre SANS numéro ni date
+                "description": f"Recette personnalisée - {cheese_type}",
+                "source_type": "user_generated",
+                "url": "",
+                "lait": self._extract_lait_from_text(' '.join(ingredients)),
+                "type_pate": cheese_type,
+                "score": 10,
+                "difficulte": "Personnalisée",
+                "duree_totale": "Variable",
+                "ingredients": ingredients,
+                "etapes": self._extract_steps_from_recipe(recipe),
+                "date_creation": entry["date"]
+            }
+            
+            kb.append(kb_entry)
+            
+            # Sauvegarder
+            with open(kb_file, 'w', encoding='utf-8') as f:
+                json.dump(kb, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Recette ajoutée à complete_knowledge_base.json")
+            
+        except Exception as e:
+            print(f"⚠️ Erreur sauvegarde complete_kb: {e}")
+       
+       
+    def _extract_steps_from_recipe(self, recipe):
+        """Extrait les étapes de la recette pour l'affichage"""
+        try:
+            # Chercher des lignes qui commencent par des numéros ou des tirets
+            import re
+            lines = recipe.split('\n')
+            steps = []
+            for line in lines:
+                line = line.strip()
+                # Capture "1. ", "- ", "• ", etc.
+                if re.match(r'^(\d+\.|\-|\•|\*)\s+', line):
+                    # Enlever le marqueur
+                    step = re.sub(r'^(\d+\.|\-|\•|\*)\s+', '', line)
+                    if step:
+                        steps.append(step)
+            return steps[:15]  # Max 15 étapes
+        except:
+            return []
+           
     def get_history(self):
         """Retourne l'historique complet"""
         return self._load_history()
@@ -3735,6 +3839,7 @@ class AgentFromagerHF:
         self._save_to_history(ingredients_list, cheese_type_clean, constraints, adapted_recipe)
         
         return adapted_recipe    
+    
     def adapt_recipe_to_profile_advanced(
         self, recipe: str, profile: str, ingredients: list, cheese_type: str
     ) -> str:
@@ -6500,7 +6605,7 @@ def generate_all(
             "",  # 2. Statut de recherche (Textbox)
             cards_html,  # 3. Cartes web (HTML)
             summary,  # 4. Historique mis à jour (Textbox)
-            gr.Dropdown(choices=choices, value=None),  # 5. Liste pour dropdown (LIST)
+            gr.update(choices=choices, value="→ Sélectionner parmi les recettes"),  # 5. ✅ CORRECTION
             "",  # 6. Effacer l'affichage précédent (Textbox)
         )
 
@@ -6694,7 +6799,8 @@ def view_knowledge_base():
         
         # Afficher TOUTES les recettes avec TOUS les détails
         for i, recipe in enumerate(recipes, 1):
-            title = recipe.get('title', 'Sans titre')
+            title_brut = recipe.get('title', 'Sans titre')
+            title = nettoyer_titre(title_brut)  # ← MODIFICATION ICI
             description = recipe.get('description', 'Pas de description')
             url = str(recipe.get('url') or recipe.get('source') or '#') 
             source_type = recipe.get('source_type', 'unknown')
@@ -6796,17 +6902,16 @@ def view_knowledge_base():
 {traceback.format_exc()}
             </pre>
         </div>
-        """
- 
+        """ 
 def view_dynamic_recipes(filter_lait=None):
     """Affiche TOUTES les recettes : statiques + dynamiques"""
     import os
     import json
     from datetime import datetime
     
-    
-    history_file = "unified_recipes_history.json" 
     all_recipes = []
+    history_file = "unified_recipes_history.json" 
+   
     
     # 1. Charger la base statique (si elle existe)
     if os.path.exists("complete_knowledge_base.json"):
@@ -6817,14 +6922,26 @@ def view_dynamic_recipes(filter_lait=None):
                 r['is_static'] = True
             all_recipes.extend(static_recipes)
     
-    # 2. Charger l'historique dynamique (si il existe)
+    # 2. Charger l'historique dynamique UNIFIÉ (nouveau système V2)
     if os.path.exists("unified_recipes_history.json"):
         with open("unified_recipes_history.json", 'r', encoding='utf-8') as f:
             dynamic_recipes = json.load(f)
-            # Marquer comme dynamiques
+            # ✅ FILTRE : Ignorer les recettes incomplètes
             for r in dynamic_recipes:
-                r['is_static'] = False
-            all_recipes.extend(dynamic_recipes)
+                # Vérifier que la recette a au minimum un titre ET des ingrédients/étapes
+                has_content = (
+                    r.get('title') and 
+                    r.get('ingredients') and 
+                    r.get('etapes') and
+                    len(r.get('ingredients', [])) > 0 and
+                    len(r.get('etapes', [])) > 0
+                )
+                
+                if has_content:
+                    r['is_static'] = False
+                    all_recipes.append(r)
+                else:
+                    print(f"⚠️ Recette incomplète ignorée: {r.get('title', 'Sans titre')}")
     
     # Filtrer par type de lait
     if filter_lait and filter_lait != "Tous":
@@ -7025,22 +7142,18 @@ def view_dynamic_recipes(filter_lait=None):
 # CREATE INTERFACE GRADIO
 # ===== create_interface AVEC AUTHENTIFICATION =====
 
-print("="*60)
-print("🔍 DEBUG AUTHENTIFICATION")
-print(f"AUTH_USERNAME chargé : {AUTH_USERNAME}")
-print(f"AUTH_PASSWORD chargé : {AUTH_PASSWORD}")
-print(f"Longueur password : {len(AUTH_PASSWORD) if AUTH_PASSWORD else 0}")
-print("="*60)
-
 def create_interface():
-    """Interface avec authentification et génération simultanée"""
-
     import gradio as gr
     import json
     import os
-
-    # Définir custom_css
+    
+    
+    # Définir custom_css (TON CODE ORIGINAL)
     custom_css = """
+    #date_str, #lait_emoji, #type_pate, #duree_affinage, #temperature {
+        color: black !important;
+        background: #FFFEF5 !important;  /* Fond crème pour contraste */
+    }
     .no-recipes {
         text-align: center;
         padding: 40px;
@@ -7072,15 +7185,15 @@ def create_interface():
     }
     """
     
-    with gr.Blocks(
-        title="🧀 Agent Fromager - Authentification",
-        theme=gr.themes.Soft(primary_hue="orange", secondary_hue="amber"),
-        head=f"""
-            <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">
-            {custom_css}
-        """,
-    ) as demo:
+    # Créer le thème
+    fromage_theme = create_fromage_theme()
     
+    with gr.Blocks(
+        title="🧀 Agent Fromager",
+        theme=fromage_theme,
+        css=minimal_css,  # ✅ Ton CSS
+        head='<link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">',
+    ) as demo:
     
         gr.HTML(f"<style>{custom_css}</style>", visible=False)
         
@@ -7136,6 +7249,7 @@ def create_interface():
                 with gr.Column(scale=2):
                     ingredients_input = gr.Textbox(
                         label="🥛 Ingrédients disponibles",
+                        elem_id="nom_variable",
                         placeholder="Ex: lait de chèvre, présure, sel, herbes",
                         lines=3,
                     )
@@ -7459,7 +7573,7 @@ def create_interface():
                 # Les nouvelles recettes de la base enrichie seront utilisées automatiquement !
                 # """)
                 
-                # Connexions
+                # # Connexions
                 # enrich_btn.click(
                 #     fn=enrich_knowledge_base,
                 #     outputs=knowledge_output
@@ -7611,7 +7725,7 @@ def create_interface():
                             
                             return [
                                 "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",
-                                gr.update(value="🔢 Compter", variant="secondary")  # UN SEUL UPDATE
+                                gr.update(value="🔢 Statistiques", variant="secondary")  # UN SEUL UPDATE
                             ]
                     
                     def get_fallback_count():
@@ -7634,13 +7748,6 @@ def create_interface():
                      
                     
                     def update_interface():
-                        """Évite les boucles au démarrage"""
-                        # Vérifie si c'est le 1er appel (Gradio passe info)
-                        import threading
-                        if not hasattr(update_interface, 'first_run'):
-                            update_interface.first_run = False
-                            return
-                        
                         """Actualise TOUTE l'interface - COMPTE RÉEL"""
                         global stats_visible
                         
@@ -7652,7 +7759,7 @@ def create_interface():
                             
                             # 1. Récupérer données
                             history = agent.get_history()
-                            fallback_count = get_fallback_count()  # ← Nombre RÉEL
+                            fallback_count = get_fallback_count()
                             
                             print(f"📊 Histoire réelle: {len(history)} entrées")
                             print(f"📊 Contenu histoire:")
@@ -7704,12 +7811,11 @@ def create_interface():
                             
                             for entry in reversed(history):
                                 entry_id = entry.get('id')
-                                entry_name = entry.get('cheese_name', f"Recette #{entry_id}")
+                                entry_name = entry.get('cheese_name') or entry.get('name') or entry.get('titre') or f"Recette #{entry_id}"
                                 date = entry.get('date', '')[:10] if entry.get('date') else 'sans date'
                                 
                                 display_text = f"{entry_id}. {entry_name} ({date})"
                                 
-                                # Vérifier les doublons (au cas où)
                                 if display_text not in recipe_map:
                                     choices.append(display_text)
                                     recipe_map[display_text] = entry_id
@@ -7719,17 +7825,17 @@ def create_interface():
                             
                             print(f"✅ Dropdown créé avec {len(choices)} choix uniques")
                             
-                            choices_with_placeholder = ["Sélectionner parmi les recettes 👉"] + choices
+                            # ===== CORRECTION : Utiliser le même placeholder =====
+                            choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
                             
                             print(f"✅ Interface: {len(history)} perso + {fallback_count} réf = {total} total")
                             
                             return [
                                 counter_html,
                                 summary,
-                                # ✅ CHANGEMENT : Utiliser gr.update() pour mettre à jour le Dropdown
                                 gr.update(
-                                    choices=choices_with_placeholder,              # Les choix avec placeholder
-                                    value="Sélectionner parmi les recettes 👉"     
+                                    choices=choices_with_placeholder,
+                                    value="→ Sélectionner parmi les recettes"  # ← CORRIGÉ
                                 ),
                                 "Sélectionnez une recette...",
                             ]
@@ -7738,16 +7844,18 @@ def create_interface():
                             print(f"❌ Erreur update_interface: {e}")
                             import traceback
                             traceback.print_exc()
+                            
+                            # ===== CORRECTION : Retourner 4 valeurs en cas d'erreur =====
                             return [
                                 f"<div style='color: red;'>Erreur: {str(e)[:50]}</div>",
                                 f"Erreur: {str(e)}",
-                                [],
+                                gr.update(
+                                    choices=["→ Sélectionner parmi les recettes"],
+                                    value="→ Sélectionner parmi les recettes"
+                                ),
                                 f"Erreur: {str(e)}",
-                                "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",
-                                "🔢 Compter",
-                                "secondary"
                             ]
-                    
+                           
                     def show_stats():
                         """Affiche les statistiques RÉELLES"""
                         try:
@@ -7948,9 +8056,9 @@ def create_interface():
                                 "✅ Historique effacé !",  # history_summary
                                 [],                        # recipe_dropdown
                                 "✅ Historique effacé",    # recipe_display
-                                "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",  # stats_display
-                                "🔢 Compter",              # count_btn texte
-                                "secondary"                # count_btn style
+                                # "<div style='padding: 20px; text-align: center; color: #666;'>Cliquez sur 'Compter' pour voir les statistiques</div>",  # stats_display
+                                # "🔢 Statistiques",              # count_btn texte
+                                # "secondary"                # count_btn style
                             ]
                             
                         except Exception as e:
@@ -7960,7 +8068,7 @@ def create_interface():
                                 [],
                                 f"Erreur: {str(e)}",
                                 f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>",
-                                "🔢 Compter",
+                                "🔢 Statistiques",
                                 "secondary"
                             ]
                     
@@ -8128,12 +8236,12 @@ def create_interface():
                         outputs=[
                             counter_card,      # 0
                             history_summary,   # 1
-                            recipe_dropdown,  # 3 choices
+                            recipe_dropdown,  # 2 choices
                             recipe_display,    # 4
                         ]
                     )
                     
-                    # Bouton Compter (TOGGLE)
+                    # Bouton Statistiques (TOGGLE)
                     count_btn.click(
                         fn=toggle_stats,
                         inputs=[],
