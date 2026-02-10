@@ -7190,9 +7190,6 @@ def create_interface():
     
     with gr.Blocks(
         title="🧀 Agent Fromager",
-        theme=fromage_theme,
-        css=minimal_css,  # ✅ Ton CSS
-        head='<link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">',
     ) as demo:
     
         gr.HTML(f"<style>{custom_css}</style>", visible=False)
@@ -9062,10 +9059,13 @@ if __name__ == "__main__":
 
     if interface:
         interface.launch(
-            share=True,
-            server_name="0.0.0.0",
-            server_port=7860,
-            debug=False
-        )
+        share=True,
+        server_name="0.0.0.0",
+        server_port=7860,
+        debug=False,
+        theme=fromage_theme,      # ← AJOUTER
+        css=minimal_css,          # ← AJOUTER
+        head='<link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">',  # ← AJOUTER
+    )
     else:
         print("❌ Erreur: create_interface() a retourné None")
