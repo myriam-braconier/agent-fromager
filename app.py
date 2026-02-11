@@ -5740,38 +5740,36 @@ Génère le support pédagogique."""
     def _generate_creative_name(self, cheese_type, ingredients):
         """Génère un nom créatif pour le fromage"""
         ingredients_str = " ".join(ingredients).lower()
-
-        # Briques génériques
+        
+        # Briques génériques par défaut
         base = ["Velours", "Délice", "Nuage", "Trésor", "Secret", "Essence"]
         lieu = ["de Cave", "du Terroir", "des Prés", "Lacté", "Artisan"]
         style = ["Fondant", "Rustique", "Crémeux", "Affiné", "Doux"]
-
-        if "chèvre" in ingredients_str:
+        
+        # Adapter selon les ingrédients
+        if "chèvre" in ingredients_str or "chevre" in ingredients_str:
             base = ["Chèvre", "Caprice", "Blanc"]
-            qualifier = ["des Prés", "Lacté", "Frais"]
+            lieu = ["des Prés", "Lacté", "Frais"]
         elif "brebis" in ingredients_str:
             base = ["Brebis", "Douceur", "Trésor"]
-            qualifier = ["Pastorale", "de Bergère", "Montagnard"]
-        elif "herbe" in ingredients_str or "épice" in ingredients_str:
+            lieu = ["Pastorale", "de Bergère", "Montagnard"]
+        elif "herbe" in ingredients_str or "épice" in ingredients_str or "epice" in ingredients_str:
             base = ["Jardin", "Bouquet", "Pré"]
-            qualifier = ["Fromager", "Lacté", "Fleuri"]
+            lieu = ["Fromager", "Lacté", "Fleuri"]
+        # Adapter selon le type
         elif "frais" in cheese_type.lower():
             base = ["Blanc", "Nuage", "Fraîcheur"]
-            qualifier = ["Matinale", "Lactée", "Pure"]
+            lieu = ["Matinale", "Lactée", "Pure"]
         elif "molle" in cheese_type.lower():
             base = ["Velours", "Crème", "Délice"]
-            qualifier = ["de Cave", "d'Artisan", "Fondant"]
-        elif "pressée" in cheese_type.lower():
+            lieu = ["de Cave", "d'Artisan", "Fondant"]
+        elif "pressée" in cheese_type.lower() or "pressee" in cheese_type.lower():
             base = ["Roc", "Meule", "Pierre"]
-            qualifier = ["du Terroir", "Tradition", "Lactée"]
-        else:
-            base = base
-            qualifier = ["Maison", "Artisanale", "Fromagère"]
-
-        return (
-            f"{self.rng.choice(base)} {self.rng.choice(lieu)} {self.rng.choice(style)}"
-        )
-
+            lieu = ["du Terroir", "Tradition", "Lactée"]
+        
+        # Générer le nom
+        return f"{self.rng.choice(base)} {self.rng.choice(lieu)} {self.rng.choice(style)}"
+    
     def _format_user_ingredients(self, ingredients):
         """Formate joliment les ingrédients utilisateur"""
         formatted = ""
