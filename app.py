@@ -4394,21 +4394,33 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         print(f"🔍 DEBUG: Type de lait détecté/défini: {lait}")
         
+      
         
         # ✅ CORRECT - Passer les deux paramètres
         generator = UnifiedRecipeGeneratorV2(knowledge_base=self.knowledge_base, agent=self)
-        
-        print("🔍 DEBUG: Appel du générateur._generate_with_llm_and_knowledge()")
-        
-        # Appeler avec les bons paramètres
-        recipe_data = generator._generate_with_llm_and_knowledge(
-            ingredients=ingredients_list,
-            cheese_type=cheese_type,
-            lait=lait,
-            profile=profile,
-            constraints=constraints,
-            creativity_level=creativity
-        )
+    
+        # Maintenant on peut utiliser generator
+        if creativity == 0:
+            # Base statique uniquement (pas de LLM)
+            print("🔍 DEBUG: Appel du générateur._generate_from_static_knowledge()")
+            recipe_data = generator._generate_from_static_knowledge(
+                ingredients=ingredients_list,
+                cheese_type=cheese_type,
+                lait=lait,
+                profile=profile,
+                constraints=constraints
+            )
+        else:
+            # Niveaux 1, 2, 3 : LLM avec scraping
+            print("🔍 DEBUG: Appel du générateur._generate_with_llm_and_knowledge()")
+            recipe_data = generator._generate_with_llm_and_knowledge(
+                ingredients=ingredients_list,
+                cheese_type=cheese_type,
+                lait=lait,
+                profile=profile,
+                constraints=constraints,
+                creativity_level=creativity
+            )
         
         print(f"🔍 DEBUG: Recette générée: {recipe_data.get('title') if recipe_data else 'None'}")
         
