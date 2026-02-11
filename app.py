@@ -6940,7 +6940,7 @@ def view_knowledge_base():
         # Normaliser la clé et rechercher l'emoji
         for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
             # Normaliser : minuscules et sans espaces superflus
-            lait_normalized = lait.lower().strip()
+            lait_normalized = (lait or "").lower().strip()
             
             # Chercher l'emoji
             emoji = emoji_map.get(lait_normalized, '❓')
@@ -7247,7 +7247,7 @@ def view_dynamic_recipes(filter_lait=None):
         # Normaliser la clé et rechercher l'emoji
         for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
             # Normaliser : minuscules et sans espaces superflus
-            lait_normalized = lait.lower().strip()
+            lait_normalized = (lait or "").lower().strip()
             
             # Chercher l'emoji
             emoji = emoji_map.get(lait_normalized, '❓')
