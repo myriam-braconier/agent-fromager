@@ -7454,7 +7454,7 @@ def create_interface():
                     gr.Markdown("""
                     ### 💡 Comment ça marche ?
                     
-                    1️⃣ Entrez vos ingrédients
+                    1️⃣ Entrez vos ingrédients séparés par une virgule
                     
                     2️⃣ Ajustez les micro-choix
                     
