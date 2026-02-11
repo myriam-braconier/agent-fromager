@@ -6501,6 +6501,7 @@ Adaptations suggérées selon vos contraintes.
                         "temperature": temperature,  # ✅ CORRIGÉ : utilise le paramètre
                         "max_tokens": max_tokens,    # ✅ CORRIGÉ : utilise le paramètre
                         "stream": False,
+                        "seed": 42  # ✅ Seed fixe pour reproductibilité
                     }
 
                     response = requests.post(
