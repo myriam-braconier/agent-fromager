@@ -6720,7 +6720,7 @@ def generate_all(
         # MAINTENANT : Il faut que votre callback Gradio ATTENDE 6 éléments !
         
         # IMPORTANT: Ajoutez le placeholder au début
-        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] +
+        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
         
         return (
             recipe,  # 1. La recette générée (Textbox)
