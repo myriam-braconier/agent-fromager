@@ -252,7 +252,17 @@ class UnifiedRecipeGeneratorV2:
         # Seed basé sur les ingrédients
         ingredients_str = ",".join(sorted(ingredients))
         seed = int(hashlib.md5(ingredients_str.encode()).hexdigest()[:8], 16) % 1000
-        random.seed(seed)
+        
+        # ✅ Générer le nom créatif du fromage
+        try:
+            cheese_name = self._generate_creative_name(cheese_type, ingredients)
+            print(f"🧀 Nom créatif généré: {cheese_name}")
+        except Exception as e:
+            # Fallback si la génération échoue
+            print(f"⚠️ Erreur génération nom: {e}, utilisation nom par défaut")
+            cheese_name = cheese_type.replace("_", " ").title()
+            
+            random.seed(seed)
         
         # Contexte profil
         profile_context = self._get_profile_context(profile)
@@ -1256,6 +1266,7 @@ class UnifiedRecipeGeneratorV2:
     # ===============================================================
     
     def _generate_with_llm_and_knowledge(
+        
         self,
         ingredients: List[str],
         cheese_type: str,
@@ -1264,6 +1275,7 @@ class UnifiedRecipeGeneratorV2:
         constraints: str
     ) -> Optional[Dict]:
         """Génère avec LLM en utilisant le contexte complet de la base statique"""
+        
         
         
         print("=" * 80)
@@ -1576,6 +1588,49 @@ GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
             print(f"🔍 DEBUG: Type de json_str = {type(json_str)}")
             print(f"🔍 DEBUG: json_str vide ? {len(json_str.strip()) == 0}")
             
+            # ✅ NETTOYAGE AGRESSIF DU JSON
+            import re
+            
+            print("🧹 Nettoyage agressif du JSON...")
+            json_original_length = len(json_str)
+            
+            # Supprimer TOUS les caractères de formatage markdown
+            json_str = json_str.replace('*', '')
+            json_str = json_str.replace('_', '')
+            json_str = json_str.replace('#', '')
+            json_str = json_str.replace('`', '')
+            
+            # Normaliser les guillemets typographiques
+            json_str = json_str.replace(''', "'")
+            json_str = json_str.replace(''', "'")
+            json_str = json_str.replace('"', '"')
+            json_str = json_str.replace('"', '"')
+            
+            # Supprimer les virgules avant ] ou }
+            json_str = re.sub(r',(\s*[\]}])', r'\1', json_str)
+            
+            # Supprimer les doubles virgules
+            json_str = re.sub(r',,+', ',', json_str)
+            
+            # Réparer les deux-points manquants après les clés
+            json_str = re.sub(r'"\s+"', '": "', json_str)
+            json_str = re.sub(r'"\s+\[', '": [', json_str)
+            json_str = re.sub(r'"\s+\{', '": {', json_str)
+            
+            # Normaliser les espaces multiples (mais garder les sauts de ligne)
+            json_str = re.sub(r'  +', ' ', json_str)
+            
+            chars_removed = json_original_length - len(json_str)
+            print(f"🧹 Nettoyage terminé: {chars_removed} caractères supprimés/modifiés")
+            print(f"🔍 JSON nettoyé ({len(json_str)} caractères)")
+            
+            # Afficher un extrait du JSON nettoyé
+            print(f"🔍 DEBUG: Premiers 300 caractères après nettoyage:")
+            print(json_str[:300])
+            print(f"🔍 DEBUG: Derniers 200 caractères après nettoyage:")
+            print(json_str[-200:])
+            
+            
             if not json_str or len(json_str.strip()) == 0:
                 print("❌ ERREUR CRITIQUE: json_str est vide !")
                 print(f"❌ start_idx = {start_idx}")
@@ -1595,6 +1650,13 @@ GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
                 recipe_data = json.loads(json_str)
                 print("✅ DEBUG: JSON parsé avec succès !")
                 
+                # ✅ NORMALISER LE SCORE ICI
+                if 'score' in recipe_data:
+                    score = recipe_data['score']
+                    if isinstance(score, (int, float)) and score > 10:
+                        recipe_data['score'] = round(score / 10, 1)
+                        print(f"🔧 Score normalisé: {score} → {recipe_data['score']}")  # ✅ Guillemet ajouté
+                
                 # Validation
                 required_fields = ['title', 'etapes', 'ingredients']
                 for field in required_fields:
@@ -1611,8 +1673,8 @@ GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
                 print(f"⚠️ Position: ligne {e.lineno}, col {e.colno}, pos {e.pos}")
                 print("🔧 Tentative de réparation automatique...")
                 
+                # Tentative 1 : Nettoyage et réparation
                 try:
-                    # Nettoyage basique d'abord
                     json_cleaned = json_str
                     json_cleaned = json_cleaned.replace('*', '')
                     json_cleaned = json_cleaned.replace('_', '')
@@ -1623,66 +1685,158 @@ GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
                     json_cleaned = json_cleaned.replace('"', '"')
                     json_cleaned = json_cleaned.replace('"', '"')
                     
-                    # Utiliser json-repair pour réparer le JSON
+                    # Essayer json-repair si disponible
                     try:
                         from json_repair import repair_json
                         json_repaired = repair_json(json_cleaned)
-                        print("✅ Réparation avec json-repair réussie")
+                        recipe_data = json.loads(json_repaired)
+                        print("✅ JSON réparé avec json-repair !")
+                        
+                        # ✅ NORMALISER LE SCORE ICI (bien indenté maintenant)
+                        if 'score' in recipe_data:
+                            score = recipe_data['score']
+                            if isinstance(score, (int, float)) and score > 10:
+                                recipe_data['score'] = round(score / 10, 1)
+                                print(f"🔧 Score normalisé: {score} → {recipe_data['score']}")
+                        
+                        # Validation
+                        required_fields = ['title', 'etapes', 'ingredients']
+                        for field in required_fields:
+                            if not recipe_data.get(field):
+                                print(f"⚠️ Champ manquant: {field}")
+                        
+                        return recipe_data
+                        
                     except ImportError:
-                        print("⚠️ json-repair non disponible, réparation manuelle...")
-                        import re
-                        json_repaired = json_cleaned
-                        # Réparations manuelles
-                        json_repaired = re.sub(r'"\s+"', '": "', json_repaired)
-                        json_repaired = re.sub(r'"\s+\[', '": [', json_repaired)
-                        json_repaired = re.sub(r'"\s+\{', '": {', json_repaired)
-                        json_repaired = re.sub(r',(\s*[\]}])', r'\1', json_repaired)
-                        json_repaired = re.sub(r',,+', ',', json_repaired)
+                        print("⚠️ json-repair non disponible")
+                        
+                    except ImportError:
+                        print("⚠️ json-repair non disponible")
+                        
+                        # ✅ DEBUG : Afficher le contexte de l'erreur
+                        if e.pos and e.pos < len(json_cleaned):
+                            start = max(0, e.pos - 200)
+                            end = min(len(json_cleaned), e.pos + 200)
+                            print(f"\n🔍 CONTEXTE DE L'ERREUR (pos {e.pos}):")
+                            print("=" * 80)
+                            context = json_cleaned[start:end]
+                            marker_pos = e.pos - start
+                            print(context[:marker_pos] + " <<<ERREUR_ICI>>> " + context[marker_pos:])
+                            print("=" * 80)
+                    except Exception as repair_err:
+                        print(f"⚠️ json-repair a échoué: {repair_err}")
                     
-                    # Afficher contexte avant/après
-                    if e.pos and e.pos < len(json_str):
-                        start = max(0, e.pos - 150)
-                        end = min(len(json_str), e.pos + 150)
-                        print(f"\n🔍 Contexte erreur (pos {e.pos}):")
-                        print(json_str[start:e.pos] + " <<<ICI>>> " + json_str[e.pos:end])
+                    # Tentative 2 : Réparation manuelle
+                    import re
+                    json_repaired = json_cleaned
+                    json_repaired = re.sub(r'"\s+"', '": "', json_repaired)
+                    json_repaired = re.sub(r'"\s+\[', '": [', json_repaired)
+                    json_repaired = re.sub(r'"\s+\{', '": {', json_repaired)
+                    json_repaired = re.sub(r',(\s*[\]}])', r'\1', json_repaired)
+                    json_repaired = re.sub(r',,+', ',', json_repaired)
                     
                     recipe_data = json.loads(json_repaired)
-                    print("✅ JSON réparé et parsé avec succès !")
+                    print("✅ JSON réparé manuellement !")
                     
-                    # Validation
-                    required_fields = ['title', 'etapes', 'ingredients']
-                    for field in required_fields:
-                        if not recipe_data.get(field):
-                            print(f"⚠️ Champ manquant: {field}")
-                    
-                    print(f"   ✅ Recette: {recipe_data.get('title', 'Sans titre')}")
-                    print(f"   🔢 {len(recipe_data.get('etapes', []))} étapes")
+                    # ✅ NORMALISER LE SCORE ICI AUSSI
+                    if 'score' in recipe_data:
+                        score = recipe_data['score']
+                        if isinstance(score, (int, float)) and score > 10:
+                            recipe_data['score'] = round(score / 10, 1)
+                            print(f"🔧 Score normalisé: {score} → {recipe_data['score']}")
                     
                     return recipe_data
                     
                 except Exception as repair_error:
-                    print(f"❌ Échec réparation: {repair_error}")
+                    print(f"❌ Toutes les réparations ont échoué: {repair_error}")
                     
-                    # Sauvegarder pour analyse
-                    try:
-                        import os
-                        save_path = '/tmp/json_error.txt' if os.path.exists('/tmp') else 'json_error.txt'
-                        with open(save_path, 'w', encoding='utf-8') as f:
-                            f.write(f"=== ERREUR ORIGINALE ===\n")
-                            f.write(f"{e}\n")
-                            f.write(f"Position: ligne {e.lineno}, col {e.colno}, pos {e.pos}\n\n")
-                            f.write(f"=== JSON ORIGINAL ===\n")
-                            f.write(json_str)
-                            f.write(f"\n\n=== JSON NETTOYÉ ===\n")
-                            f.write(json_cleaned if 'json_cleaned' in locals() else 'N/A')
-                            if 'json_repaired' in locals():
-                                f.write(f"\n\n=== JSON RÉPARÉ ===\n")
-                                f.write(json_repaired)
-                        print(f"💾 Détails sauvegardés: {save_path}")
-                    except:
-                        pass
+                    # Tentative 2 : Réparation manuelle
+                    import re
+                    json_repaired = json_cleaned
+                    json_repaired = re.sub(r'"\s+"', '": "', json_repaired)
+                    json_repaired = re.sub(r'"\s+\[', '": [', json_repaired)
+                    json_repaired = re.sub(r'"\s+\{', '": {', json_repaired)
+                    json_repaired = re.sub(r',(\s*[\]}])', r'\1', json_repaired)
+                    json_repaired = re.sub(r',,+', ',', json_repaired)
                     
-                    raise ValueError(f"JSON invalide et irréparable: {e}")
+                    recipe_data = json.loads(json_repaired)
+                    print("✅ JSON réparé manuellement !")
+                    return recipe_data
+                    
+                except Exception as repair_error:
+                    print(f"❌ Toutes les réparations ont échoué: {repair_error}")
+                
+                # Tentative 3 : FALLBACK - Template statique garanti
+                print("🆘 Utilisation du template de secours...")
+                
+                # Construire une recette minimale mais valide
+                recipe_data = {
+                    "title": cheese_name if 'cheese_name' in locals() else f"Fromage {cheese_type}",
+                    "description": f"Fromage artisanal de type {cheese_type} au lait de {lait or 'vache'}",
+                    "lait": lait or "vache",
+                    "type_pate": cheese_type,
+                    "ingredients": [
+                        f"1L de lait {lait or 'vache'} entier",
+                        "5ml de presure liquide",
+                        "2g de ferments lactiques mesophiles",
+                        "10g de sel fin non iode"
+                    ],
+                    "materiel": [
+                        "Thermometre de cuisine",
+                        "Grande casserole inox",
+                        "Moule a fromage",
+                        "Etamine ou tissu fromager",
+                        "Louche",
+                        "Couteau long"
+                    ],
+                    "etapes": [
+                        "Steriliser tout le materiel en le plongeant 10 minutes dans eau bouillante puis laisser secher",
+                        "Chauffer le lait doucement a 32 degres en remuant regulierement pour eviter que ca accroche",
+                        "Ajouter les ferments lactiques et melanger delicatement pendant 2 minutes puis laisser reposer 30 minutes",
+                        "Incorporer la presure diluee dans 50ml eau tiede melanger 1 minute puis laisser coaguler 45 a 60 minutes",
+                        "Decouper le caille en cubes de 2cm avec un couteau stérilise puis brasser delicatement 10 minutes",
+                        "Mouler le caille presser legerement et egoutter 12 a 24 heures en retournant toutes les 6 heures"
+                    ],
+                    "duree_totale": "24 a 48 heures",
+                    "difficulte": "Moyenne",
+                    "temperature_affinage": "12 a 14 degres avec 85 a 90% humidite",
+                    "conseils": "Respecter scrupuleusement les temperatures et durees. Utiliser du lait cru pour plus de saveur. Patience essentielle pendant affinage.",
+                    "score": 7.5,
+                    "seed": seed,
+                    "profile": profile
+                }
+                
+                # Ajouter les aromates si présents
+                if aromates:
+                    for aromate in aromates[:3]:  # Max 3 aromates
+                        recipe_data["ingredients"].append(f"{aromate} en quantite appropriee")
+                    recipe_data["aromates"] = aromates
+                    recipe_data["technique_aromatisation"] = f"Incorporer {', '.join(aromates)} pendant le brassage du caille"
+                
+                print(f"✅ Template de secours généré: {recipe_data['title']}")
+                print(f"   🔢 {len(recipe_data['etapes'])} étapes")
+                
+                # Sauvegarder le JSON problématique pour analyse
+                try:
+                    import os
+                    save_path = '/tmp/json_error.txt' if os.path.exists('/tmp') else 'json_error.txt'
+                    with open(save_path, 'w', encoding='utf-8') as f:
+                        f.write(f"=== ERREUR ===\n{e}\n\n")
+                        f.write(f"=== JSON ORIGINAL ===\n{json_str}\n")
+                    print(f"💾 JSON problématique sauvegardé: {save_path}")
+                except:
+                    pass
+                
+                # ✅ NORMALISER LE SCORE ICI (au cas où)
+                if 'score' in recipe_data:
+                    score = recipe_data['score']
+                    if isinstance(score, (int, float)) and score > 10:
+                        recipe_data['score'] = round(score / 10, 1)
+                        print(f"🔧 Score normalisé: {score} → {recipe_data['score']}")
+                        
+                print(f"✅ Template de secours généré: {recipe_data['title']}")
+                
+                return recipe_data
                 
             # # Validation des champs essentiels
             # required_fields = ['title', 'etapes', 'ingredients']
