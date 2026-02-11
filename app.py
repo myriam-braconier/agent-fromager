@@ -6720,7 +6720,7 @@ def generate_all(
         # MAINTENANT : Il faut que votre callback Gradio ATTENDE 6 éléments !
         
         # IMPORTANT: Ajoutez le placeholder au début
-        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
+        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] +
         
         return (
             recipe,  # 1. La recette générée (Textbox)
@@ -9336,7 +9336,6 @@ if __name__ == "__main__":
 
     # Créer et lancer l'interface qui retourne demo
     interface = create_interface()
-
     if interface:
         interface.launch(
         share=False,
@@ -9346,6 +9345,6 @@ if __name__ == "__main__":
         theme=fromage_theme,      # ← AJOUTER
         css=minimal_css,          # ← AJOUTER
         head='<link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/391/cheese-wedge_1f9c0.png">',  # ← AJOUTER
-    )
+        )
     else:
         print("❌ Erreur: create_interface() a retourné None")
