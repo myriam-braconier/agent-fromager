@@ -473,7 +473,7 @@ class AgentFromagerHF:
 
             # ===== CONSTRUCTION INTELLIGENTE DE LA REQUÊTE =====
             # Toujours inclure "fromage"
-            if cheese_type and cheese_type not in ["Laissez l'IA choisir", "Laissez l'IA choisir ou pas !"]:
+            if cheese_type and cheese_type not in ["Laissez l'IA choisir ou pas !", "Laissez l'IA choisir ou pas !"]:
                 # Si type spécifique, l'utiliser
                 query = f"recette fromage {cheese_type} {ingredients}"
             else:
@@ -683,7 +683,7 @@ class AgentFromagerHF:
 
         for i in range(count):
             # Choisir un type aléatoire ou utiliser celui spécifié
-            if cheese_type and cheese_type != "Laissez l'IA choisir":
+            if cheese_type and cheese_type != "Laissez l'IA choisir ou pas !":
                 chosen_type = cheese_type.lower()
             else:
                 chosen_type = self.rng.choice(cheese_types)
@@ -2244,7 +2244,7 @@ class AgentFromagerHF:
         query_parts = []
 
         # Type de fromage basique
-        if cheese_type and cheese_type != "Laissez l'IA choisir":
+        if cheese_type and cheese_type != "Laissez l'IA choisir ou pas !":
             if "frais" in cheese_type.lower():
                 query_parts.append("fromage frais")
             elif "pressée" in cheese_type.lower():
@@ -3830,7 +3830,7 @@ class AgentFromagerHF:
         # ===== CHOISIR UN TYPE DIFFÉRENT SELON PROFIL =====
         cheese_type_clean = cheese_type  # Valeur par défaut
         
-        if cheese_type == "Laissez l'IA choisir":
+        if cheese_type == "Laissez l'IA choisir ou pas !":
             # CHANGEMENT PRINCIPAL : type différent selon profil
             if profile == "🧀 Amateur":
                 # Amateur = toujours fromage frais (simple et rapide)
@@ -3854,7 +3854,7 @@ class AgentFromagerHF:
             cheese_type_clean = cheese_type
             
             # Validation de compatibilité lait/type
-            if lait and cheese_type_clean not in ["Fromage artisanal", "Laissez l'IA choisir"]:
+            if lait and cheese_type_clean not in ["Fromage artisanal", "Laissez l'IA choisir ou pas !"]:
                 is_valid, reason = self._validate_combination(lait, cheese_type_clean)
                 if not is_valid:
                     alternatives = self._suggest_alternatives(lait, cheese_type_clean)
@@ -5063,7 +5063,7 @@ Génère le support pédagogique."""
             ingredients_list = [ing.strip() for ing in ingredients.split(',')]
             
             # Déterminer le type si non spécifié
-            if cheese_type == "Laissez l'IA choisir":
+            if cheese_type == "Laissez l'IA choisir ou pas !":
                 cheese_type_clean = self._determine_type_based_on_ingredients(ingredients_list)
             else:
                 cheese_type_clean = cheese_type
@@ -5073,7 +5073,7 @@ Génère le support pédagogique."""
             lait = self._extract_lait_from_text(' '.join(ingredients_list))
             
             # Vérifier la compatibilité si un lait et un type de pâte sont définis
-            if lait and cheese_type_clean not in ["Fromage artisanal", "Laissez l'IA choisir"]:
+            if lait and cheese_type_clean not in ["Fromage artisanal", "Laissez l'IA choisir ou pas !"]:
                 is_valid, reason = self._validate_combination(lait, cheese_type_clean)
                 if not is_valid:
                     alternatives = self._suggest_alternatives(lait, cheese_type_clean)
@@ -7529,7 +7529,7 @@ def create_interface():
 
                     cheese_type_input = gr.Dropdown(
                         choices=[
-                            "Laissez l'IA choisir",
+                            "Laissez l'IA choisir ou pas !",
                             "Fromage frais",
                             "Pâte molle",
                             "Pâte pressée non cuite",
@@ -7537,7 +7537,7 @@ def create_interface():
                             "Pâte persillée",
                         ],
                         label="🧀 Type de fromage",
-                        value="Laissez l'IA choisir",
+                        value="Laissez l'IA choisir ou pas !",
                     )
 
                     constraints_input = gr.Textbox(
