@@ -4345,33 +4345,85 @@ en molécules aromatiques. Plus long = goût plus prononcé.
 """
         return recipe
 
+    
     def _generate_unique_recipe_hybrid(
         self, ingredients, cheese_type, constraints, creativity, profile=None
     ):
         """Génère une recette UNIQUE avec système unifié V2"""
-        
         print(f"🎲 Génération avec système unifié V2: profil={profile}, créativité={creativity}")
         
-        # Utiliser le générateur unifié V2
-        generator = UnifiedRecipeGeneratorV2(self)
+        # Debug des paramètres reçus
+        print(f"🔍 DEBUG: ingredients={ingredients}")
+        print(f"🔍 DEBUG: cheese_type={cheese_type}")
+        print(f"🔍 DEBUG: profile={profile}")
         
-        recipe_data = generator.generate_recipe(
-            ingredients=ingredients,
+        # Convertir ingredients en liste si nécessaire
+        if isinstance(ingredients, str):
+            ingredients_list = [ing.strip() for ing in ingredients.split(',') if ing.strip()]
+        else:
+            ingredients_list = ingredients
+        
+        print(f"🔍 DEBUG: ingredients_list converti={ingredients_list}")
+        
+        # Extraire le type de lait depuis les ingrédients
+        lait = None
+        laits_possibles = ['vache', 'chèvre', 'chevre', 'brebis', 'bufflonne']
+        
+        for ing in ingredients_list:
+            ing_lower = ing.lower()
+            for type_lait in laits_possibles:
+                if type_lait in ing_lower:
+                    # Normaliser
+                    if type_lait in ['chèvre', 'chevre']:
+                        lait = 'chèvre'
+                    elif type_lait == 'vache':
+                        lait = 'vache'
+                    elif type_lait == 'brebis':
+                        lait = 'brebis'
+                    elif type_lait == 'bufflonne':
+                        lait = 'bufflonne'
+                    break
+            if lait:
+                break
+        
+        # Si pas de lait détecté, utiliser vache par défaut
+        if not lait:
+            lait = 'vache'
+            print(f"⚠️ Aucun type de lait détecté dans les ingrédients, utilisation par défaut: vache")
+        
+        print(f"🔍 DEBUG: Type de lait détecté/défini: {lait}")
+        
+        
+        # ✅ CORRECT - Passer les deux paramètres
+        generator = UnifiedRecipeGeneratorV2(knowledge_base=self.knowledge_base, agent=self)
+        
+        print("🔍 DEBUG: Appel du générateur._generate_with_llm_and_knowledge()")
+        
+        # Appeler avec les bons paramètres
+        recipe_data = generator._generate_with_llm_and_knowledge(
+            ingredients=ingredients_list,
             cheese_type=cheese_type,
-            creativity=creativity,
-            profile=profile or "🧀 Amateur",
+            lait=lait,
+            profile=profile,
             constraints=constraints
         )
+        
+        print(f"🔍 DEBUG: Recette générée: {recipe_data.get('title') if recipe_data else 'None'}")
+        
+        # Vérifier si la recette a été générée
+        if not recipe_data:
+            print("⚠️ Le générateur a retourné None, impossible de continuer")
+            return "❌ Erreur: Impossible de générer la recette avec le LLM"
         
         # Formater en texte
         formatter = RecipeFormatter()
         recipe_text = formatter.format_to_text(recipe_data)
         
+        # Sauvegarder dans l'historique
         self._save_to_history(ingredients, cheese_type, constraints, recipe_text)
         
         return recipe_text
-
-        
+    
     def _format_llm_recipe_to_text(self, recipe_data: dict, profile: str, constraints: str) -> str:
         """
         Convertit une recette JSON du LLM en format texte formaté
@@ -5783,110 +5835,118 @@ Adaptations suggérées selon vos contraintes.
         except:
             return False
 
-    def chat_with_llm(self, user_message: str, conversation_history=None) -> str:
+    def chat_with_llm(self, user_message: str, conversation_history=None, temperature=0.7, max_tokens=8192) -> str:
         """
+        Dialogue avec le LLM
+        Args:
+            user_message: Le message de l'utilisateur
+            conversation_history: Historique de la conversation (optionnel)
+            temperature: Température de génération (0.0 à 1.0)
+            max_tokens: Nombre maximum de tokens à générer
+        
         Chat intelligent avec fallback sur plusieurs fournisseurs gratuits
         Priorité: 1. OpenRouter → 2. Google AI → 3. Ollama → 4. Hugging Face → 5. Fallback local
         """
-        print(f"💬 Question reçue: '{user_message[:100]}...'")
+        try:
+            print(f"💬 Question reçue: '{user_message[:100]}...'")
+            print(f"🎛️ Paramètres: temperature={temperature}, max_tokens={max_tokens}")
 
-        # DEBUG: État des LLMs (avec vérification d'attributs pour éviter les erreurs)
-        print("🔍 ÉTAT LLMs - ", end="")
-        if hasattr(self, "openrouter_enabled"):
-            print(f"OpenRouter: {self.openrouter_enabled}, ", end="")
-        if hasattr(self, "google_ai_enabled"):
-            print(f"Google AI: {self.google_ai_enabled}, ", end="")
-        if hasattr(self, "ollama_enabled"):
-            print(f"Ollama: {self.ollama_enabled}, ", end="")
-        if hasattr(self, "together_enabled"):
-            print(f"Together: {self.together_enabled}")
-        print()
+            # DEBUG: État des LLMs (avec vérification d'attributs pour éviter les erreurs)
+            print("🔍 ÉTAT LLMs - ", end="")
+            if hasattr(self, "openrouter_enabled"):
+                print(f"OpenRouter: {self.openrouter_enabled}, ", end="")
+            if hasattr(self, "google_ai_enabled"):
+                print(f"Google AI: {self.google_ai_enabled}, ", end="")
+            if hasattr(self, "ollama_enabled"):
+                print(f"Ollama: {self.ollama_enabled}, ", end="")
+            if hasattr(self, "together_enabled"):
+                print(f"Together: {self.together_enabled}")
+            print()
 
-        # ===== TENTATIVE AVEC LES LLMS =====
+            # ===== TENTATIVE AVEC LES LLMS =====
 
-        # 1. OPENROUTER (priorité haute - gratuit avec quotas)
-        if hasattr(self, "openrouter_enabled") and self.openrouter_enabled:
-            try:
-                print("  🤖 Tentative OpenRouter...")
-                # Vérifier si la méthode existe
-                if hasattr(self, "_chat_openrouter"):
-                    response = self._chat_openrouter(user_message, conversation_history)
-                    if response and response.strip():
-                        print(f"  ✅ Réponse OpenRouter ({len(response)} caractères)")
-                        return response
-                else:
-                    print("  ⚠️ Méthode _chat_openrouter manquante!")
-            except Exception as e:
-                print(f"  ⚠️ OpenRouter échoué: {type(e).__name__}")
+            # 1. OPENROUTER (priorité haute - gratuit avec quotas)
+            if hasattr(self, "openrouter_enabled") and self.openrouter_enabled:
+                try:
+                    print("  🤖 Tentative OpenRouter...")
+                    if hasattr(self, "_chat_openrouter"):
+                        response = self._chat_openrouter(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse OpenRouter ({len(response)} caractères)")
+                            return response
+                    else:
+                        print("  ⚠️ Méthode _chat_openrouter manquante!")
+                except Exception as e:
+                    print(f"  ⚠️ OpenRouter échoué: {type(e).__name__} - {e}")
 
-        # 2. GOOGLE AI / GEMINI
-        if hasattr(self, "google_ai_enabled") and self.google_ai_enabled:
-            try:
-                print("  🤖 Tentative Google AI...")
-                if hasattr(self, "_chat_google_ai"):
-                    response = self._chat_google_ai(user_message, conversation_history)
-                    if response and response.strip():
-                        print(f"  ✅ Réponse Google AI ({len(response)} caractères)")
-                        return response
-            except Exception as e:
-                print(f"  ⚠️ Google AI échoué: {type(e).__name__}")
+            # 2. GOOGLE AI / GEMINI
+            if hasattr(self, "google_ai_enabled") and self.google_ai_enabled:
+                try:
+                    print("  🤖 Tentative Google AI...")
+                    if hasattr(self, "_chat_google_ai"):
+                        response = self._chat_google_ai(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse Google AI ({len(response)} caractères)")
+                            return response
+                except Exception as e:
+                    print(f"  ⚠️ Google AI échoué: {type(e).__name__} - {e}")
 
-        # 3. TOGETHER AI (si vous avez ajouté cette méthode)
-        if hasattr(self, "together_enabled") and self.together_enabled:
-            try:
-                print("  🤖 Tentative Together AI...")
-                if hasattr(self, "_chat_together_ai"):
-                    response = self._chat_together_ai(
-                        user_message, conversation_history
-                    )
-                    if response and response.strip():
-                        print(f"  ✅ Réponse Together AI ({len(response)} caractères)")
-                        return response
-            except Exception as e:
-                print(f"  ⚠️ Together AI échoué: {type(e).__name__}")
+            # 3. TOGETHER AI
+            if hasattr(self, "together_enabled") and self.together_enabled:
+                try:
+                    print("  🤖 Tentative Together AI...")
+                    if hasattr(self, "_chat_together_ai"):
+                        response = self._chat_together_ai(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse Together AI ({len(response)} caractères)")
+                            return response
+                except Exception as e:
+                    print(f"  ⚠️ Together AI échoué: {type(e).__name__} - {e}")
 
-        # 4. OLLAMA (local)
-        if hasattr(self, "ollama_enabled") and self.ollama_enabled:
-            try:
-                print("  🤖 Tentative Ollama...")
-                if hasattr(self, "_chat_ollama"):
-                    response = self._chat_ollama(user_message, conversation_history)
-                    if response and response.strip():
-                        print(f"  ✅ Réponse Ollama ({len(response)} caractères)")
-                        return response
-            except Exception as e:
-                print(f"  ⚠️ Ollama échoué: {type(e).__name__}")
+            # 4. OLLAMA (local)
+            if hasattr(self, "ollama_enabled") and self.ollama_enabled:
+                try:
+                    print("  🤖 Tentative Ollama...")
+                    if hasattr(self, "_chat_ollama"):
+                        response = self._chat_ollama(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse Ollama ({len(response)} caractères)")
+                            return response
+                except Exception as e:
+                    print(f"  ⚠️ Ollama échoué: {type(e).__name__} - {e}")
 
-        # 5. DEEPSEEK (si vous le gardez)
-        if hasattr(self, "deepseek_enabled") and self.deepseek_enabled:
-            try:
-                print("  🤖 Tentative DeepSeek...")
-                if hasattr(self, "_chat_deepseek"):
-                    response = self._chat_deepseek(user_message, conversation_history)
-                    if response and response.strip():
-                        print(f"  ✅ Réponse DeepSeek ({len(response)} caractères)")
-                        return response
-            except Exception as e:
-                print(f"  ⚠️ DeepSeek échoué: {type(e).__name__}")
+            # 5. DEEPSEEK
+            if hasattr(self, "deepseek_enabled") and self.deepseek_enabled:
+                try:
+                    print("  🤖 Tentative DeepSeek...")
+                    if hasattr(self, "_chat_deepseek"):
+                        response = self._chat_deepseek(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse DeepSeek ({len(response)} caractères)")
+                            return response
+                except Exception as e:
+                    print(f"  ⚠️ DeepSeek échoué: {type(e).__name__} - {e}")
 
-        # 6. HUGGING FACE
-        if hasattr(self, "hf_inference_enabled") and self.hf_inference_enabled:
-            try:
-                print("  🤖 Tentative Hugging Face...")
-                if hasattr(self, "_chat_huggingface"):
-                    response = self._chat_huggingface(
-                        user_message, conversation_history
-                    )
-                    if response and response.strip():
-                        print(f"  ✅ Réponse Hugging Face ({len(response)} caractères)")
-                        return response
-            except Exception as e:
-                print(f"  ⚠️ Hugging Face échoué: {type(e).__name__}")
+            # 6. HUGGING FACE
+            if hasattr(self, "hf_inference_enabled") and self.hf_inference_enabled:
+                try:
+                    print("  🤖 Tentative Hugging Face...")
+                    if hasattr(self, "_chat_huggingface"):
+                        response = self._chat_huggingface(user_message, conversation_history, temperature, max_tokens)
+                        if response and response.strip():
+                            print(f"  ✅ Réponse Hugging Face ({len(response)} caractères)")
+                            return response
+                except Exception as e:
+                    print(f"  ⚠️ Hugging Face échoué: {type(e).__name__} - {e}")
 
-        # 7. FALLBACK LOCAL (toujours disponible)
-        print("  🧠 Tous les LLMs ont échoué → fallback local")
-        return self._fallback_chat_response(user_message)
-
+            # 7. FALLBACK LOCAL (toujours disponible)
+            print("  🧠 Tous les LLMs ont échoué → fallback local")
+            return self._fallback_chat_response(user_message)
+        
+        except Exception as e:
+            print(f"❌ Erreur critique dans chat_with_llm: {e}")
+            return self._fallback_chat_response(user_message)
+    
     def _get_cheese_context(self, question: str) -> str:
         """Extrait des infos de la base pour aider le LLM"""
         # Recherche simple
@@ -5986,7 +6046,6 @@ Adaptations suggérées selon vos contraintes.
                 "google/flan-t5-xl",  # Plus léger
                 "HuggingFaceH4/zephyr-7b-alpha",  # Version alpha si beta échoue
                 "microsoft/phi-2",  # Petit mais efficace
-                "Qwen/Qwen2.5-7B-Instruct",  # Modèle récent
             ]
 
             for model in models:
@@ -6393,10 +6452,11 @@ Adaptations suggérées selon vos contraintes.
 
         return response
 
-    def _chat_openrouter(self, user_message: str, conversation_history=None):
+    def _chat_openrouter(self, user_message: str, conversation_history=None, temperature=0.7, max_tokens=20000):
         """Utilise OpenRouter API avec des modèles GRATUITS qui fonctionnent"""
         try:
             print(f"    🔑 OpenRouter Key détectée")
+            print(f"    🎛️ Paramètres: temperature={temperature}, max_tokens={max_tokens}")
 
             headers = {
                 "Authorization": f"Bearer {self.openrouter_api_key}",
@@ -6409,8 +6469,8 @@ Adaptations suggérées selon vos contraintes.
                 {
                     "role": "system",
                     "content": """Tu es "Maître Fromager Pierre", expert français avec 40 ans d'expérience.
-Tu es chaleureux, pédagogique et passionné. Réponds EN FRANÇAIS avec précision et enthousiasme.
-Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""",
+    Tu es chaleureux, pédagogique et passionné. Réponds EN FRANÇAIS avec précision et enthousiasme.
+    Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""",
                 }
             ]
 
@@ -6424,13 +6484,11 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
 
             # MODÈLES GRATUITS QUI FONCTIONNENT VRAIMENT SUR OPENROUTER
             free_models = [
-                "meta-llama/llama-3.2-3b-instruct",  # ✅ GARANTI GRATUIT - Llama 3.2
-                "microsoft/phi-3-mini-4k-instruct",  # ✅ GARANTI GRATUIT - Microsoft
-                "qwen/qwen2.5-3b-instruct",  # ✅ GARANTI GRATUIT - Alibaba (bon français)
-                "google/gemma-2-2b-it",  # ✅ GARANTI GRATUIT - Google
-                "mistralai/mistral-7b-instruct-v0.2",  # ⚠️ Parfois gratuit
-                "huggingfaceh4/zephyr-7b-beta",  # ⚠️ Parfois gratuit
-            ]
+                "mistralai/mistral-7b-instruct",  # ✅ Bon pour JSON structuré
+                "meta-llama/llama-3.2-3b-instruct",
+                "microsoft/phi-3-mini-4k-instruct",
+                "google/gemma-2-2b-it",
+                        ]
 
             # Essayer chaque modèle jusqu'à ce qu'un fonctionne
             for model in free_models:
@@ -6440,8 +6498,8 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
                     payload = {
                         "model": model,
                         "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 2000,
+                        "temperature": temperature,  # ✅ CORRIGÉ : utilise le paramètre
+                        "max_tokens": max_tokens,    # ✅ CORRIGÉ : utilise le paramètre
                         "stream": False,
                     }
 
@@ -6449,7 +6507,7 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
-                        timeout=15,
+                        timeout=60,  # Augmenté pour les longues réponses
                     )
 
                     print(
@@ -6479,6 +6537,11 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
                         print(
                             f"    ❌ Erreur {response.status_code} pour {model.split('/')[-1]}"
                         )
+                        try:
+                            error_detail = response.json()
+                            print(f"    📄 Détail erreur: {error_detail}")
+                        except:
+                            pass
                         continue
 
                 except requests.exceptions.Timeout:
@@ -6487,7 +6550,7 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
 
                 except Exception as e:
                     print(
-                        f"    ⚠️ Exception avec {model.split('/')[-1]}: {type(e).__name__}"
+                        f"    ⚠️ Exception avec {model.split('/')[-1]}: {type(e).__name__} - {e}"
                     )
                     continue
 
@@ -6495,9 +6558,9 @@ Sois concis mais complet. Utilise des emojis fromagers occasionnellement 🧀.""
             return None
 
         except Exception as e:
-            print(f"    ❌ Exception OpenRouter globale: {type(e).__name__}")
+            print(f"    ❌ Exception OpenRouter globale: {type(e).__name__} - {e}")
             return None
-
+    
     # Fin de la classe
 
 
@@ -6760,8 +6823,6 @@ Il fonctionne automatiquement quand vous générez une recette :
 
 📁 Sauvegardé dans : complete_knowledge_base.json
 
-💡 La base enrichie sera automatiquement utilisée
-   lors de la prochaine génération de recette !
 """
         return result
         
@@ -6791,12 +6852,6 @@ Traceback :
 
 ───────────────────────────────────────
 
-ℹ️ MAIS LE NOUVEAU SYSTÈME HYBRIDE EST DISPONIBLE !
-
-L'ancien système statique a échoué, mais le nouveau système
-hybride dynamique devrait fonctionner normalement.
-
-👉 Testez en générant une recette dans "Mode créatif"
 """
 
 def view_knowledge_base():
