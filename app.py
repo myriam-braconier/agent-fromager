@@ -433,6 +433,7 @@ class AgentFromagerHF:
                     'url': recipe['url'],
                     'source_url': recipe['url'],
                     'source_type': 'scraped',
+                    'creativity_level': 1,
                     'lait': self._extract_lait_from_text(ingredients),
                     'type_pate': cheese_type,
                     'ingredients': recipe.get('ingredients', []),
@@ -6719,7 +6720,7 @@ def generate_all(
         # MAINTENANT : Il faut que votre callback Gradio ATTENDE 6 éléments !
         
         # IMPORTANT: Ajoutez le placeholder au début
-        choices_with_placeholder = ["→ Sélectionner parmi les recettes"]
+        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
         
         return (
             recipe,  # 1. La recette générée (Textbox)
@@ -6745,6 +6746,7 @@ def generate_all(
             [],  # 5. Liste vide pour dropdown (LIST)
             "",  # 6. Vide (Textbox)
         )
+
 # ===== Enrichissement de la base de connaissance ========
 def enrich_knowledge_base():
     """
@@ -7408,6 +7410,7 @@ def view_dynamic_recipes(filter_lait=None):
         <div style="padding: 20px; background: #FFEBEE; border-radius: 8px;">
             <h3 style="color: #C62828;">❌ Erreur de lecture</h3>
             <pre style="background: white; padding: 10px; border-radius: 4px; overflow: auto;">
+
 {str(e)}
 
 {traceback.format_exc()}
