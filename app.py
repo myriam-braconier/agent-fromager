@@ -4406,7 +4406,8 @@ en molécules aromatiques. Plus long = goût plus prononcé.
             cheese_type=cheese_type,
             lait=lait,
             profile=profile,
-            constraints=constraints
+            constraints=constraints,
+            creativity_level=creativity
         )
         
         print(f"🔍 DEBUG: Recette générée: {recipe_data.get('title') if recipe_data else 'None'}")
@@ -6615,14 +6616,27 @@ def generate_all(
 
         print("✅ Recette générée")
 
-        # 2. RECHERCHE WEB
+        # 2. RECHERCHE WEB - adapter selon le niveau de créativité
         try:
-            web_recipes = agent.search_web_recipes(
-                ingredients, cheese_type, max_results=6
-            )
-            print(
-                f"✅ Recherche web: {len(web_recipes) if web_recipes else 0} résultats"
-            )
+            # ✅ LOGIQUE SELON NIVEAU
+            if creativity == 0:
+                # Niveau 0 : Base statique uniquement (pas de web)
+                print("📋 Niveau 0 : Base statique uniquement")
+                web_recipes = []
+                
+            elif creativity in [1, 2]:
+                # Niveau 1 ou 2 : Scraping activé
+                print(f"🌐 Niveau {creativity} : Recherche web activée")
+                web_recipes = agent.search_web_recipes(
+                    ingredients, cheese_type, max_results=6
+                )
+                print(f"✅ {len(web_recipes)} recettes trouvées")
+                
+            else:  # creativity == 3
+                # Niveau 3 : LLM pur (pas de web)
+                print("🤖 Niveau 3 : LLM pur uniquement")
+                web_recipes = []
+                
         except Exception as e:
             print(f"⚠️ Erreur recherche web: {e}")
             web_recipes = []
@@ -6720,7 +6734,7 @@ def generate_all(
         # MAINTENANT : Il faut que votre callback Gradio ATTENDE 6 éléments !
         
         # IMPORTANT: Ajoutez le placeholder au début
-        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
+        choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + (choices or [])
         
         return (
             recipe,  # 1. La recette générée (Textbox)
@@ -7585,6 +7599,8 @@ def create_interface():
                     gr.Markdown("""
                     ### 💡 Comment ça marche ?
                     
+                    1️⃣ Choisissez votre profil
+                    
                     1️⃣ Entrez vos ingrédients séparés par une virgule
                     
                     2️⃣ Ajustez les micro-choix
@@ -7592,12 +7608,12 @@ def create_interface():
                     3️⃣ Cliquez sur "Générer"
                     
                     **Résultat :**
-                    - Onglet 1 : 📖 Ma recette
-                    - Onglet 2 : 🌐 Recettes web
-                    - Onglet 3 : 📚 Base de connaissances
-                    - Onglet 4 : 💬 Expert Fromager
-                    - Onglet 5 : 🎯 Recettes Dynamiques
-                    - Onglet 6 : 🕒 Historique
+                    - Onglet 1 : 📖 Ma recette selon ma créativité
+                    - Onglet 2 : 🌐 Recettes web (scraping éthique)
+                    - Onglet 3 : 📚 Base de connaissances (les bons conseils)
+                    - Onglet 4 : 💬 Dialogue avec l'Expert Fromager
+                    - Onglet 5 : 🎯 Recettes Dynamiques (scraping + IA)
+                    - Onglet 6 : 🕒 Historique des recettes générées
                     """)
 
             # ===== FONCTIONS LOCALES =====
