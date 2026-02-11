@@ -5808,11 +5808,6 @@ Génère le support pédagogique."""
 
         return note
 
-    def _add_constraints_note(self, constraints):
-        """Ajoute une note sur les contraintes"""
-        if not constraints or constraints.strip() == "":
-            return ""
-
         return f"""
 ⚙️ ADAPTATION AUX CONTRAINTES : {constraints.upper()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -6895,16 +6890,78 @@ def view_knowledge_base():
         """
         
         # Stats par type de lait
-        emoji_map = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑', 'bufflonne': '🐃'}
+        # Emoji map étendu avec variations et synonymes
+        emoji_map = {
+            'vache': '🐄',
+            'vaches': '🐄',
+            'bovin': '🐄',
+            'bovine': '🐄',
+            'lait de vache': '🐄',
+            
+            'chèvre': '🐐',
+            'chevre': '🐐',  # Sans accent
+            'chèvres': '🐐',
+            'chevres': '🐐',
+            'caprin': '🐐',
+            'caprine': '🐐',
+            'lait de chèvre': '🐐',
+            'lait de chevre': '🐐',
+            
+            'brebis': '🐑',
+            'ovin': '🐑',
+            'ovine': '🐑',
+            'mouton': '🐑',
+            'lait de brebis': '🐑',
+            
+            'bufflonne': '🐃',
+            'buffle': '🐃',
+            'bufflonnes': '🐃',
+            'buffles': '🐃',
+            'bubalus': '🐃',
+            'lait de bufflonne': '🐃',
+            
+            'mixte': '🥛',
+            'mélange': '🥛',
+            'melange': '🥛',
+            'plusieurs laits': '🥛',
+            
+            # Autres animaux (si jamais utilisés)
+            'chamelle': '🐪',
+            'chameau': '🐪',
+            'ânesse': '🫏',
+            'anesse': '🫏',
+            'jument': '🐴',
+            'renne': '🦌',
+            'yak': '🦬',
+        }
+
+        # Normaliser la clé et rechercher l'emoji
         for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
-            emoji = emoji_map.get(lait, '❓')
+            # Normaliser : minuscules et sans espaces superflus
+            lait_normalized = lait.lower().strip()
+            
+            # Chercher l'emoji
+            emoji = emoji_map.get(lait_normalized, '❓')
+            
+            # Couleur de fond selon le type de lait
+            color_map = {
+                '🐄': {'bg': '#FFF3E0', 'border': '#FFE0B2', 'text': '#E65100'},  # Orange - vache
+                '🐐': {'bg': '#F3E5F5', 'border': '#E1BEE7', 'text': '#7B1FA2'},  # Violet - chèvre
+                '🐑': {'bg': '#E8F5E9', 'border': '#C8E6C9', 'text': '#2E7D32'},  # Vert - brebis
+                '🐃': {'bg': '#E3F2FD', 'border': '#BBDEFB', 'text': '#1565C0'},  # Bleu - bufflonne
+                '🥛': {'bg': '#FAFAFA', 'border': '#E0E0E0', 'text': '#424242'},  # Gris - mixte
+                '❓': {'bg': '#FFF9C4', 'border': '#FFF59D', 'text': '#F57F17'},  # Jaune - inconnu
+            }
+            
+            colors = color_map.get(emoji, color_map['❓'])
+            
             html += f"""
-                <div style="background: #FFF3E0; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #FFE0B2;">
-                    <div style="font-size: 36px;">{emoji}</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #E65100;">{count}</div>
-                    <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
-                </div>
-            """
+                        <div style="background: {colors['bg']}; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid {colors['border']};">
+                            <div style="font-size: 36px;">{emoji}</div>
+                            <div style="font-size: 24px; font-weight: bold; color: {colors['text']};">{count}</div>
+                            <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
+                        </div>
+                    """
         
         html += """
                 </div>
@@ -7021,6 +7078,7 @@ def view_knowledge_base():
             </pre>
         </div>
         """ 
+
 def view_dynamic_recipes(filter_lait=None):
     """Affiche TOUTES les recettes : statiques + dynamiques"""
     import os
@@ -7139,7 +7197,78 @@ def view_dynamic_recipes(filter_lait=None):
         """
         
         # Stats par type de lait
-        emoji_map = {'vache': '🐄', 'chèvre': '🐐', 'brebis': '🐑', 'bufflonne': '🐃'}
+        # Emoji map étendu avec variations et synonymes
+        emoji_map = {
+            'vache': '🐄',
+            'vaches': '🐄',
+            'bovin': '🐄',
+            'bovine': '🐄',
+            'lait de vache': '🐄',
+            
+            'chèvre': '🐐',
+            'chevre': '🐐',  # Sans accent
+            'chèvres': '🐐',
+            'chevres': '🐐',
+            'caprin': '🐐',
+            'caprine': '🐐',
+            'lait de chèvre': '🐐',
+            'lait de chevre': '🐐',
+            
+            'brebis': '🐑',
+            'ovin': '🐑',
+            'ovine': '🐑',
+            'mouton': '🐑',
+            'lait de brebis': '🐑',
+            
+            'bufflonne': '🐃',
+            'buffle': '🐃',
+            'bufflonnes': '🐃',
+            'buffles': '🐃',
+            'bubalus': '🐃',
+            'lait de bufflonne': '🐃',
+            
+            'mixte': '🥛',
+            'mélange': '🥛',
+            'melange': '🥛',
+            'plusieurs laits': '🥛',
+            
+            # Autres animaux (si jamais utilisés)
+            'chamelle': '🐪',
+            'chameau': '🐪',
+            'ânesse': '🫏',
+            'anesse': '🫏',
+            'jument': '🐴',
+            'renne': '🦌',
+            'yak': '🦬',
+        }
+
+        # Normaliser la clé et rechercher l'emoji
+        for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
+            # Normaliser : minuscules et sans espaces superflus
+            lait_normalized = lait.lower().strip()
+            
+            # Chercher l'emoji
+            emoji = emoji_map.get(lait_normalized, '❓')
+            
+            # Couleur de fond selon le type de lait
+            color_map = {
+                '🐄': {'bg': '#FFF3E0', 'border': '#FFE0B2', 'text': '#E65100'},  # Orange - vache
+                '🐐': {'bg': '#F3E5F5', 'border': '#E1BEE7', 'text': '#7B1FA2'},  # Violet - chèvre
+                '🐑': {'bg': '#E8F5E9', 'border': '#C8E6C9', 'text': '#2E7D32'},  # Vert - brebis
+                '🐃': {'bg': '#E3F2FD', 'border': '#BBDEFB', 'text': '#1565C0'},  # Bleu - bufflonne
+                '🥛': {'bg': '#FAFAFA', 'border': '#E0E0E0', 'text': '#424242'},  # Gris - mixte
+                '❓': {'bg': '#FFF9C4', 'border': '#FFF59D', 'text': '#F57F17'},  # Jaune - inconnu
+            }
+            
+            colors = color_map.get(emoji, color_map['❓'])
+            
+            html += f"""
+                        <div style="background: {colors['bg']}; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid {colors['border']};">
+                            <div style="font-size: 36px;">{emoji}</div>
+                            <div style="font-size: 24px; font-weight: bold; color: {colors['text']};">{count}</div>
+                            <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
+                        </div>
+                    """
         for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
             emoji = emoji_map.get(lait, '❓')
             html += f"""
