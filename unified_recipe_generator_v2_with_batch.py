@@ -2439,7 +2439,8 @@ class RecipeFormatter:
             'llm_pure_with_knowledge': '🤖📚',
             'enriched_base': '📚',
             'web_enriched': '🌐',
-            'static_knowledge': '📋'
+            'static_knowledge': '📋',
+            'unknown': '🧀',
         }
         
         mode_icon = mode_icons.get(mode, '❓')
