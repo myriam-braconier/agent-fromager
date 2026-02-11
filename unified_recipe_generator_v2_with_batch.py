@@ -1383,118 +1383,99 @@ class UnifiedRecipeGeneratorV2:
                 knowledge_context += f"- {item}\n"
         
         # ========== CONSTRUIRE LE PROMPT ==========
-        prompt = f"""Tu es un maître fromager expert avec des décennies d'expérience. Génère UNE recette UNIQUE au format JSON STRICT et ULTRA-DÉTAILLÉE.
+        prompt = f"""Tu es un maitre fromager expert. Genere UNE recette JSON VALIDE et detaillee.
 
 INTERDICTIONS ABSOLUES:
-❌ PAS de texte explicatif avant le JSON
-❌ PAS de markdown (pas de ```)
-❌ PAS de commentaires
-❌ PAS de titres ou sections
-✅ COMMENCE DIRECTEMENT PAR {{
-✅ TERMINE DIRECTEMENT PAR }}
-    
-INGRÉDIENTS DISPONIBLES: {', '.join(ingredients)}
-TYPE DE LAIT: {lait or "vache"}
-TYPE DE FROMAGE: {cheese_type}
+❌ PAS de texte avant ou apres le JSON
+❌ PAS de markdown ``` 
+❌ PAS d asterisques * ni underscores _
+✅ COMMENCE PAR {{ et TERMINE PAR }}
+
+INGREDIENTS: {', '.join(ingredients)}
+LAIT: {lait or "vache"}
+TYPE: {cheese_type}
 AROMATES: {', '.join(aromates) if aromates else "AUCUN"}
 PROFIL: {profile}
 
-{knowledge_context[:1500] if knowledge_context else ""}
+{knowledge_context[:800] if knowledge_context else ""}
 
-RÈGLES JSON ABSOLUES (NON-NÉGOCIABLES):
-1. ✅ JSON VALIDE uniquement - commence par {{ et termine par }}
-2. ✅ Chaque accolade ouvrante {{ DOIT avoir sa fermante }}
-3. ✅ Chaque crochet ouvrant [ DOIT avoir son fermant ]
-4. ✅ Virgules ENTRE les éléments, JAMAIS avant ] ou }}
-5. ✅ Guillemets doubles " pour TOUTES les clés et valeurs string
-6. ✅ Pas de virgule après le dernier élément d'un tableau ou objet
-7. ✅ N'utilise QUE les aromates listés ci-dessus
-8. ✅ Inclus obligatoirement: présure, ferments lactiques, sel
-9. ✅ Minimum 6 étapes détaillées
-10. ✅ Structure SIMPLE et PLATE - pas d'objets imbriqués complexes
-11. ⚠️ AUCUN astérisque * dans le JSON (pas de markdown italique !)
-12. ⚠️ AUCUN underscore _ pour le markdown (pas de __gras__)
-13. ⚠️ Texte brut uniquement dans les strings
+REGLES JSON CRITIQUES:
+1. Chaque {{ a son }}, chaque [ a son ]
+2. Virgules ENTRE elements, JAMAIS avant ] ou }}
+3. Tableaux = STRINGS uniquement (pas de dictionnaires imbriques)
+4. Pas d accents (e au lieu de e, a au lieu de a)
+5. Guillemets doubles " partout
+6. Structure PLATE (pas d objets dans objets)
 
-EXIGENCE DE LONGUEUR OPTIMALE:
-- Chaque étape doit contenir 150-250 caractères (pas plus !)
-- Description du fromage: 100-150 caractères
-- Conseils: 200-300 caractères
-- TOTAL VISÉ: 4000-6000 caractères (pas plus de 8000)
+LONGUEUR CIBLE:
+- Chaque etape: 180-280 caracteres (detail gestes, temperatures, durees, raisons)
+- Description: 120-180 caracteres (texture, gout, aromes)
+- Conseils: 300-450 caracteres (astuces, erreurs a eviter)
+- Materiel: 8-10 elements
+- 8 etapes minimum
 
-⚠️ IMPÉRATIF: FERME TOUTES LES ACCOLADES ET CROCHETS !
-⚠️ VÉRIFIE que ton JSON se termine par }} avant d'envoyer
-⚠️ PAS d'objets imbriqués comme {{"type": "...", "origine": "..."}} !
-
-⚠️⚠️⚠️ RÈGLES ANTI-MARKDOWN (CRITIQUE) ⚠️⚠️⚠️
-- INTERDICTION ABSOLUE d'utiliser * (astérisque) dans le JSON
-- INTERDICTION ABSOLUE d'utiliser _ (underscore) dans le JSON  
-- INTERDICTION ABSOLUE de tout formatage markdown
-- Si tu veux mettre en valeur un mot, utilise MAJUSCULES, pas markdown
-- Exemple CORRECT: "ferments lactiques Lactococcus lactis"
-- Exemple INTERDIT: "ferments lactiques *Lactococcus lactis*"
-
-Le JSON doit contenir UNIQUEMENT du texte brut, des virgules, des accolades, des crochets et des guillemets.
-AUCUN autre caractère spécial de formatage n'est autorisé.
-
-FORMAT JSON ULTRA-SIMPLIFIÉ (COPIE EXACTEMENT CETTE STRUCTURE):
+FORMAT JSON (COPIE EXACTEMENT):
 
 {{
-    "title": "Nom du fromage",
-    "description": "Description en une phrase courte",
-    "lait": "Type de lait et température",
-    "type_pate": "Type de pâte",
+    "title": "Nom creatif du fromage",
+    "description": "Description appetissante en 2 phrases courtes avec texture onctueus, aromes subtils et aspect visuel",
+    "lait": "{lait or 'vache'} cru ou pasteurise a temperature ambiante pour meilleure fermentation",
+    "type_pate": "{cheese_type} avec caracteristiques texture et fermetee",
     "ingredients": [
-        "1L de lait entier",
-        "5ml de presure liquide",
-        "2g de ferments lactiques",
-        "10g de sel fin",
-        "Aromates doses precises"
+        "1L lait {lait or 'vache'} entier temperature ambiante",
+        "5ml presure liquide ou 1/4 comprime",
+        "2g ferments lactiques mesophiles Lactococcus lactis",
+        "10g sel fin non iode"{', "aromates doses precises"' if aromates else ''}
     ],
     "materiel": [
-        "thermometre",
-        "casserole",
-        "moule",
-        "etamine"
+        "Thermometre cuisine precis graduation 1 degre",
+        "Casserole inox 2-3 litres",
+        "Moule fromage perfore",
+        "Etamine ou tissu fromager",
+        "Louche inox",
+        "Couteau long lame fine",
+        "Planche decouper bois",
+        "Recipient petit-lait",
+        "Grille egouttage",
+        "Film alimentaire"
     ],
     "etapes": [
-        "Etape 1 - Steriliser tout le materiel 10 minutes dans eau bouillante",
-        "Etape 2 - Chauffer lait a 32 degres en remuant doucement",
-        "Etape 3 - Ajouter ferments lactiques et melanger 2 minutes",
-        "Etape 4 - Ajouter presure diluee et attendre 45 minutes",
-        "Etape 5 - Decouper caille en cubes de 2cm et brasser",
-        "Etape 6 - Mouler et egoutter 12 heures"
+        "Etape 1 STERILISATION: Steriliser tout materiel dans eau bouillante 10 minutes minimum puis secher air libre torchon propre. Etape CRUCIALE eviter contamination bacterienne ruiner fromage. Pendant ce temps sortir lait refrigerateur atteindre temperature ambiante environ 20 degres pour preparation optimale.",
+        
+        "Etape 2 CHAUFFAGE LAIT: Verser lait casserole steriilisee chauffer lentement feu doux remuant regulierement louche eviter accrochage fond. Objectif atteindre precisement 32 degres Celsius verifier thermometre toutes 2 minutes. Temperature permet ferments lactiques developper maniere optimale. JAMAIS depasser 35 degres sous peine tuer ferments.",
+        
+        "Etape 3 ENSEMENCEMENT: A 32 degres retirer casserole feu. Saupoudrer ferments lactiques surface lait pluie fine laisser reposer 2 minutes sans toucher pour rehydratation ferments. Melanger delicatement mouvements bas haut 2 minutes repartir ferments masse lait. Couvrir laisser reposer 30-45 minutes temperature ambiante acidification commence.",
+        
+        "Etape 4 EMPRESURAGE: Diluer presure dans 50ml eau tiede non chloree eau robinet trop chloree inhibe action presure. Verser melange lait remuant vigoureusement 1 minute mouvements circulaires disperser presure. STOPPER net tout mouvement. Couvrir laisser repos ABSOLU 45-60 minutes caille forme progressivement. Tester prise incliner casserole caille detache bords bloc ferme.",
+        
+        "Etape 5 DECOUPAGE: Couteau long fin decouper caille cubes reguliers 2cm cote tracant lignes verticales sens puis autre sens perpendiculaire puis diagonale creer grille tridimensionnelle. Laisser reposer 5 minutes cubes raffermissent. Permet expulsion progressive petit-lait serum concentration matiere seche.",
+        
+        "Etape 6 BRASSAGE: Brasser delicatement cubes caille louche 10-15 minutes mouvements lents reguliers. Grains raffermissent progressivement diminuent volume expulsant serum. Observer texture grains devenir fermes rester souples. Brassage vigoureux casserait grains donnerait fromage granuleux. Arreter quand grains consistance voulue.",
+        
+        "Etape 7 MOULAGE: Deposer delicatement grains caille moule perfore grille dessus recipient recuperer petit-lait continue ecouler. Remplir moule progressivement tassant legerement mains propres eviter poches air. Fromage affaisse naturellement egouttage. Retourner moule toutes 6 heures premieres 24 heures egouttage homogene forme reguliere.",
+        
+        "Etape 8 SALAGE AFFINAGE: Apres 24 heures egouttage demouler delicatement fromage. Saler toutes faces frottant legerement sel environ 2% poids fromage. Sel cree croute protectrice rehausse aromes regule humidite. Placer fromage grille endroit frais 12-14 degres 85% humidite. Retourner tous 2 jours 2-4 semaines selon type. Observer apparition croute ajuster temperature humidite necessaire."
     ],
-    "duree_totale": "24-48h",
-    "difficulte": "Moyenne",
-    "temperature_affinage": "12-14 degres avec 85% humidite",
-    "conseils": "Conseils pratiques en une ou deux phrases courtes",
+    "duree_totale": "24-48h fabrication puis 2-4 semaines affinage",
+    "difficulte": "Moyenne - Necessite precision patience surveillance mais accessible amateurs motives",
+    "temperature_affinage": "12-14 degres avec 85-90% humidite cave ou frigo amenage",
+    "conseils": "Toujours utiliser lait cru fermier possible contient flore lactique riche donne caractere fromage. Lait pasteurise fonctionne gout neutre. Thermometre precis indispensable 2-3 degres difference ruinent fromage. Patience essentielle jamais precipiter etapes fromage besoin temps developper aromes. Erreurs eviter: lait UHT coagule mal, sel iode tue ferments, affinage trop sec croute craque trop humide moisissures. Variantes possibles herbes epices fleurs cendres bois. Affinage modulable gouts court doux cremeux long prononce ferme.",
     "aromates": {json.dumps(aromates, ensure_ascii=False)},
-    "technique_aromatisation": "Technique incorporation aromates",
-    "score": 8.0,
+    "technique_aromatisation": "Incorporer aromates haches concasses moulage melangeant grains caille ou saupoudrer surface avant affinage infusion progressive aromes pate",
+    "score": 8.5,
     "seed": {seed},
     "profile": "{profile}"
 }}
 
-REGLES ULTRA-STRICTES:
-- PAS d'accents dans le JSON (utilise e au lieu de é, a au lieu de à)
-- PAS de caracteres speciaux (* _ # etc)
-- PAS d'apostrophes (utilise espaces)
-- Texte simple sans formatage
-- Maximum 150 caracteres par etape
-- Virgules ENTRE elements, JAMAIS avant ] ou }}
+VERIFICATION FINALE AVANT ENVOI:
+✅ Commence par {{ termine par }}
+✅ Tous tableaux sont strings simples
+✅ Aucun dict imbrique
+✅ Virgules correctes
+✅ Pas asterisques ni underscores
+✅ 8 etapes minimum 180-280 caracteres chacune
 
-⚠️ INSTRUCTIONS FINALES CRITIQUES:
-- COMMENCE DIRECTEMENT PAR LA PREMIÈRE ACCOLADE {{
-- TERMINE DIRECTEMENT PAR LA DERNIÈRE ACCOLADE }}
-- AUCUN texte avant ou après
-- AUCUN formatage markdown (* pour italique, ** pour gras, _ pour souligné)
-- Texte brut UNIQUEMENT dans toutes les valeurs
-- VALIDE ton JSON mentalement avant d'envoyer
-- Structure PLATE uniquement (pas d'objets dans les objets)
-
-GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
-
+GENERE MAINTENANT JSON VALIDE:"""
         # ========== APPEL AU LLM ==========
         try:
             print("🔍 DEBUG: Envoi du prompt au LLM...")
@@ -2367,19 +2348,15 @@ class RecipeFormatter:
     @staticmethod
     def format_to_text(recipe_data: Dict) -> str:
         """Convertit JSON en texte formaté"""
-        
         # ===== GÉNÉRATION INTELLIGENTE DU TITRE =====
         titre_base = recipe_data.get('title', 'Fromage Maison')
-        
         # Si le titre est générique, créer un titre personnalisé
         if titre_base.upper() in ['FROMAGE PERSONNALISÉ', 'FROMAGE MAISON', 'FROMAGE']:
             import random
-            
             lait = recipe_data.get('lait', 'vache')
             type_pate = recipe_data.get('type_pate', 'Fromage frais')
             ingredients = recipe_data.get('ingredients', [])
             profile = recipe_data.get('profile', 'Standard')
-            
             # Extraire herbes/épices des ingrédients
             herbes = []
             for ing in ingredients:
@@ -2390,7 +2367,6 @@ class RecipeFormatter:
                         if herb_name in ing_lower:
                             herbes.append(herb_name)
                             break
-            
             # Noms de base selon le type de lait
             base_noms = {
                 'vache': ['TOMME', 'FERMIER', 'CAMPAGNARD', 'TERROIR'],
@@ -2398,9 +2374,7 @@ class RecipeFormatter:
                 'brebis': ['BREBIS', 'OVIN', 'BERGER', 'PECORINO'],
                 'bufflonne': ['BUFFALO', 'BUFFLONNE', 'MOZZARELLA']
             }
-            
             nom_base = random.choice(base_noms.get(lait, ['ARTISAN', 'FERMIER', 'MAISON']))
-            
             # Construire le titre
             if herbes:
                 title = f"{nom_base} AU {herbes[0].upper()}"
@@ -2412,7 +2386,6 @@ class RecipeFormatter:
                 title = f"{nom_base} PÂTE MOLLE"
             else:
                 title = f"{nom_base} AFFINÉ"
-            
             # Ajouter qualificatif selon le profil
             if profile == "🏭 Producteur" and 'AFFINÉ' not in title:
                 title += " AFFINÉ"
@@ -2434,6 +2407,8 @@ class RecipeFormatter:
         score = recipe_data.get('score', 8)
         mode = recipe_data.get('generation_mode', 'unknown')
         profile = recipe_data.get('profile', 'Standard')
+
+        source_type = recipe_data.get('source_type', 'generated')  # valeur par défaut 'generated'
         
         mode_icons = {
             'llm_pure_with_knowledge': '🤖📚',
@@ -2442,47 +2417,68 @@ class RecipeFormatter:
             'static_knowledge': '📋',
             'unknown': '🧀',
         }
-        
         mode_icon = mode_icons.get(mode, '❓')
         
         ingredients_text = "\n".join([f"  • {ing}" for ing in ingredients])
-        etapes_text = "\n\n".join(etapes)
+        
+        # ✅ NORMALISER LES ÉTAPES (convertir dicts en strings si nécessaire)
+        etapes_normalized = []
+        for i, etape in enumerate(etapes, 1):
+            if isinstance(etape, dict):
+                # Si c'est un dict, extraire le texte
+                texte = (etape.get('texte') or 
+                        etape.get('description') or 
+                        etape.get('text') or 
+                        etape.get('instruction') or 
+                        str(etape))
+                # Ajouter numéro si absent
+                if not texte.strip().lower().startswith('etape'):
+                    etapes_normalized.append(f"Étape {i}: {texte}")
+                else:
+                    etapes_normalized.append(texte)
+            elif isinstance(etape, str):
+                # Si c'est déjà une string, garder tel quel
+                etapes_normalized.append(etape)
+            else:
+                # Autre type, convertir en string
+                etapes_normalized.append(f"Étape {i}: {str(etape)}")
+        
+        # Joindre les étapes normalisées
+        etapes_text = "\n\n".join(etapes_normalized)
         
         formatted = f"""
-    ╔==============================================================╗
-    ║  {mode_icon} {title.upper()}
-    ║  (Profil: {profile} | Mode: {mode})
-    ║  ⭐ Score: {score}/10
-    ╚==============================================================╝
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                    🧀 {title.upper()}
+    ║                    {mode_icon} {type_pate} | Mode: {source_type}
+    ╚══════════════════════════════════════════════════════════════╝
 
     📝 DESCRIPTION
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {description}
 
-    📋 INFORMATIONS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🥛 Lait : {lait.capitalize()}
-    🧀 Type de pâte : {type_pate}
-    ⏱️ Durée totale : {duree_totale}
-    📊 Difficulté : {difficulte}
-    🌡️ Température affinage : {temperature_affinage}
+    🥛 TYPE DE LAIT
+    {lait}
 
-    🛒 INGRÉDIENTS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    🧀 TYPE DE PÂTE
+    {type_pate}
+
+    📦 INGRÉDIENTS
     {ingredients_text}
 
     👨‍🍳 ÉTAPES DE FABRICATION
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     {etapes_text}
 
-    💡 CONSEILS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ⏱️  INFORMATIONS PRATIQUES
+    - Durée totale: {duree_totale}
+    - Difficulté: {difficulte}
+    - Température d'affinage: {temperature_affinage}
+    - Score: {score}/10
+
+    💡 CONSEILS DU MAÎTRE FROMAGER
     {conseils}
 
-    ⚠️ RAPPEL : Respectez les règles d'hygiène strictes en fabrication fromagère.
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    ✨ Bon fromage ! Recette générée spécialement pour vous.
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Recette générée par Agent Fromager 🧀 | Profil: {profile}
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     """
         
         return formatted
