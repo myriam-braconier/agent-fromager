@@ -2345,11 +2345,13 @@ Réponds JSON uniquement (sans markdown):
 class RecipeFormatter:
     """Formate les recettes JSON en texte lisible"""
     
+   
     @staticmethod
     def format_to_text(recipe_data: Dict) -> str:
         """Convertit JSON en texte formaté"""
         # ===== GÉNÉRATION INTELLIGENTE DU TITRE =====
         titre_base = recipe_data.get('title', 'Fromage Maison')
+        
         # Si le titre est générique, créer un titre personnalisé
         if titre_base.upper() in ['FROMAGE PERSONNALISÉ', 'FROMAGE MAISON', 'FROMAGE']:
             import random
@@ -2357,16 +2359,17 @@ class RecipeFormatter:
             type_pate = recipe_data.get('type_pate', 'Fromage frais')
             ingredients = recipe_data.get('ingredients', [])
             profile = recipe_data.get('profile', 'Standard')
+            
             # Extraire herbes/épices des ingrédients
             herbes = []
             for ing in ingredients:
                 ing_lower = str(ing).lower()
                 if any(h in ing_lower for h in ['thym', 'romarin', 'basilic', 'herbe', 'épice', 'poivre', 'ail', 'ciboulette', 'persil']):
-                    # Extraire juste le nom de l'herbe
                     for herb_name in ['thym', 'romarin', 'basilic', 'poivre', 'ail', 'ciboulette', 'persil']:
                         if herb_name in ing_lower:
                             herbes.append(herb_name)
                             break
+            
             # Noms de base selon le type de lait
             base_noms = {
                 'vache': ['TOMME', 'FERMIER', 'CAMPAGNARD', 'TERROIR'],
@@ -2375,6 +2378,7 @@ class RecipeFormatter:
                 'bufflonne': ['BUFFALO', 'BUFFLONNE', 'MOZZARELLA']
             }
             nom_base = random.choice(base_noms.get(lait, ['ARTISAN', 'FERMIER', 'MAISON']))
+            
             # Construire le titre
             if herbes:
                 title = f"{nom_base} AU {herbes[0].upper()}"
@@ -2386,15 +2390,18 @@ class RecipeFormatter:
                 title = f"{nom_base} PÂTE MOLLE"
             else:
                 title = f"{nom_base} AFFINÉ"
+            
             # Ajouter qualificatif selon le profil
             if profile == "🏭 Producteur" and 'AFFINÉ' not in title:
                 title += " AFFINÉ"
             elif profile == "🧀 Amateur" and 'MAISON' not in nom_base:
                 title += " MAISON"
         else:
-            title = titre_base
+            title = titre_base  # ✅ CETTE LIGNE EST CRUCIALE !
+        
         # ===== FIN GÉNÉRATION INTELLIGENTE =====
         
+        # ✅ Extraire les autres variables APRÈS avoir défini title
         description = recipe_data.get('description', '')
         lait = recipe_data.get('lait', 'vache')
         type_pate = recipe_data.get('type_pate', 'Fromage frais')
@@ -2407,8 +2414,20 @@ class RecipeFormatter:
         score = recipe_data.get('score', 8)
         mode = recipe_data.get('generation_mode', 'unknown')
         profile = recipe_data.get('profile', 'Standard')
-
-        source_type = recipe_data.get('source_type', 'generated')  # valeur par défaut 'generated'
+        
+        # ✅ GESTION DES 4 NIVEAUX DE CRÉATIVITÉ
+        creativity_level = recipe_data.get('creativity_level', 0)
+        
+        creativity_mapping = {
+            0: {'source_type': 'Base statique', 'icon': '📋'},
+            1: {'source_type': 'Web scrapé', 'icon': '🌐'},
+            2: {'source_type': 'Hybride (Web + IA)', 'icon': '🌐🤖'},
+            3: {'source_type': 'IA pure', 'icon': '🤖'}
+        }
+        
+        creativity_info = creativity_mapping.get(creativity_level, creativity_mapping[0])
+        source_type = creativity_info['source_type']
+        creativity_icon = creativity_info['icon']
         
         mode_icons = {
             'llm_pure_with_knowledge': '🤖📚',
@@ -2417,68 +2436,65 @@ class RecipeFormatter:
             'static_knowledge': '📋',
             'unknown': '🧀',
         }
-        mode_icon = mode_icons.get(mode, '❓')
+        mode_icon = mode_icons.get(mode, creativity_icon)
+    
         
         ingredients_text = "\n".join([f"  • {ing}" for ing in ingredients])
         
-        # ✅ NORMALISER LES ÉTAPES (convertir dicts en strings si nécessaire)
+        # ✅ NORMALISER LES ÉTAPES
         etapes_normalized = []
         for i, etape in enumerate(etapes, 1):
             if isinstance(etape, dict):
-                # Si c'est un dict, extraire le texte
                 texte = (etape.get('texte') or 
                         etape.get('description') or 
                         etape.get('text') or 
                         etape.get('instruction') or 
                         str(etape))
-                # Ajouter numéro si absent
                 if not texte.strip().lower().startswith('etape'):
                     etapes_normalized.append(f"Étape {i}: {texte}")
                 else:
                     etapes_normalized.append(texte)
             elif isinstance(etape, str):
-                # Si c'est déjà une string, garder tel quel
                 etapes_normalized.append(etape)
             else:
-                # Autre type, convertir en string
                 etapes_normalized.append(f"Étape {i}: {str(etape)}")
         
-        # Joindre les étapes normalisées
         etapes_text = "\n\n".join(etapes_normalized)
         
         formatted = f"""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                    🧀 {title.upper()}
-    ║                    {mode_icon} {type_pate} | Mode: {source_type}
-    ╚══════════════════════════════════════════════════════════════╝
+        ╔══════════════════════════════════════════════════════════════╗
+        ║                    🧀 {title.upper()}
+        ║                    {mode_icon} {type_pate} | Mode: {source_type}
+        ║                    📊 Créativité: Niveau {creativity_level}/3
+        ╠══════════════════════════════════════════════════════════════╣
 
-    📝 DESCRIPTION
-    {description}
+        📝 DESCRIPTION
+        {description}
 
-    🥛 TYPE DE LAIT
-    {lait}
+        🥛 TYPE DE LAIT
+        {lait}
 
-    🧀 TYPE DE PÂTE
-    {type_pate}
+        🧀 TYPE DE PÂTE
+        {type_pate}
 
-    📦 INGRÉDIENTS
-    {ingredients_text}
+        📦 INGRÉDIENTS
+        {ingredients_text}
 
-    👨‍🍳 ÉTAPES DE FABRICATION
-    {etapes_text}
+        👨‍🍳 ÉTAPES DE FABRICATION
+        {etapes_text}
 
-    ⏱️  INFORMATIONS PRATIQUES
-    - Durée totale: {duree_totale}
-    - Difficulté: {difficulte}
-    - Température d'affinage: {temperature_affinage}
-    - Score: {score}/10
+        ⏱️  INFORMATIONS PRATIQUES
+        - Durée totale: {duree_totale}
+        - Difficulté: {difficulte}
+        - Température d'affinage: {temperature_affinage}
+        - Score: {score}/10
 
-    💡 CONSEILS DU MAÎTRE FROMAGER
-    {conseils}
+        💡 CONSEILS DU MAÎTRE FROMAGER
+        {conseils}
 
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Recette générée par Agent Fromager 🧀 | Profil: {profile}
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    """
-        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        Recette générée par Agent Fromager 🧀 | Profil: {profile}
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        """
+            
         return formatted
