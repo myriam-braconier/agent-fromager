@@ -1272,7 +1272,8 @@ class UnifiedRecipeGeneratorV2:
         cheese_type: str,
         lait: Optional[str],
         profile: str,
-        constraints: str
+        constraints: str,
+        creativity_level: int = 0 
     ) -> Optional[Dict]:
         """Génère avec LLM en utilisant le contexte complet de la base statique"""
         
@@ -1644,8 +1645,9 @@ GENERE MAINTENANT JSON VALIDE:"""
                     if not recipe_data.get(field):
                         print(f"⚠️ Champ manquant: {field}")
                 
-                print(f"   ✅ Recette générée: {recipe_data.get('title', 'Sans titre')}")
-                print(f"   🔢 {len(recipe_data.get('etapes', []))} étapes")
+                # ✅ AJOUTER LE NIVEAU DE CRÉATIVITÉ
+                recipe_data['creativity_level'] = creativity_level
+                recipe_data['generation_mode'] = self._get_generation_mode(creativity_level)
                 
                 return recipe_data
             
@@ -1685,6 +1687,10 @@ GENERE MAINTENANT JSON VALIDE:"""
                         for field in required_fields:
                             if not recipe_data.get(field):
                                 print(f"⚠️ Champ manquant: {field}")
+                                
+                        # ✅ AJOUTER LE NIVEAU DE CRÉATIVITÉ
+                        recipe_data['creativity_level'] = creativity_level
+                        recipe_data['generation_mode'] = self._get_generation_mode(creativity_level)
                         
                         return recipe_data
                         
@@ -1719,6 +1725,10 @@ GENERE MAINTENANT JSON VALIDE:"""
                     recipe_data = json.loads(json_repaired)
                     print("✅ JSON réparé manuellement !")
                     
+                    # ✅ AJOUTER LE NIVEAU DE CRÉATIVITÉ
+                    recipe_data['creativity_level'] = creativity_level
+                    recipe_data['generation_mode'] = self._get_generation_mode(creativity_level)
+                    
                     # ✅ NORMALISER LE SCORE ICI AUSSI
                     if 'score' in recipe_data:
                         score = recipe_data['score']
@@ -1742,6 +1752,11 @@ GENERE MAINTENANT JSON VALIDE:"""
                     
                     recipe_data = json.loads(json_repaired)
                     print("✅ JSON réparé manuellement !")
+                    
+                    # ✅ AJOUTER LE NIVEAU DE CRÉATIVITÉ
+                    recipe_data['creativity_level'] = creativity_level
+                    recipe_data['generation_mode'] = self._get_generation_mode(creativity_level)
+                    
                     return recipe_data
                     
                 except Exception as repair_error:
@@ -1784,7 +1799,9 @@ GENERE MAINTENANT JSON VALIDE:"""
                     "conseils": "Respecter scrupuleusement les temperatures et durees. Utiliser du lait cru pour plus de saveur. Patience essentielle pendant affinage.",
                     "score": 7.5,
                     "seed": seed,
-                    "profile": profile
+                    "profile": profile,
+                    "creativity_level": creativity_level,  # ✅ AJOUTER
+                    "generation_mode": self._get_generation_mode(creativity_level)  # ✅ AJOUTER
                 }
                 
                 # Ajouter les aromates si présents
@@ -1944,6 +1961,17 @@ GENERE MAINTENANT JSON VALIDE:"""
         }
         return astuces.get(profile, "Notez vos observations à chaque étape pour progresser rapidement !")
         
+
+    def _get_generation_mode(self, creativity_level: int) -> str:
+        """Retourne le mode de génération selon le niveau de créativité"""
+        modes = {
+            0: 'static_knowledge',
+            1: 'web_enriched',
+            2: 'llm_pure_with_knowledge',
+            3: 'llm_pure_with_knowledge'
+        }
+        return modes.get(creativity_level, 'unknown')
+
 
     # ===============================================================
     # SCRAPING WEB (comme avant)
@@ -2352,6 +2380,8 @@ class RecipeFormatter:
         # ===== GÉNÉRATION INTELLIGENTE DU TITRE =====
         titre_base = recipe_data.get('title', 'Fromage Maison')
         
+        
+        
         # Si le titre est générique, créer un titre personnalisé
         if titre_base.upper() in ['FROMAGE PERSONNALISÉ', 'FROMAGE MAISON', 'FROMAGE']:
             import random
@@ -2359,6 +2389,8 @@ class RecipeFormatter:
             type_pate = recipe_data.get('type_pate', 'Fromage frais')
             ingredients = recipe_data.get('ingredients', [])
             profile = recipe_data.get('profile', 'Standard')
+            
+            
             
             # Extraire herbes/épices des ingrédients
             herbes = []
@@ -2400,6 +2432,36 @@ class RecipeFormatter:
             title = titre_base  # ✅ CETTE LIGNE EST CRUCIALE !
         
         # ===== FIN GÉNÉRATION INTELLIGENTE =====
+        
+        # ✅ IMPORTANT : S'assurer que title est TOUJOURS défini
+        if titre_base.upper() in ['FROMAGE PERSONNALISÉ', 'FROMAGE MAISON', 'FROMAGE']:
+            # ... génération personnalisée ...
+            title = f"{nom_base} AU {herbes[0].upper()}"  # ou autre logique
+        else:
+            title = titre_base  # ✅ NE PAS OUBLIER CETTE LIGNE !
+        
+        # ===== EXTRAIRE LES AUTRES VARIABLES =====
+        description = recipe_data.get('description', '')
+        lait = recipe_data.get('lait', 'vache')
+        type_pate = recipe_data.get('type_pate', 'Fromage frais')
+        
+        # ✅ GESTION DU NIVEAU DE CRÉATIVITÉ
+        creativity_level = recipe_data.get('creativity_level', 0)
+        
+        # Mapping des niveaux
+        creativity_mapping = {
+            0: {'source_type': 'Base statique', 'icon': '📋'},
+            1: {'source_type': 'Web scrapé', 'icon': '🌐'},
+            2: {'source_type': 'Hybride (Web + IA)', 'icon': '🌐🤖'},
+            3: {'source_type': 'IA pure', 'icon': '🤖'}
+        }
+        
+        creativity_info = creativity_mapping.get(creativity_level, creativity_mapping[0])
+        source_type = creativity_info['source_type']
+        creativity_icon = creativity_info['icon']
+        
+        
+        
         
         # ✅ Extraire les autres variables APRÈS avoir défini title
         description = recipe_data.get('description', '')
@@ -2464,10 +2526,10 @@ class RecipeFormatter:
         formatted = f"""
         ╔══════════════════════════════════════════════════════════════╗
         ║                    🧀 {title.upper()}
-        ║                    {mode_icon} {type_pate} | Mode: {source_type}
+        ║                    {creativity_icon} {type_pate} | Mode: {source_type}
         ║                    📊 Créativité: Niveau {creativity_level}/3
         ╠══════════════════════════════════════════════════════════════╣
-
+        
         📝 DESCRIPTION
         {description}
 
