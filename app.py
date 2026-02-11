@@ -8084,7 +8084,7 @@ def create_interface():
                                 date = entry.get('date', '')[:10] if entry.get('date') else 'sans date'
                                 
                                 display_text = f"{entry_name} ({date})"
-                                                               
+
                                 if display_text not in recipe_map:
                                     choices.append(display_text)
                                     recipe_map[display_text] = entry_id
@@ -8106,7 +8106,7 @@ def create_interface():
                                     choices=choices_with_placeholder,
                                     value="→ Sélectionner parmi les recettes"  # ← CORRIGÉ
                                 ),
-                                "Sélectionnez une recette...",
+                                "Actualisez puis sélectionnez une recette...",
                             ]
                             
                         except Exception as e:
@@ -8372,7 +8372,7 @@ def create_interface():
                             print(f"⚠️ C'est une liste! Longueur: {len(selected)}")
                             if not selected:
                                 print("❌ Liste vide")
-                                return "Sélectionnez une recette..."
+                                return "Actualisez puis sélectionnez une recette..."
                             selected = selected[0]
                             print(f"✅ Premier élément extrait: {selected}")
                         
@@ -8406,7 +8406,7 @@ def create_interface():
                         # ===== FIN DEBUG ============
                         
                         if not selected:
-                            return "Sélectionnez une recette..."
+                            return "Actualisez puis sélectionnez une recette..."
                         
                         try:
                             # Chercher dans le mapping
