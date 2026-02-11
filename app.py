@@ -7947,7 +7947,7 @@ def create_interface():
                             show_fallback_btn = gr.Button("📖 Voir recettes de référence")
                         
                         with gr.Column(scale=2):
-                            # dropdown de test
+                           
 
                             recipe_dropdown = gr.Dropdown(
                                 label="🍽️ Sélectionner une recette",
@@ -8083,8 +8083,8 @@ def create_interface():
                                 entry_name = entry.get('cheese_name') or entry.get('name') or entry.get('titre') or f"Recette #{entry_id}"
                                 date = entry.get('date', '')[:10] if entry.get('date') else 'sans date'
                                 
-                                display_text = f"{entry_id}. {entry_name} ({date})"
-                                
+                                display_text = f"{entry_name} ({date})"
+                                                               
                                 if display_text not in recipe_map:
                                     choices.append(display_text)
                                     recipe_map[display_text] = entry_id
