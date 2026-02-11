@@ -23,18 +23,36 @@ from typing import List, Dict, Optional
 class UnifiedRecipeGeneratorV2:
     """Générateur unifié avec intégration complète de la base statique"""
     
-    def __init__(self, agent):
+    def __init__(self, knowledge_base=None, agent=None):
         """
+        Initialise le générateur unifié V2
+        
         Args:
-            agent: Instance de AgentFromagerHF avec accès aux LLMs et knowledge_base
+            knowledge_base: Base de connaissances statique (dict)
+            agent: Agent avec la méthode chat_with_llm() (optionnel)
         """
+        # Priorité : knowledge_base passé en paramètre, sinon depuis l'agent
+        if knowledge_base is not None:
+            self.knowledge_base = knowledge_base
+        elif agent is not None and hasattr(agent, 'knowledge_base'):
+            self.knowledge_base = agent.knowledge_base
+        else:
+            self.knowledge_base = {}
+        
+        # Stocker l'agent
         self.agent = agent
+        
+        # Cache et historique
         self.cache = {}
         self.history_file = "unified_recipes_history.json"
         
-        # Accès à la base de connaissances statique de l'agent
-        self.knowledge_base = agent.knowledge_base if hasattr(agent, 'knowledge_base') else {}
-        
+        # Debug
+        print(f"🔍 UnifiedRecipeGeneratorV2 initialisé:")
+        print(f"   - knowledge_base: {len(self.knowledge_base)} clés")
+        print(f"   - agent: {type(self.agent)}")
+        if self.agent:
+            print(f"   - agent a chat_with_llm: {hasattr(self.agent, 'chat_with_llm')}")
+               
     # ===============================================================
     # MÉTHODE PRINCIPALE
     # ===============================================================
@@ -228,12 +246,13 @@ class UnifiedRecipeGeneratorV2:
         constraints: str
     ) -> Dict:
         """Génère une recette en utilisant la base de connaissances statique"""
-        
         import hashlib
+        import random
         
         # Seed basé sur les ingrédients
         ingredients_str = ",".join(sorted(ingredients))
         seed = int(hashlib.md5(ingredients_str.encode()).hexdigest()[:8], 16) % 1000
+        random.seed(seed)
         
         # Contexte profil
         profile_context = self._get_profile_context(profile)
@@ -241,69 +260,114 @@ class UnifiedRecipeGeneratorV2:
         # Récupérer les infos du type de fromage depuis la base statique
         type_info = self._get_type_info_from_knowledge(cheese_type)
         
-        # Nom créatif
-        prefixes = ["Artisanal", "Fermier", "Maison", "du Terroir", "Authentique"]
-        suffixes = ["Frais", "Traditionnel", "Rustique", "Nature", "Gourmand"]
+        # ========== NOM CRÉATIF ==========
+        prefixes = ["Artisanal", "Fermier", "Maison", "du Terroir", "Authentique", "Rustique"]
+        suffixes = ["Frais", "Traditionnel", "Rustique", "Nature", "Gourmand", "Parfumé"]
         
-        random.seed(seed)
         prefix = random.choice(prefixes)
         suffix = random.choice(suffixes)
         
-        title = f"{prefix} {cheese_type} {suffix}"
+        # Ajouter le lait au nom si spécifié
+        lait_name = f"de {lait}" if lait and lait != "vache" else ""
+        title = f"{prefix} {cheese_type} {lait_name} {suffix}".strip()
         
-        # Ingrédients avec quantités adaptées au profil
+        # ========== INGRÉDIENTS AVEC QUANTITÉS ADAPTÉES ==========
         quantite_lait = profile_context['quantite_lait']
-        
         ingredients_list = [
-            f"{quantite_lait} lait {lait or 'entier'}",
+            f"{quantite_lait} de lait {lait or 'de vache'} (entier, pasteurisé ou cru)"
         ]
         
-        # Ajouter présure et ferments depuis la base statique
-        if 'ingredients_base' in self.knowledge_base:
-            if 'ferments' in self.knowledge_base['ingredients_base']:
-                ingredients_list.append("Ferments lactiques (selon la base)")
-            if 'presure' in self.knowledge_base['ingredients_base']:
-                ingredients_list.append("Présure (selon dosage recommandé)")
+        # Coagulant depuis la base statique
+        if 'ingredients_base' in self.knowledge_base and 'Coagulant' in self.knowledge_base['ingredients_base']:
+            coagulant_options = self.knowledge_base['ingredients_base']['Coagulant']
+            coagulant = random.choice(coagulant_options)
+            # Dosage adapté selon quantité
+            if "1L" in quantite_lait or "1 L" in quantite_lait:
+                dosage_presure = "5 ml (ou 3 gouttes)"
+            elif "2L" in quantite_lait or "2 L" in quantite_lait:
+                dosage_presure = "10 ml (ou 6 gouttes)"
+            else:
+                dosage_presure = "Selon indications fabricant"
+            ingredients_list.append(f"{dosage_presure} de {coagulant.lower()}")
         else:
-            # Fallback si pas de base
-            ingredients_list.extend([
-                "5 ml présure liquide",
-                "2 g ferments lactiques"
-            ])
+            ingredients_list.append("5 ml de présure liquide")
         
-        ingredients_list.append(f"{profile_context['sel']} sel fin non iodé")
+        # Ferments depuis la base statique
+        if 'ingredients_base' in self.knowledge_base and 'Ferments' in self.knowledge_base['ingredients_base']:
+            ferments_options = self.knowledge_base['ingredients_base']['Ferments']
+            ferment = random.choice(ferments_options)
+            ingredients_list.append(f"2 g de ferments {ferment.lower()}")
+        else:
+            ingredients_list.append("2 g de ferments lactiques")
         
-        # Ajouter aromates/épices depuis la base statique
+        # Sel depuis la base statique
+        if 'ingredients_base' in self.knowledge_base and 'Sel' in self.knowledge_base['ingredients_base']:
+            sel_options = self.knowledge_base['ingredients_base']['Sel']
+            sel = random.choice(sel_options)
+            ingredients_list.append(f"{profile_context['sel']} de {sel.lower()}")
+        else:
+            ingredients_list.append(f"{profile_context['sel']} de sel fin non iodé")
+        
+        # ========== AROMATES ET ÉPICES DEPUIS LA BASE ==========
         aromates = self._extract_aromates(ingredients)
+        aromates_utilises = []
         
         if aromates and 'epices_et_aromates' in self.knowledge_base:
             for aromate in aromates:
-                # Vérifier le dosage recommandé
-                dosage = self._get_dosage_from_knowledge(aromate)
-                ingredients_list.append(f"{dosage} {aromate}")
-        else:
-            for aromate in aromates:
-                ingredients_list.append(f"1 cuillère à café de {aromate}")
+                # Vérifier compatibilité avec type de fromage
+                if self._check_aromate_compatibility(aromate, cheese_type, lait):
+                    dosage = self._get_dosage_from_knowledge(aromate, quantite_lait)
+                    ingredients_list.append(f"{dosage} de {aromate}")
+                    aromates_utilises.append(aromate)
         
-        # Étapes basées sur la base de connaissances
+        # ========== ÉTAPES DÉTAILLÉES ==========
         etapes = self._generate_steps_from_knowledge(
             cheese_type,
             quantite_lait,
             type_info,
-            profile_context
+            profile_context,
+            aromates_utilises,
+            lait
         )
         
-        # Température d'affinage depuis la base
+        # ========== TEMPÉRATURE ET CONDITIONS D'AFFINAGE ==========
         temp_affinage = self._get_temperature_affinage_from_knowledge(cheese_type)
         
-        # Conseils depuis la base
-        conseils_base = self._get_conseils_from_knowledge(cheese_type)
-        conseils = f"{profile_context['conseil']}\n\n{conseils_base}"
+        # ========== CONSEILS PERSONNALISÉS ==========
+        conseils_sections = []
         
-        # Construire la recette
+        # Conseils du profil
+        conseils_sections.append(f"**{profile_context['conseil']}**")
+        
+        # Conseils spécifiques au type de fromage
+        conseils_base = self._get_conseils_from_knowledge(cheese_type)
+        if conseils_base:
+            conseils_sections.append(f"\n**Spécificités du {cheese_type} :**\n{conseils_base}")
+        
+        # Problèmes courants
+        problemes = self._get_problemes_courants_from_knowledge(cheese_type)
+        if problemes:
+            conseils_sections.append(f"\n**⚠️ Problèmes courants à éviter :**\n{problemes}")
+        
+        # Conservation
+        conservation = self._get_conservation_from_knowledge(cheese_type)
+        if conservation:
+            conseils_sections.append(f"\n**📦 Conservation :**\n{conservation}")
+        
+        # Accords
+        accords = self._get_accords_from_knowledge(cheese_type, lait)
+        if accords:
+            conseils_sections.append(f"\n**🍷 Accords recommandés :**\n{accords}")
+        
+        conseils = "\n".join(conseils_sections)
+        
+        # ========== MATÉRIEL NÉCESSAIRE ==========
+        materiel = self._get_materiel_from_knowledge(profile, cheese_type)
+        
+        # ========== CONSTRUIRE LA RECETTE COMPLÈTE ==========
         recipe = {
             'title': title,
-            'description': f"{type_info.get('description', f'Fromage {cheese_type.lower()}')} adapté au profil {profile}",
+            'description': f"{type_info.get('description', f'Fromage {cheese_type.lower()}')} - {profile_context['description']}",
             'lait': lait or 'vache',
             'type_pate': cheese_type,
             'ingredients': ingredients_list,
@@ -311,14 +375,881 @@ class UnifiedRecipeGeneratorV2:
             'duree_totale': type_info.get('duree', profile_context['duree_totale']),
             'difficulte': type_info.get('difficulte', profile_context['difficulte']),
             'temperature_affinage': temp_affinage,
+            'materiel_necessaire': materiel,
             'conseils': conseils,
+            'aromates': aromates_utilises,
+            'technique_aromatisation': self._get_technique_aromatisation(aromates_utilises, cheese_type) if aromates_utilises else None,
             'score': 7,
-            'seed': seed
+            'seed': seed,
+            'profile': profile,
+            'exemples_fromages': type_info.get('exemples', '')
         }
         
-        print(f"   📝 Recette basée sur knowledge_base : {title}")
+        print(f"   📝 Recette générée : {title}")
+        print(f"   🧀 Type: {cheese_type} | Lait: {lait or 'vache'} | Profil: {profile}")
         
         return recipe
+
+    def generate_recipe_pdf(self, recipe: Dict, output_path: str = None) -> str:
+        """
+        Génère un PDF professionnel de la recette de fromage
+        
+        Args:
+            recipe: Dictionnaire contenant les données de la recette
+            output_path: Chemin de sortie (optionnel)
+        
+        Returns:
+            Chemin du fichier PDF généré
+        """
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+            PageBreak, Image, KeepTogether
+        )
+        from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+        from datetime import datetime
+        
+        # Définir le chemin de sortie
+        if output_path is None:
+            safe_title = "".join(c for c in recipe['title'] if c.isalnum() or c in (' ', '-', '_')).strip()
+            output_path = f"/mnt/user-data/outputs/Recette_{safe_title}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        
+        # Créer le document
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=A4,
+            rightMargin=2*cm,
+            leftMargin=2*cm,
+            topMargin=2*cm,
+            bottomMargin=2*cm,
+            title=recipe['title'],
+            author="Agent Fromager"
+        )
+        
+        # Conteneur des éléments
+        story = []
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        
+        # Style titre principal
+        style_title = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2C5F2D'),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Style sous-titre
+        style_subtitle = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.HexColor('#666666'),
+            spaceAfter=20,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Oblique'
+        )
+        
+        # Style section
+        style_section = ParagraphStyle(
+            'SectionTitle',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#2C5F2D'),
+            spaceAfter=12,
+            spaceBefore=20,
+            fontName='Helvetica-Bold',
+            borderPadding=5,
+            borderColor=colors.HexColor('#2C5F2D'),
+            borderWidth=0,
+            leftIndent=0
+        )
+        
+        # Style corps de texte
+        style_body = ParagraphStyle(
+            'CustomBody',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#333333'),
+            spaceAfter=8,
+            alignment=TA_JUSTIFY,
+            leading=16
+        )
+        
+        # Style liste
+        style_list = ParagraphStyle(
+            'CustomList',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#333333'),
+            leftIndent=20,
+            spaceAfter=6,
+            leading=14
+        )
+        
+        # ========== EN-TÊTE ==========
+        # Titre
+        story.append(Paragraph(f"🧀 {recipe['title']}", style_title))
+        
+        # Description
+        if recipe.get('description'):
+            story.append(Paragraph(recipe['description'], style_subtitle))
+        
+        story.append(Spacer(1, 0.5*cm))
+        
+        # ========== INFORMATIONS CLÉS ==========
+        info_data = [
+            ['🥛 Type de lait', recipe.get('lait', 'Non spécifié').capitalize()],
+            ['🧀 Catégorie', recipe.get('type_pate', 'Non spécifié')],
+            ['⏱️ Durée totale', recipe.get('duree_totale', 'Variable')],
+            ['📊 Difficulté', recipe.get('difficulte', 'Moyenne')],
+            ['🌡️ Affinage', recipe.get('temperature_affinage', 'Selon type')],
+        ]
+        
+        if recipe.get('profile'):
+            info_data.append(['👤 Profil', recipe['profile']])
+        
+        info_table = Table(info_data, colWidths=[6*cm, 11*cm])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E8F5E9')),
+            ('BACKGROUND', (1, 0), (1, -1), colors.white),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#333333')),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        
+        story.append(info_table)
+        story.append(Spacer(1, 0.8*cm))
+        
+        # ========== MATÉRIEL NÉCESSAIRE ==========
+        if recipe.get('materiel_necessaire'):
+            story.append(Paragraph("🔧 Matériel nécessaire", style_section))
+            
+            for item in recipe['materiel_necessaire']:
+                story.append(Paragraph(f"• {item}", style_list))
+            
+            story.append(Spacer(1, 0.5*cm))
+        
+        # ========== INGRÉDIENTS ==========
+        story.append(Paragraph("🛒 Ingrédients", style_section))
+        
+        ingredients_data = [[Paragraph(f"<b>{ing}</b>", style_body)] for ing in recipe.get('ingredients', [])]
+        
+        ingredients_table = Table(ingredients_data, colWidths=[17*cm])
+        ingredients_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF9E6')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#333333')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E6D8A3')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),
+        ]))
+        
+        story.append(ingredients_table)
+        story.append(Spacer(1, 0.8*cm))
+        
+        # ========== ÉTAPES DE FABRICATION ==========
+        story.append(Paragraph("👨‍🍳 Étapes de fabrication", style_section))
+        
+        for i, etape in enumerate(recipe.get('etapes', []), 1):
+            # Nettoyer les marqueurs markdown
+            etape_clean = etape.replace('**', '').replace('*', '')
+            
+            # Créer un tableau pour chaque étape
+            etape_data = [[
+                Paragraph(f"<b>Étape {i}</b>", style_body),
+                Paragraph(etape_clean, style_body)
+            ]]
+            
+            etape_table = Table(etape_data, colWidths=[2.5*cm, 14.5*cm])
+            etape_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#2C5F2D')),
+                ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#F5F5F5')),
+                ('TEXTCOLOR', (0, 0), (0, 0), colors.white),
+                ('TEXTCOLOR', (1, 0), (1, 0), colors.HexColor('#333333')),
+                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+                ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (0, 0), 11),
+                ('FONTSIZE', (1, 0), (1, 0), 10),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('LEFTPADDING', (1, 0), (1, 0), 12),
+                ('RIGHTPADDING', (1, 0), (1, 0), 12),
+            ]))
+            
+            story.append(etape_table)
+            story.append(Spacer(1, 0.3*cm))
+        
+        story.append(Spacer(1, 0.5*cm))
+        
+        # ========== TECHNIQUE D'AROMATISATION ==========
+        if recipe.get('technique_aromatisation') and recipe.get('aromates'):
+            story.append(Paragraph("🌿 Aromatisation", style_section))
+            
+            aromates_text = ", ".join(recipe['aromates'])
+            story.append(Paragraph(f"<b>Aromates utilisés :</b> {aromates_text}", style_body))
+            story.append(Spacer(1, 0.2*cm))
+            
+            technique_clean = recipe['technique_aromatisation'].replace('**', '').replace('*', '')
+            story.append(Paragraph(f"<b>Technique :</b> {technique_clean}", style_body))
+            story.append(Spacer(1, 0.5*cm))
+        
+        # ========== CONSEILS ==========
+        if recipe.get('conseils'):
+            story.append(PageBreak())
+            story.append(Paragraph("💡 Conseils et recommandations", style_section))
+            
+            conseils_clean = recipe['conseils'].replace('**', '<b>').replace('**', '</b>')
+            conseils_paragraphs = conseils_clean.split('\n\n')
+            
+            for para in conseils_paragraphs:
+                if para.strip():
+                    # Gérer les listes à puces
+                    if para.strip().startswith('•') or para.strip().startswith('-'):
+                        lines = para.split('\n')
+                        for line in lines:
+                            if line.strip():
+                                story.append(Paragraph(line.strip(), style_list))
+                    else:
+                        story.append(Paragraph(para.strip(), style_body))
+                    story.append(Spacer(1, 0.3*cm))
+        
+        # ========== EXEMPLES DE FROMAGES ==========
+        if recipe.get('exemples_fromages'):
+            story.append(Spacer(1, 0.5*cm))
+            story.append(Paragraph("🧀 Exemples de fromages de cette catégorie", style_section))
+            story.append(Paragraph(recipe['exemples_fromages'], style_body))
+        
+        # ========== PIED DE PAGE ==========
+        story.append(Spacer(1, 1*cm))
+        
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.HexColor('#999999'),
+            alignment=TA_CENTER,
+            spaceAfter=5
+        )
+        
+        story.append(Paragraph("─" * 80, footer_style))
+        story.append(Paragraph(
+            f"📅 Recette générée le {datetime.now().strftime('%d/%m/%Y à %H:%M')} par <b>Agent Fromager</b>",
+            footer_style
+        ))
+        story.append(Paragraph(
+            "🧀 Fromagerie artisanale et transmission du savoir-faire fromager",
+            footer_style
+        ))
+        
+        if recipe.get('seed'):
+            story.append(Paragraph(
+                f"<i>Seed de recette : {recipe['seed']}</i>",
+                footer_style
+            ))
+        
+        # ========== GÉNÉRER LE PDF ==========
+        try:
+            doc.build(story)
+            print(f"✅ PDF généré avec succès : {output_path}")
+            return output_path
+        except Exception as e:
+            print(f"❌ Erreur lors de la génération du PDF : {e}")
+            raise
+
+
+    def batch_generate_pdfs(self, recipes: List[Dict], output_dir: str = "/mnt/user-data/outputs") -> List[str]:
+        """
+        Génère des PDFs pour plusieurs recettes
+        
+        Args:
+            recipes: Liste de dictionnaires de recettes
+            output_dir: Répertoire de sortie
+        
+        Returns:
+            Liste des chemins des PDFs générés
+        """
+        import os
+        
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        pdf_paths = []
+        
+        for i, recipe in enumerate(recipes, 1):
+            print(f"📄 Génération PDF {i}/{len(recipes)} : {recipe['title']}")
+            
+            try:
+                safe_title = "".join(c for c in recipe['title'] if c.isalnum() or c in (' ', '-', '_')).strip()
+                output_path = os.path.join(output_dir, f"Recette_{i:02d}_{safe_title}.pdf")
+                
+                pdf_path = self.generate_recipe_pdf(recipe, output_path)
+                pdf_paths.append(pdf_path)
+                
+            except Exception as e:
+                print(f"⚠️ Échec pour '{recipe['title']}' : {e}")
+                continue
+        
+        print(f"\n✅ {len(pdf_paths)}/{len(recipes)} PDFs générés avec succès")
+        return pdf_paths
+
+
+    # ========== FONCTION D'EXPORT AVEC GÉNÉRATION PDF ==========
+    def export_recipe_with_pdf(self, recipe: Dict, format: str = 'both') -> Dict[str, str]:
+        """
+        Exporte une recette en JSON et/ou PDF
+        
+        Args:
+            recipe: Dictionnaire de la recette
+            format: 'json', 'pdf', ou 'both'
+        
+        Returns:
+            Dictionnaire avec les chemins des fichiers générés
+        """
+        import json
+        from datetime import datetime
+        
+        safe_title = "".join(c for c in recipe['title'] if c.isalnum() or c in (' ', '-', '_')).strip()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        outputs = {}
+        
+        # Export JSON
+        if format in ['json', 'both']:
+            json_path = f"/mnt/user-data/outputs/Recette_{safe_title}_{timestamp}.json"
+            
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(recipe, f, ensure_ascii=False, indent=2)
+            
+            outputs['json'] = json_path
+            print(f"✅ JSON exporté : {json_path}")
+        
+        # Export PDF
+        if format in ['pdf', 'both']:
+            pdf_path = f"/mnt/user-data/outputs/Recette_{safe_title}_{timestamp}.pdf"
+            
+            try:
+                self.generate_recipe_pdf(recipe, pdf_path)
+                outputs['pdf'] = pdf_path
+            except Exception as e:
+                print(f"❌ Erreur PDF : {e}")
+        
+        return outputs
+
+    # ========== MÉTHODES AUXILIAIRES ==========
+
+    def _get_type_info_from_knowledge(self, cheese_type: str) -> Dict:
+        """Récupère les infos d'un type de fromage depuis la base"""
+        if 'types_pate' in self.knowledge_base:
+            return self.knowledge_base['types_pate'].get(cheese_type, {})
+        return {}
+
+
+    def _check_aromate_compatibility(self, aromate: str, cheese_type: str, lait: Optional[str]) -> bool:
+        """Vérifie la compatibilité aromate/fromage depuis regles_compatibilite"""
+        if 'regles_compatibilite' not in self.knowledge_base:
+            return True
+        
+        # Vérifier exclusions absolues
+        if 'exclusions_absolues' in self.knowledge_base['regles_compatibilite']:
+            for exclusion in self.knowledge_base['regles_compatibilite']['exclusions_absolues']:
+                if f"type_pate:{cheese_type}" in exclusion['combinaison'] and aromate.lower() in exclusion['combinaison'].lower():
+                    print(f"   ⚠️ Exclusion : {aromate} incompatible avec {cheese_type}")
+                    return False
+        
+        # Vérifier compatibilité type_pate x aromates
+        if 'type_pate_x_aromates' in self.knowledge_base['regles_compatibilite']:
+            if cheese_type in self.knowledge_base['regles_compatibilite']['type_pate_x_aromates']:
+                infos = self.knowledge_base['regles_compatibilite']['type_pate_x_aromates'][cheese_type]
+                
+                # Vérifier incompatibilités
+                if 'aromates_incompatibles' in infos:
+                    for incompatible in infos['aromates_incompatibles']:
+                        if incompatible.lower() in aromate.lower():
+                            print(f"   ⚠️ {aromate} déconseillé pour {cheese_type}")
+                            return False
+        
+        return True
+
+
+    def _get_dosage_from_knowledge(self, aromate: str, quantite_lait: str = "1L") -> str:
+        """
+        Récupère le dosage recommandé depuis la base de connaissances
+        
+        Args:
+            aromate: Nom de l'aromate/épice
+            quantite_lait: Quantité de lait utilisée (ex: "1L", "2L", "10L")
+        
+        Returns:
+            Dosage recommandé avec unité
+        """
+        if 'dosages_recommandes' not in self.knowledge_base:
+            return "1 cuillère à café"
+        
+        dosages = self.knowledge_base['dosages_recommandes']
+        aromate_lower = aromate.lower()
+        
+        # Extraire le coefficient multiplicateur selon quantité de lait
+        coef = 1.0
+        try:
+            # Chercher un nombre suivi de L ou l
+            import re
+            match = re.search(r'(\d+(?:\.\d+)?)\s*[Ll]', quantite_lait)
+            if match:
+                coef = float(match.group(1))
+        except:
+            coef = 1.0
+        
+        # Identifier la catégorie et appliquer le dosage
+        
+        # Herbes fraîches
+        if any(herb in aromate_lower for herb in ['basilic', 'thym', 'romarin', 'persil', 'menthe', 'ciboulette', 'aneth', 'coriandre']):
+            if 'frais' in aromate_lower or 'fraîche' in aromate_lower:
+                base = dosages.get('Herbes fraîches', "2-3 cuillères à soupe")
+                if coef > 1:
+                    # Extraire les nombres du dosage
+                    try:
+                        nums = re.findall(r'\d+', base)
+                        if len(nums) >= 2:
+                            min_val = int(nums[0]) * coef
+                            max_val = int(nums[1]) * coef
+                            return f"{int(min_val)}-{int(max_val)} cuillères à soupe"
+                    except:
+                        pass
+                return base
+            else:
+                # Herbes séchées
+                base = dosages.get('Herbes séchées', "1-2 cuillères à soupe")
+                if coef > 1:
+                    try:
+                        nums = re.findall(r'\d+', base)
+                        if len(nums) >= 2:
+                            min_val = int(nums[0]) * coef
+                            max_val = int(nums[1]) * coef
+                            return f"{int(min_val)}-{int(max_val)} cuillères à soupe"
+                    except:
+                        pass
+                return base
+        
+        # Épices moulues
+        elif any(spice in aromate_lower for spice in ['poivre', 'paprika', 'curry', 'cumin', 'piment', 'cayenne', 'espelette']):
+            base = dosages.get('Épices moulues', "1-2 cuillères à café")
+            if coef > 1:
+                try:
+                    nums = re.findall(r'\d+', base)
+                    if len(nums) >= 2:
+                        min_val = int(nums[0]) * coef
+                        max_val = int(nums[1]) * coef
+                        return f"{int(min_val)}-{int(max_val)} cuillères à café"
+                except:
+                    pass
+            return base
+        
+        # Graines et épices en grains
+        elif any(grain in aromate_lower for grain in ['graines', 'grain', 'fenouil', 'carvi', 'nigelle', 'coriandre en graines']):
+            base = dosages.get('Épices en grains', "1 cuillère à soupe concassée")
+            if coef > 1:
+                return f"{int(coef)} cuillères à soupe concassées"
+            return base
+        
+        # Ail
+        elif 'ail' in aromate_lower:
+            if coef > 1:
+                min_val = int(1 * coef)
+                max_val = int(2 * coef)
+                return f"{min_val}-{max_val} gousses"
+            return "1-2 gousses"
+        
+        # Gingembre
+        elif 'gingembre' in aromate_lower:
+            if coef > 1:
+                min_val = int(1 * coef)
+                max_val = int(2 * coef)
+                return f"{min_val}-{max_val} morceaux de 2cm"
+            return "1-2 morceaux de 2cm"
+        
+        # Zestes
+        elif any(zest in aromate_lower for zest in ['zeste', 'citron', 'orange', 'bergamote', 'lime']):
+            if coef > 1:
+                return f"{int(coef)} agrume(s) entier(s)"
+            return "1 agrume entier"
+        
+        # Cendres
+        elif 'cendre' in aromate_lower or 'charbon' in aromate_lower:
+            return "Fine couche sur la croûte"
+        
+        # Noix, noisettes, pistaches
+        elif any(nut in aromate_lower for nut in ['noix', 'noisette', 'pistache', 'amande']):
+            if coef > 1:
+                return f"{int(30 * coef)}g concassées"
+            return "30g concassées (2-3 cuillères à soupe)"
+        
+        # Olives
+        elif 'olive' in aromate_lower:
+            if coef > 1:
+                return f"{int(50 * coef)}g dénoyautées et coupées"
+            return "50g dénoyautées et coupées"
+        
+        # Tomates séchées
+        elif 'tomate' in aromate_lower and ('séchée' in aromate_lower or 'sechee' in aromate_lower):
+            if coef > 1:
+                return f"{int(30 * coef)}g hachées"
+            return "30g hachées"
+        
+        # Fruits secs
+        elif any(fruit in aromate_lower for fruit in ['abricot', 'figue', 'raisin', 'datte', 'pruneau']):
+            if coef > 1:
+                return f"{int(40 * coef)}g hachés"
+            return "40g hachés (environ 4-5 pièces)"
+        
+        # Fleurs et pollen
+        elif any(fleur in aromate_lower for fleur in ['lavande', 'safran', 'rose', 'bleuet', 'pollen']):
+            if 'safran' in aromate_lower:
+                if coef > 1:
+                    return f"{int(0.2 * coef * 10) / 10}g (quelques pistils)"
+                return "0.2g (quelques pistils)"
+            else:
+                if coef > 1:
+                    return f"{int(1 * coef)} cuillère à café"
+                return "1 cuillère à café"
+        
+        # Truffe
+        elif 'truffe' in aromate_lower:
+            if coef > 1:
+                return f"{int(10 * coef)}g râpée"
+            return "10g râpée (environ 1 petite truffe)"
+        
+        # Champignons séchés
+        elif 'champignon' in aromate_lower and 'séché' in aromate_lower:
+            if coef > 1:
+                return f"{int(20 * coef)}g réhydratés et hachés"
+            return "20g réhydratés et hachés"
+        
+        # Dosage par défaut
+        return "Selon goût (1-2 cuillères à café)"
+
+    def _generate_steps_from_knowledge(
+        self,
+        cheese_type: str,
+        quantite_lait: str,
+        type_info: Dict,
+        profile_context: Dict,
+        aromates: List[str],
+        lait: Optional[str]
+    ) -> List[str]:
+        """Génère les étapes de fabrication adaptées au profil"""
+        
+        etapes = []
+        
+        # Intro adaptée au profil
+        ton = profile_context.get('ton', 'Encourageant')
+        
+        if ton == 'Encourageant, pédagogique, rassurant' or ton == 'Encourageant':
+            etapes.append("**🌟 Préparation (pas de panique !)** : Rassemblez tout votre matériel et vos ingrédients. Lisez la recette en entier avant de commencer - c'est le secret d'une première fois réussie !")
+        elif ton == 'Technique, précis, professionnel' or ton == 'Technique':
+            etapes.append("**📋 Mise en place** : Préparer et peser tous les ingrédients. Stériliser le matériel à l'eau bouillante. Vérifier la température ambiante (20-22°C optimal).")
+        else:
+            etapes.append("**🎓 Préparation pédagogique** : Avant de commencer avec vos apprenants, vérifiez que chaque poste dispose du matériel nécessaire. Préparez vos supports visuels.")
+        
+        # Chauffage du lait
+        if "Fromage frais" in cheese_type:
+            temp_cible = "35-37°C"
+        elif "Pâte pressée cuite" in cheese_type:
+            temp_cible = "52-54°C"
+        else:
+            temp_cible = "30-32°C"
+        
+        etapes.append(f"**🌡️ Chauffage du lait** : Versez le lait dans une grande casserole. Chauffez doucement à feu moyen en remuant régulièrement jusqu'à atteindre {temp_cible}. Utilisez un thermomètre - la précision est importante !")
+        
+        # Ajout ferments
+        etapes.append("**🦠 Ajout des ferments** : Retirez du feu. Saupoudrez les ferments à la surface, attendez 2 minutes qu'ils se réhydratent, puis mélangez délicatement. Laissez reposer 30-45 minutes à température ambiante (cette étape s'appelle la maturation).")
+        
+        # Emprésurage
+        etapes.append(f"**💧 Emprésurage** : Diluez la présure dans 2 cuillères à soupe d'eau froide. Versez dans le lait en mélangeant doucement pendant 30 secondes. Couvrez et laissez reposer {self._get_caillage_time(cheese_type)} sans bouger la casserole.")
+        
+        # Découpe du caillé
+        if "Fromage frais" in cheese_type:
+            etapes.append("**🔪 Test du caillé** : Le caillé est prêt quand il se détache net sur les bords. Versez délicatement dans une étamine ou un moule perforé pour l'égouttage.")
+        else:
+            etapes.append("**🔪 Découpe du caillé** : Vérifiez la 'cassure nette' (le caillé doit se fendre proprement). Découpez en cubes de 1-2 cm avec un couteau long en faisant des lignes verticales puis horizontales.")
+        
+        # Brassage si nécessaire
+        if "pressée" in cheese_type.lower():
+            etapes.append("**🌀 Brassage et chauffage** : Remuez doucement les cubes de caillé pendant 10-15 minutes en chauffant progressivement à 38-40°C. Le petit-lait va se séparer, les grains vont se raffermir.")
+        
+        # Moulage avec aromates
+        if aromates:
+            technique = self._get_technique_aromatisation(aromates, cheese_type)
+            etapes.append(f"**🌿 Moulage avec aromates** : {technique}. Versez le caillé dans le moule en tassant légèrement.")
+        else:
+            etapes.append("**🧈 Moulage** : Transférez le caillé dans le(s) moule(s) perforé(s). Tassez légèrement avec le dos d'une cuillère.")
+        
+        # Égouttage
+        egouttage_time = self._get_egouttage_time(cheese_type, profile_context)
+        etapes.append(f"**💧 Égouttage** : Laissez égoutter {egouttage_time} en retournant le fromage {self._get_retournement(cheese_type)}. Le petit-lait va s'écouler naturellement.")
+        
+        # Salage
+        etapes.append(f"**🧂 Salage** : {self._get_salage_method(cheese_type)}. Le sel parfume et favorise la formation de la croûte.")
+        
+        # Affinage
+        temp_affinage = self._get_temperature_affinage_from_knowledge(cheese_type)
+        if "Fromage frais" in cheese_type:
+            etapes.append(f"**❄️ Conservation** : Votre fromage frais est prêt ! Conservez-le au réfrigérateur dans une boîte hermétique et consommez sous 3-5 jours.")
+        else:
+            etapes.append(f"**🏺 Affinage** : Placez le fromage dans votre cave d'affinage ou une pièce fraîche à {temp_affinage}. Retournez-le tous les 2 jours. {self._get_affinage_specifics(cheese_type)}")
+        
+        return etapes
+
+    def _get_caillage_time(self, cheese_type: str) -> str:
+        """Temps de caillage selon type"""
+        times = {
+            "Fromage frais": "45 minutes à 1h",
+            "Pâte molle": "1h à 1h30",
+            "Pâte pressée non cuite": "30-45 minutes",
+            "Pâte pressée cuite": "30-40 minutes",
+            "Pâte persillée": "1h30 à 2h"
+        }
+        return times.get(cheese_type, "1 heure")
+
+
+    def _get_egouttage_time(self, cheese_type: str, profile_context: Dict) -> str:
+        """Temps d'égouttage adapté"""
+        if "Fromage frais" in cheese_type:
+            return "4-6 heures au frais" if profile_context['niveau'] == 'débutant' else "6-12 heures"
+        elif "Pâte molle" in cheese_type:
+            return "12-18 heures à température ambiante"
+        else:
+            return "6-8 heures avec poids de 500g-1kg"
+
+
+    def _get_retournement(self, cheese_type: str) -> str:
+        """Fréquence de retournement"""
+        if "Fromage frais" in cheese_type:
+            return "pas nécessaire"
+        elif "Pâte molle" in cheese_type:
+            return "toutes les 6 heures"
+        else:
+            return "toutes les 2-3 heures"
+
+
+    def _get_salage_method(self, cheese_type: str) -> str:
+        """Méthode de salage"""
+        if "Fromage frais" in cheese_type:
+            return "Saupoudrez de sel fin sur toutes les faces, ou mélangez directement dans la pâte"
+        elif "persillée" in cheese_type.lower():
+            return "Frottez toutes les faces avec du gros sel, puis bain de saumure 24h"
+        else:
+            return "Frottez généreusement toutes les faces avec du sel fin ou gros sel"
+
+
+    def _get_affinage_specifics(self, cheese_type: str) -> str:
+        """Spécificités d'affinage"""
+        specs = {
+            "Pâte molle": "Une croûte blanche fleurie va apparaître après 5-7 jours. Durée totale : 2-4 semaines.",
+            "Pâte pressée non cuite": "La croûte va se former et durcir. Frottez-la avec un linge humide chaque semaine. Durée : 1-3 mois minimum.",
+            "Pâte pressée cuite": "Patience ! L'affinage peut durer 3-12 mois selon le résultat souhaité.",
+            "Pâte persillée": "Les veines bleues vont se développer après 2-3 semaines. Piquez avec une aiguille stérile pour favoriser l'aération."
+        }
+        return specs.get(cheese_type, "Suivez l'évolution de votre fromage semaine après semaine.")
+
+
+    def _get_temperature_affinage_from_knowledge(self, cheese_type: str) -> str:
+        """Récupère température d'affinage depuis la base"""
+        if 'temperatures_affinage' in self.knowledge_base:
+            return self.knowledge_base['temperatures_affinage'].get(cheese_type, "10-14°C, 85% humidité")
+        return "10-14°C, 85% humidité"
+
+
+    def _get_technique_aromatisation(self, aromates: List[str], cheese_type: str) -> str:
+        """Récupère la meilleure technique d'aromatisation"""
+        if 'techniques_aromatisation' not in self.knowledge_base:
+            return "Incorporez les aromates au moment du moulage"
+        
+        techniques = self.knowledge_base['techniques_aromatisation']
+        
+        if "Fromage frais" in cheese_type:
+            return techniques.get('Incorporation dans le caillé', '') + " - mélangez délicatement les herbes fraîches dans le caillé égoutté"
+        elif any('cendr' in a.lower() for a in aromates):
+            return techniques.get('Enrobage externe', '') + " - roulez le fromage démoulé dans les cendres"
+        else:
+            return techniques.get('Couche intermédiaire', '') + " - créez des strates aromates/caillé dans le moule"
+
+
+    def _get_conseils_from_knowledge(self, cheese_type: str) -> str:
+        """Récupère conseils spécifiques au type"""
+        if 'types_pate' in self.knowledge_base and cheese_type in self.knowledge_base['types_pate']:
+            info = self.knowledge_base['types_pate'][cheese_type]
+            return f"Difficulté : {info.get('difficulte', '')}. Durée d'affinage typique : {info.get('duree', '')}."
+        return ""
+
+
+    def _get_problemes_courants_from_knowledge(self, cheese_type: str) -> str:
+        """Sélectionne 2-3 problèmes pertinents"""
+        if 'problemes_courants' not in self.knowledge_base:
+            return ""
+        
+        problemes = self.knowledge_base['problemes_courants']
+        
+        # Sélection contextuelle
+        if "Fromage frais" in cheese_type:
+            keys = ['Caillé trop dur', 'Pas de caillage', 'Fromage trop acide']
+        elif "Pâte molle" in cheese_type:
+            keys = ['Moisissures indésirables', 'Croûte craquelée', 'Fromage coule']
+        elif "pressée" in cheese_type.lower():
+            keys = ['Texture granuleuse', 'Fromage trop sec', 'Yeux (trous) non désirés']
+        else:
+            keys = list(problemes.keys())[:3]
+        
+        result = []
+        for key in keys:
+            if key in problemes:
+                result.append(f"• {key} : {problemes[key]}")
+        
+        return "\n".join(result)
+
+
+    def _get_conservation_from_knowledge(self, cheese_type: str) -> str:
+        """Récupère infos de conservation"""
+        if 'conservation' in self.knowledge_base:
+            for key, value in self.knowledge_base['conservation'].items():
+                if cheese_type in key:
+                    return value
+        return "Conservez au frais dans du papier sulfurisé ou une boîte hermétique."
+
+
+    def _get_accords_from_knowledge(self, cheese_type: str, lait: Optional[str]) -> str:
+        """Récupère accords vins et mets"""
+        accords = []
+        
+        # Accords vins
+        if 'accords_vins' in self.knowledge_base:
+            # Chercher par type ou par lait
+            for key, value in self.knowledge_base['accords_vins'].items():
+                if cheese_type in key or (lait and lait.lower() in key.lower()):
+                    accords.append(f"🍷 {value}")
+                    break
+        
+        # Accords mets
+        if 'accords_mets' in self.knowledge_base:
+            for key, value in self.knowledge_base['accords_mets'].items():
+                if cheese_type in key:
+                    accords.append(f"🍽️ {value}")
+                    break
+        
+        return "\n".join(accords) if accords else ""
+
+
+    def _get_materiel_from_knowledge(self, profile: str, cheese_type: str) -> List[str]:
+        """Liste du matériel nécessaire selon profil"""
+        if 'materiel_indispensable' not in self.knowledge_base:
+            return []
+        
+        materiel = self.knowledge_base['materiel_indispensable']
+        
+        if profile == "🧀 Amateur":
+            return materiel.get('Pour débuter', [])
+        elif profile == "🏭 Producteur":
+            return materiel.get('Pour expert', [])
+        else:
+            return materiel.get('Pour progresser', [])
+
+
+    def _extract_aromates(self, ingredients: List[str]) -> List[str]:
+        """Extrait les aromates de la liste d'ingrédients"""
+        aromates = []
+        
+        # Liste des mots-clés d'aromates
+        aromates_keywords = [
+            'thym', 'romarin', 'basilic', 'menthe', 'persil', 'ciboulette', 'aneth',
+            'poivre', 'paprika', 'curry', 'cumin', 'piment', 'ail', 'herbes',
+            'lavande', 'noix', 'olive', 'tomate séchée', 'cendre', 'truffe'
+        ]
+        
+        for ing in ingredients:
+            ing_lower = ing.lower()
+            for keyword in aromates_keywords:
+                if keyword in ing_lower:
+                    aromates.append(ing)
+                    break
+        
+        return aromates
+
+
+    def _get_profile_context(self, profile: str) -> Dict:
+        """Récupère le contexte du profil depuis la base"""
+        if 'profils_utilisateurs' in self.knowledge_base:
+            profile_data = self.knowledge_base['profils_utilisateurs'].get(profile, {})
+            
+            # Adapter les quantités selon profil
+            if profile == "🧀 Amateur":
+                quantite = "1L"
+                sel = "1 cuillère à café"
+                duree = "24-48h"
+                difficulte = "Facile"
+                conseil = "Prenez votre temps et suivez chaque étape tranquillement !"
+                description = profile_data.get('description', 'Débutant, usage familial, matériel limité')  # ✅
+            elif profile == "🏭 Producteur":
+                quantite = "10L"
+                sel = "2% du poids total"
+                duree = "Selon cahier des charges"
+                difficulte = "Technique"
+                conseil = "Documentez température, pH et temps à chaque étape."
+                description = profile_data.get('description', 'Professionnel ou semi-pro, recherche de qualité')  # ✅
+            else:  # Formateur
+                quantite = "2L"
+                sel = "15g"
+                duree = "Variable selon session"
+                difficulte = "Moyenne"
+                conseil = "Préparez des échantillons à différents stades pour la démonstration."
+                description = profile_data.get('description', 'Enseignant, animateur, partage de savoir')  # ✅
+            
+            return {
+                'quantite_lait': quantite,
+                'sel': sel,
+                'duree_totale': duree,
+                'difficulte': difficulte,
+                'conseil': conseil,
+                'ton': profile_data.get('ton', 'neutre'),
+                'niveau': profile_data.get('niveau', 'intermédiaire'),
+                'description': description  # ✅ Toujours une vraie description
+            }
+        
+        # Fallback
+        return {
+            'quantite_lait': '1L',
+            'sel': '1 cuillère à café',
+            'duree_totale': '48h',
+            'difficulte': 'Facile',
+            'conseil': 'Suivez les étapes avec attention !',
+            'ton': 'Encourageant',
+            'niveau': 'débutant',
+            'description': 'Recette adaptée pour débutants'  # ✅ Fallback avec vraie description
+        }
     
     # ===============================================================
     # GÉNÉRATION LLM AVEC CONTEXTE BASE STATIQUE
@@ -332,101 +1263,446 @@ class UnifiedRecipeGeneratorV2:
         profile: str,
         constraints: str
     ) -> Optional[Dict]:
-        """Génère avec LLM en utilisant le contexte de la base statique"""
+        """Génère avec LLM en utilisant le contexte complet de la base statique"""
+        
+        
+        print("=" * 80)
+        print("🚨 FONCTION _generate_with_llm_and_knowledge() APPELÉE !")
+        print(f"🚨 Ingrédients reçus : {ingredients}")
+        print(f"🚨 Type de fromage : {cheese_type}")
+        print("=" * 80)
+        
+        import json
+        import time
+        import random
         
         seed = int(time.time() * 1000 + random.randint(1, 999))
         
-        # Récupérer le contexte depuis la base statique
+        # ========== RÉCUPÉRER LE CONTEXTE DEPUIS LA BASE STATIQUE ==========
         type_info = self._get_type_info_from_knowledge(cheese_type)
         aromates = self._extract_aromates(ingredients)
         profile_context = self._get_profile_context(profile)
         
-        # Construire un contexte enrichi pour le LLM
+        # ========== CONSTRUIRE UN CONTEXTE ENRICHI POUR LE LLM ==========
         knowledge_context = f"""
-**CONTEXTE DEPUIS LA BASE DE CONNAISSANCES:**
+    **📚 CONTEXTE DEPUIS LA BASE DE CONNAISSANCES:**
 
-Type de fromage : {cheese_type}
-- Description : {type_info.get('description', 'N/A')}
-- Exemples similaires : {type_info.get('exemples', 'N/A')}
-- Durée typique : {type_info.get('duree', 'N/A')}
-- Difficulté : {type_info.get('difficulte', 'N/A')}
+    **Type de fromage : {cheese_type}**
+    - Description : {type_info.get('description', 'N/A')}
+    - Exemples similaires : {type_info.get('exemples', 'N/A')}
+    - Durée typique d'affinage : {type_info.get('duree', 'N/A')}
+    - Niveau de difficulté : {type_info.get('difficulte', 'N/A')}
 
-Température d'affinage recommandée : {self._get_temperature_affinage_from_knowledge(cheese_type)}
+    **Conditions d'affinage recommandées :**
+    {self._get_temperature_affinage_from_knowledge(cheese_type)}
 
-Aromates détectés : {', '.join(aromates) if aromates else 'aucun'}
-"""
+    **Profil utilisateur : {profile}**
+    - Niveau : {profile_context.get('niveau', 'intermédiaire')}
+    - Ton à adopter : {profile_context.get('ton', 'neutre')}
+    - Quantité de lait : {profile_context.get('quantite_lait', '1L')}
+    - Description : {profile_context.get('description', '')}
+    """
+
+        # Ajouter les aromates et dosages
+        if aromates:
+            knowledge_context += f"\n**🌿 Aromates détectés : {', '.join(aromates)}**\n"
+            knowledge_context += "\n**⚠️ IMPORTANT : Utilise UNIQUEMENT ces aromates, n'en ajoute pas d'autres !**\n"
+            
+            if 'dosages_recommandes' in self.knowledge_base:
+                knowledge_context += "\n**Dosages recommandés pour 1kg de fromage :**\n"
+                for aromate in aromates:
+                    dosage = self._get_dosage_from_knowledge(aromate, profile_context.get('quantite_lait', '1L'))
+                    knowledge_context += f"- {aromate} : {dosage}\n"
+            
+            # Vérifier compatibilités
+            if 'regles_compatibilite' in self.knowledge_base:
+                knowledge_context += "\n**⚠️ Règles de compatibilité :**\n"
+                for aromate in aromates:
+                    if not self._check_aromate_compatibility(aromate, cheese_type, lait):
+                        knowledge_context += f"- ⚠️ {aromate} peut être incompatible avec {cheese_type}\n"
+            
+            # Techniques d'aromatisation
+            if 'techniques_aromatisation' in self.knowledge_base:
+                technique = self._get_technique_aromatisation(aromates, cheese_type)
+                knowledge_context += f"\n**Technique d'aromatisation suggérée :**\n{technique}\n"
+        else:
+            knowledge_context += "\n**Aromates : Aucun aromate spécifié**\n"
         
-        # Ajouter les dosages recommandés si disponibles
-        if aromates and 'dosages_recommandes' in self.knowledge_base:
-            knowledge_context += "\nDosages recommandés :\n"
-            for aromate in aromates:
-                dosage = self._get_dosage_from_knowledge(aromate)
-                knowledge_context += f"- {aromate} : {dosage}\n"
+        # Ajouter les problèmes courants à anticiper
+        if 'problemes_courants' in self.knowledge_base:
+            problemes = self._get_problemes_courants_from_knowledge(cheese_type)
+            if problemes:
+                knowledge_context += f"\n**⚠️ Problèmes courants à anticiper :**\n{problemes}\n"
         
-        prompt = f"""Tu es un maître fromager expert. Génère UNE recette UNIQUE et TECHNIQUE.
+        # Ajouter les associations classiques
+        if 'associations_classiques' in self.knowledge_base:
+            assoc_key = None
+            if lait and lait.lower() in ['chèvre', 'chevre']:
+                assoc_key = 'Fromage de chèvre'
+            elif lait and lait.lower() == 'brebis':
+                assoc_key = 'Brebis'
+            elif 'molle' in cheese_type.lower():
+                assoc_key = 'Pâte molle'
+            elif 'pressée' in cheese_type.lower():
+                assoc_key = 'Pâte pressée'
+            elif 'persillée' in cheese_type.lower() or 'bleu' in cheese_type.lower():
+                assoc_key = 'Pâte persillée'
+            elif 'frais' in cheese_type.lower():
+                assoc_key = 'Fromage frais'
+            
+            if assoc_key and assoc_key in self.knowledge_base['associations_classiques']:
+                assoc = self.knowledge_base['associations_classiques'][assoc_key]
+                knowledge_context += f"\n**🎨 Associations classiques pour ce type :**\n{assoc}\n"
+        
+        # Ajouter conservation et accords
+        conservation = self._get_conservation_from_knowledge(cheese_type)
+        if conservation:
+            knowledge_context += f"\n**📦 Conservation :**\n{conservation}\n"
+        
+        accords = self._get_accords_from_knowledge(cheese_type, lait)
+        if accords:
+            knowledge_context += f"\n**🍷 Accords recommandés :**\n{accords}\n"
+        
+        # Ajouter le matériel nécessaire
+        materiel = self._get_materiel_from_knowledge(profile, cheese_type)
+        if materiel:
+            knowledge_context += f"\n**🔧 Matériel nécessaire pour ce profil :**\n"
+            for item in materiel[:5]:  # Limiter à 5 pour ne pas surcharger
+                knowledge_context += f"- {item}\n"
+        
+        # ========== CONSTRUIRE LE PROMPT ==========
+        prompt = f"""Tu es un maître fromager expert avec des décennies d'expérience. Génère UNE recette UNIQUE au format JSON STRICT et ULTRA-DÉTAILLÉE.
 
-**CONTEXTE UTILISATEUR:**
-- Ingrédients : {', '.join(ingredients)}
-- Type de lait : {lait or "au choix"}
-- Type de fromage : {cheese_type}
-- Profil : {profile}
-- Contraintes : {constraints or "aucune"}
+INTERDICTIONS ABSOLUES:
+❌ PAS de texte explicatif avant le JSON
+❌ PAS de markdown (pas de ```)
+❌ PAS de commentaires
+❌ PAS de titres ou sections
+✅ COMMENCE DIRECTEMENT PAR {{
+✅ TERMINE DIRECTEMENT PAR }}
+    
+INGRÉDIENTS DISPONIBLES: {', '.join(ingredients)}
+TYPE DE LAIT: {lait or "vache"}
+TYPE DE FROMAGE: {cheese_type}
+AROMATES: {', '.join(aromates) if aromates else "AUCUN"}
+PROFIL: {profile}
 
-{knowledge_context}
+{knowledge_context[:1500] if knowledge_context else ""}
 
-**PROFIL:**
-{profile_context}
+RÈGLES JSON ABSOLUES (NON-NÉGOCIABLES):
+1. ✅ JSON VALIDE uniquement - commence par {{ et termine par }}
+2. ✅ Chaque accolade ouvrante {{ DOIT avoir sa fermante }}
+3. ✅ Chaque crochet ouvrant [ DOIT avoir son fermant ]
+4. ✅ Virgules ENTRE les éléments, JAMAIS avant ] ou }}
+5. ✅ Guillemets doubles " pour TOUTES les clés et valeurs string
+6. ✅ Pas de virgule après le dernier élément d'un tableau ou objet
+7. ✅ N'utilise QUE les aromates listés ci-dessus
+8. ✅ Inclus obligatoirement: présure, ferments lactiques, sel
+9. ✅ Minimum 6 étapes détaillées
+10. ✅ Structure SIMPLE et PLATE - pas d'objets imbriqués complexes
+11. ⚠️ AUCUN astérisque * dans le JSON (pas de markdown italique !)
+12. ⚠️ AUCUN underscore _ pour le markdown (pas de __gras__)
+13. ⚠️ Texte brut uniquement dans les strings
 
-**SEED: {seed}**
+EXIGENCE DE LONGUEUR OPTIMALE:
+- Chaque étape doit contenir 150-250 caractères (pas plus !)
+- Description du fromage: 100-150 caractères
+- Conseils: 200-300 caractères
+- TOTAL VISÉ: 4000-6000 caractères (pas plus de 8000)
 
-**CONSIGNE:** Réponds UNIQUEMENT avec un JSON valide (sans markdown):
+⚠️ IMPÉRATIF: FERME TOUTES LES ACCOLADES ET CROCHETS !
+⚠️ VÉRIFIE que ton JSON se termine par }} avant d'envoyer
+⚠️ PAS d'objets imbriqués comme {{"type": "...", "origine": "..."}} !
+
+⚠️⚠️⚠️ RÈGLES ANTI-MARKDOWN (CRITIQUE) ⚠️⚠️⚠️
+- INTERDICTION ABSOLUE d'utiliser * (astérisque) dans le JSON
+- INTERDICTION ABSOLUE d'utiliser _ (underscore) dans le JSON  
+- INTERDICTION ABSOLUE de tout formatage markdown
+- Si tu veux mettre en valeur un mot, utilise MAJUSCULES, pas markdown
+- Exemple CORRECT: "ferments lactiques Lactococcus lactis"
+- Exemple INTERDIT: "ferments lactiques *Lactococcus lactis*"
+
+Le JSON doit contenir UNIQUEMENT du texte brut, des virgules, des accolades, des crochets et des guillemets.
+AUCUN autre caractère spécial de formatage n'est autorisé.
+
+FORMAT JSON OBLIGATOIRE (REMPLIS-LE ENTIÈREMENT):
 
 {{
-    "title": "Nom original et appétissant",
-    "description": "Description technique (150 caractères)",
+    "title": "Nom du fromage",
+    "description": "Description courte",
     "lait": "{lait or 'vache'}",
     "type_pate": "{cheese_type}",
-    "ingredients": ["Quantité + ingrédient", "..."],
-    "etapes": ["1. Étape détaillée avec T° et durée", "...", "Minimum 6 étapes"],
-    "duree_totale": "{type_info.get('duree', '24h')}",
-    "difficulte": "{type_info.get('difficulte', 'Moyenne')}",
-    "temperature_affinage": "T° précise",
-    "conseils": "Conseils adaptés au profil {profile}",
-    "score": 8.5
-}}"""
+    "ingredients": [
+        "1L de lait {lait or 'vache'}",
+        "5 ml de présure liquide",
+        "2 g de ferments lactiques",
+        "10g de sel fin"
+        {', "aromates ici"' if aromates else ''}
+    ],
+    "etapes": [
+        "Étape 1: Stériliser le matériel...",
+        "Étape 2: Chauffer le lait à 32°C...",
+        "Étape 3: Ajouter les ferments...",
+        "Étape 4: Ajouter la présure...",
+        "Étape 5: Découper le caillé...",
+        "Étape 6: Mouler et égoutter...",
+        "Étape 7: Saler...",
+        "Étape 8: Affiner..."
+    ],
+    "duree_totale": "24-48h",
+    "difficulte": "Moyenne",
+    "temperature_affinage": "12-14°C",
+    "materiel_necessaire": ["thermomètre", "casserole", "moule"],
+    "conseils": "Conseils pratiques",
+    "aromates": {json.dumps(aromates, ensure_ascii=False)},
+    "technique_aromatisation": "Technique d'ajout des aromates",
+    "score": 8.0,
+    "seed": {seed},
+    "profile": "{profile}",
+    "exemples_fromages": "Exemples similaires"
+}}
 
+⚠️ INSTRUCTIONS FINALES CRITIQUES:
+- COMMENCE DIRECTEMENT PAR LA PREMIÈRE ACCOLADE {{
+- TERMINE DIRECTEMENT PAR LA DERNIÈRE ACCOLADE }}
+- AUCUN texte avant ou après
+- AUCUN formatage markdown (* pour italique, ** pour gras, _ pour souligné)
+- Texte brut UNIQUEMENT dans toutes les valeurs
+- VALIDE ton JSON mentalement avant d'envoyer
+- Structure PLATE uniquement (pas d'objets dans les objets)
+
+GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
+
+        # ========== APPEL AU LLM ==========
         try:
-            response = self.agent.chat_with_llm(prompt, [])
+            print("🔍 DEBUG: Envoi du prompt au LLM...")
+            print(f"🔍 Longueur du prompt: {len(prompt)} caractères")
             
-            # Nettoyage
-            response = response.strip()
-            if '```json' in response:
-                response = response.replace('```json', '').replace('```', '')
-            elif '```' in response:
-                response = response.replace('```', '')
-            response = response.strip()
             
-            # Extraction JSON
-            start = response.find('{')
-            end = response.rfind('}') + 1
+            response = self.agent.chat_with_llm(
+                prompt,
+                max_tokens=8192,  # Augmentez cette valeur si nécessaire
+                temperature=0.8
+            )
+            print(f"🔍 DEBUG: Réponse LLM reçue ({len(response)} caractères)")
+            print(f"🔍 DEBUG: Premiers 500 caractères: {response[:500]}")
             
-            if start == -1 or end <= start:
-                raise ValueError("Pas de JSON trouvé")
+           
+            # Nettoyage de la réponse
+            cleaned = response.strip()
             
-            json_str = response[start:end]
-            data = json.loads(json_str)
+            # Retirer les blocs markdown
+            if cleaned.startswith('```'):
+                first_newline = cleaned.find('\n')
+                if first_newline != -1:
+                    cleaned = cleaned[first_newline + 1:]
+                else:
+                    cleaned = cleaned[3:]
             
-            if not data.get('title') or not data.get('etapes'):
-                raise ValueError("JSON incomplet")
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3].rstrip()
             
-            print(f"   📝 LLM: {data['title']}")
-            print(f"   🔢 {len(data.get('etapes', []))} étapes")
+            cleaned = cleaned.strip()
             
-            return data
+            print(f"🔍 DEBUG: Après retrait markdown ({len(cleaned)} caractères)")
+            print(f"🔍 DEBUG: Premiers 300 caractères:")
+            print(cleaned[:300])
+            print(f"🔍 DEBUG: Derniers 200 caractères:")
+            print(cleaned[-200:])
             
-        except Exception as e:
-            print(f"   ❌ Erreur LLM: {e}")
+            # ========== EXTRACTION DU JSON ==========
+            start_idx = cleaned.find('{')
+            
+            if start_idx == -1:
+                print("❌ DEBUG: Aucune accolade ouvrante trouvée dans la réponse")
+                print(f"❌ DEBUG: Contenu complet de 'cleaned':")
+                print(cleaned)
+                raise ValueError("Aucune accolade ouvrante trouvée dans la réponse")
+            
+            print(f"✅ DEBUG: Première accolade trouvée à l'index {start_idx}")
+            
+            # Compter les accolades pour trouver la fin
+            brace_count = 0
+            end_idx = -1
+            in_string = False
+            escape_next = False
+            
+            for i in range(start_idx, len(cleaned)):
+                char = cleaned[i]
+                
+                if escape_next:
+                    escape_next = False
+                    continue
+                
+                if char == '\\':
+                    escape_next = True
+                    continue
+                
+                if char == '"':
+                    in_string = not in_string
+                    continue
+                
+                if not in_string:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_idx = i
+                            break
+            
+            # Extraire ou compléter le JSON
+            if end_idx == -1:
+                print(f"⚠️ DEBUG: JSON incomplet (accolades restantes: {brace_count})")
+                json_str = cleaned[start_idx:]
+                json_str += "\n" + ("}" * brace_count)
+                print(f"🔧 DEBUG: JSON complété avec {brace_count} accolade(s)")
+            else:
+                json_str = cleaned[start_idx:end_idx + 1]
+                print(f"✅ DEBUG: JSON complet trouvé")
+            
+            # ✅ VÉRIFICATION CRITIQUE
+            print(f"🔍 DEBUG: Longueur de json_str = {len(json_str)}")
+            print(f"🔍 DEBUG: Type de json_str = {type(json_str)}")
+            print(f"🔍 DEBUG: json_str vide ? {len(json_str.strip()) == 0}")
+            
+            if not json_str or len(json_str.strip()) == 0:
+                print("❌ ERREUR CRITIQUE: json_str est vide !")
+                print(f"❌ start_idx = {start_idx}")
+                print(f"❌ end_idx = {end_idx}")
+                print(f"❌ brace_count = {brace_count}")
+                print(f"❌ Contenu de 'cleaned' autour de start_idx:")
+                print(cleaned[max(0, start_idx-50):min(len(cleaned), start_idx+200)])
+                raise ValueError("JSON extrait est vide")
+            
+            print(f"🔍 DEBUG: Premiers 500 caractères de json_str:")
+            print(json_str[:500])
+            print(f"🔍 DEBUG: Derniers 300 caractères de json_str:")
+            print(json_str[-300:])
+            
+            # Parser le JSON
+            try:
+                recipe_data = json.loads(json_str)
+                print("✅ DEBUG: JSON parsé avec succès !")
+                
+                # Validation
+                required_fields = ['title', 'etapes', 'ingredients']
+                for field in required_fields:
+                    if not recipe_data.get(field):
+                        print(f"⚠️ Champ manquant: {field}")
+                
+                print(f"   ✅ Recette générée: {recipe_data.get('title', 'Sans titre')}")
+                print(f"   🔢 {len(recipe_data.get('etapes', []))} étapes")
+                
+                return recipe_data
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️ DEBUG: Erreur parsing JSON: {e}")
+                print(f"⚠️ Position: ligne {e.lineno}, col {e.colno}, pos {e.pos}")
+                print("🔧 Tentative de réparation automatique...")
+                
+                try:
+                    import re
+                    
+                    json_repaired = json_str
+                    
+                    # 1. Remplacer les astérisques par rien (pas de suppression de contexte)
+                    json_repaired = json_repaired.replace('*', '')
+                    
+                    # 2. Supprimer les virgules avant ] ou }
+                    json_repaired = re.sub(r',(\s*[\]}])', r'\1', json_repaired)
+                    
+                    # 3. Supprimer les doubles virgules
+                    json_repaired = re.sub(r',,+', ',', json_repaired)
+                    
+                    # 4. Supprimer les underscores markdown
+                    json_repaired = json_repaired.replace('__', '')
+                    json_repaired = json_repaired.replace('_', '')
+                    
+                    # 5. Nettoyer les espaces multiples (mais garder les \n)
+                    json_repaired = re.sub(r'  +', ' ', json_repaired)
+                    
+                    print(f"🔧 Réparations appliquées")
+                    
+                    # Afficher un extrait de ce qui a été réparé autour de l'erreur
+                    if e.pos and e.pos < len(json_str):
+                        start = max(0, e.pos - 100)
+                        end = min(len(json_str), e.pos + 100)
+                        print(f"🔧 Avant réparation (pos {e.pos}):")
+                        print(json_str[start:end])
+                        if e.pos < len(json_repaired):
+                            print(f"🔧 Après réparation:")
+                            print(json_repaired[start:end])
+                    
+                    recipe_data = json.loads(json_repaired)
+                    print("✅ JSON réparé avec succès !")
+                    
+                    # Validation après réparation
+                    required_fields = ['title', 'etapes', 'ingredients']
+                    for field in required_fields:
+                        if not recipe_data.get(field):
+                            print(f"⚠️ Champ manquant: {field}")
+                    
+                    print(f"   ✅ Recette générée: {recipe_data.get('title', 'Sans titre')}")
+                    print(f"   🔢 {len(recipe_data.get('etapes', []))} étapes")
+                    
+                    return recipe_data
+                    
+                except json.JSONDecodeError as repair_error:
+                    print(f"❌ Impossible de réparer le JSON: {repair_error}")
+                    print(f"❌ Nouvelle position d'erreur: ligne {repair_error.lineno}, col {repair_error.colno}")
+                    
+                    # Afficher le contexte de l'erreur après réparation
+                    if repair_error.pos and repair_error.pos < len(json_repaired):
+                        start = max(0, repair_error.pos - 300)
+                        end = min(len(json_repaired), repair_error.pos + 300)
+                        print(f"❌ Contexte après tentative de réparation (pos {repair_error.pos}):")
+                        print("=" * 80)
+                        print(json_repaired[start:end])
+                        print("=" * 80)
+                    
+                    # Sauvegarder les deux versions
+                    with open('/tmp/json_error_original.txt', 'w', encoding='utf-8') as f:
+                        f.write(json_str)
+                    with open('/tmp/json_error_repaired.txt', 'w', encoding='utf-8') as f:
+                        f.write(json_repaired)
+                    print("💾 JSON original: /tmp/json_error_original.txt")
+                    print("💾 JSON réparé: /tmp/json_error_repaired.txt")
+                    
+                    raise ValueError(f"JSON invalide et irréparable: {e}")
+                    
+                except Exception as other_error:
+                    print(f"❌ Erreur inattendue lors de la réparation: {other_error}")
+                    raise ValueError(f"JSON invalide: {e}")
+            # # Validation des champs essentiels
+            # required_fields = ['title', 'etapes', 'ingredients']
+            # for field in required_fields:
+            #     if not data.get(field):
+            #         raise ValueError(f"Champ requis manquant : {field}")
+            
+            # # Validation du nombre d'étapes
+            # if len(data.get('etapes', [])) < 6:
+            #     print(f"   ⚠️ Seulement {len(data['etapes'])} étapes générées (minimum 6 recommandé)")
+            
+            # print(f"   ✅ LLM a généré : {data['title']}")
+            # print(f"   🔢 {len(data.get('etapes', []))} étapes détaillées")
+            # print(f"   🧀 Type : {data.get('type_pate', 'N/A')}")
+            # print(f"   ⭐ Score : {data.get('score', 'N/A')}")
+            
+            
+            
+            # return data
+            
+        except json.JSONDecodeError as e:
+            print(f"   ❌ Erreur de parsing JSON : {e}")
+            print(f"   📄 Réponse reçue : {response[:200]}...")
             return None
+        
+        
+        
+        
+        
+        
     
     # ===============================================================
     # HELPERS : ACCÈS À LA BASE STATIQUE
@@ -478,25 +1754,29 @@ Aromates détectés : {', '.join(aromates) if aromates else 'aucun'}
         
         return "12°C, 85% HR"
     
-    def _get_dosage_from_knowledge(self, ingredient: str) -> str:
-        """Récupère le dosage recommandé depuis la base"""
-        
-        if not self.knowledge_base or 'dosages_recommandes' not in self.knowledge_base:
-            return "selon goût"
-        
-        dosages = self.knowledge_base['dosages_recommandes']
-        
-        # Chercher
-        if ingredient in dosages:
-            return dosages[ingredient]
-        
-        # Chercher par correspondance partielle
-        for key, value in dosages.items():
-            if ingredient.lower() in key.lower() or key.lower() in ingredient.lower():
-                return value
-        
-        return "selon goût"
-    
+       
+    def _get_temp_caillage(self, cheese_type: str) -> str:
+        """Température de caillage selon type"""
+        if "Fromage frais" in cheese_type:
+            return "35-37°C"
+        elif "Pâte pressée cuite" in cheese_type:
+            return "52-54°C"
+        elif "Pâte persillée" in cheese_type:
+            return "30-32°C"
+        else:
+            return "30-32°C"
+
+    def _get_test_maturite(self, cheese_type: str) -> str:
+        """Test de maturité selon type"""
+        tests = {
+            "Fromage frais": "il est ferme au toucher",
+            "Pâte molle": "une croûte blanche fleurie s'est formée et qu'il est souple au centre",
+            "Pâte pressée non cuite": "la croûte est sèche et que le fromage résiste à la pression du doigt",
+            "Pâte pressée cuite": "il est dur et que la croûte est bien formée",
+            "Pâte persillée": "les veines bleues sont bien développées et réparties"
+        }
+        return tests.get(cheese_type, "il est ferme et la croûte est formée")
+       
     def _get_conseils_from_knowledge(self, cheese_type: str) -> str:
         """Récupère les conseils depuis la base (problèmes courants, etc.)"""
         
@@ -510,34 +1790,16 @@ Aromates détectés : {', '.join(aromates) if aromates else 'aucun'}
         
         return "\n".join(conseils) if conseils else "Respectez les températures et l'hygiène."
     
-    def _generate_steps_from_knowledge(
-        self,
-        cheese_type: str,
-        quantite_lait: str,
-        type_info: Dict,
-        profile_context: Dict
-    ) -> List[str]:
-        """Génère les étapes en utilisant la base de connaissances"""
+    def _get_astuce_profile(self, profile: str) -> str:
+        """Astuce spécifique au profil"""
+        astuces = {
+            "🧀 Amateur": "Pour votre première fois, divisez les quantités par deux (500ml de lait) - c'est plus facile à gérer et moins décourageant en cas d'erreur. Le fromage raté peut toujours servir en cuisine !",
+            "🏭 Producteur": "Tenez un cahier de fabrication avec pH, température, durée exacte à chaque étape et résultat final. Cette traçabilité vous permettra de reproduire ou d'ajuster vos meilleures recettes.",
+            "🎓 Formateur": "Préparez 3 échantillons à différents stades (caillé frais, fromage à 1 semaine, fromage affiné) pour montrer l'évolution. C'est très pédagogique de faire goûter le petit-lait - les gens sont souvent surpris de son goût légèrement sucré !"
+        }
+        return astuces.get(profile, "Notez vos observations à chaque étape pour progresser rapidement !")
         
-        # Étapes de base standard
-        etapes = [
-            f"1. Chauffer {quantite_lait} lait à 32°C en remuant doucement (20 min).",
-            "2. Retirer du feu, ajouter les ferments, mélanger 2 min.",
-            "3. Laisser maturer 30 min à température ambiante couvert.",
-            "4. Ajouter la présure diluée, mélanger 1 min.",
-            "5. Laisser cailler 45 min sans bouger (test de la coupure nette).",
-            "6. Découper le caillé en cubes de 1-2 cm.",
-            "7. Brasser délicatement 15 min.",
-            f"8. Mouler, égoutter {profile_context['temps_egouttage']} en retournant.",
-        ]
-        
-        # Ajouter affinage si nécessaire
-        if "affiné" in cheese_type.lower() or "molle" in cheese_type.lower() or "pressée" in cheese_type.lower():
-            temp = self._get_temperature_affinage_from_knowledge(cheese_type)
-            etapes.append(f"9. Saler à sec, affiner {profile_context['temps_affinage']} à {temp}.")
-        
-        return etapes
-    
+
     # ===============================================================
     # SCRAPING WEB (comme avant)
     # ===============================================================
@@ -678,7 +1940,34 @@ Aromates détectés : {', '.join(aromates) if aromates else 'aucun'}
 Si une info manque dans le texte, utilise null."""
 
         try:
-            response = self.agent.chat_with_llm(prompt, [])
+                        # ===== DEBUG COMPLET =====
+            print("=" * 80)
+            print("🔍 DEBUG AGENT:")
+            print(f"Type de self.agent: {type(self.agent)}")
+            print(f"Contenu de self.agent: {self.agent}")
+            print(f"Attributs de self.agent: {dir(self.agent)}")
+
+            # Vérifier si c'est un dict
+            if isinstance(self.agent, dict):
+                print("⚠️ PROBLÈME: self.agent est un dictionnaire, pas un objet Agent !")
+                print(f"Clés du dictionnaire: {list(self.agent.keys())}")
+                return None
+
+            # Vérifier si la méthode existe
+            if not hasattr(self.agent, 'chat_with_llm'):
+                print("❌ ERREUR: self.agent n'a pas de méthode 'chat_with_llm'")
+                print(f"Méthodes disponibles: {[m for m in dir(self.agent) if not m.startswith('_')]}")
+                return None
+
+            print("✅ self.agent a la méthode chat_with_llm")
+            print("=" * 80)
+
+            # Maintenant l'appel
+            response = self.agent.chat_with_llm(
+                prompt,
+                max_tokens=20000,  # ✅ DOUBLÉ pour avoir le JSON complet
+                temperature=0.8
+            )
             
             # Nettoyage
             response = response.strip()
@@ -796,38 +2085,6 @@ Réponds JSON uniquement (sans markdown):
             if aromate in ingredients_str:
                 found.append(aromate)
         return found
-    
-    def _get_profile_context(self, profile):
-        contexts = {
-            "🧀 Amateur": {
-                "quantite_lait": "1 litre",
-                "sel": "10g",
-                "temps_egouttage": "6h",
-                "temps_affinage": "1 semaine",
-                "duree_totale": "24-48 heures",
-                "difficulte": "Facile",
-                "conseil": "✨ Conseil débutant : Commencez petit !"
-            },
-            "🏭 Producteur": {
-                "quantite_lait": "10 litres",
-                "sel": "100g",
-                "temps_egouttage": "12h",
-                "temps_affinage": "2-8 semaines",
-                "duree_totale": "2-8 semaines",
-                "difficulte": "Technique",
-                "conseil": "📊 Conseil pro : Mesurez le pH."
-            },
-            "🎓 Formateur": {
-                "quantite_lait": "5 litres",
-                "sel": "50g",
-                "temps_egouttage": "8h",
-                "temps_affinage": "Variable",
-                "duree_totale": "Variable",
-                "difficulte": "Pédagogique",
-                "conseil": "🎓 Conseil formateur : Préparez des questions."
-            }
-        }
-        return contexts.get(profile, contexts["🧀 Amateur"])
     
     def _has_llm_available(self):
         return any([
