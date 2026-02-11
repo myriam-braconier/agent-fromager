@@ -1425,42 +1425,52 @@ EXIGENCE DE LONGUEUR OPTIMALE:
 Le JSON doit contenir UNIQUEMENT du texte brut, des virgules, des accolades, des crochets et des guillemets.
 AUCUN autre caractère spécial de formatage n'est autorisé.
 
-FORMAT JSON OBLIGATOIRE (REMPLIS-LE ENTIÈREMENT):
+FORMAT JSON ULTRA-SIMPLIFIÉ (COPIE EXACTEMENT CETTE STRUCTURE):
 
 {{
     "title": "Nom du fromage",
-    "description": "Description courte",
-    "lait": "{lait or 'vache'}",
-    "type_pate": "{cheese_type}",
+    "description": "Description en une phrase courte",
+    "lait": "Type de lait et température",
+    "type_pate": "Type de pâte",
     "ingredients": [
-        "1L de lait {lait or 'vache'}",
-        "5 ml de présure liquide",
-        "2 g de ferments lactiques",
-        "10g de sel fin"
-        {', "aromates ici"' if aromates else ''}
+        "1L de lait entier",
+        "5ml de presure liquide",
+        "2g de ferments lactiques",
+        "10g de sel fin",
+        "Aromates doses precises"
+    ],
+    "materiel": [
+        "thermometre",
+        "casserole",
+        "moule",
+        "etamine"
     ],
     "etapes": [
-        "Étape 1: Stériliser le matériel...",
-        "Étape 2: Chauffer le lait à 32°C...",
-        "Étape 3: Ajouter les ferments...",
-        "Étape 4: Ajouter la présure...",
-        "Étape 5: Découper le caillé...",
-        "Étape 6: Mouler et égoutter...",
-        "Étape 7: Saler...",
-        "Étape 8: Affiner..."
+        "Etape 1 - Steriliser tout le materiel 10 minutes dans eau bouillante",
+        "Etape 2 - Chauffer lait a 32 degres en remuant doucement",
+        "Etape 3 - Ajouter ferments lactiques et melanger 2 minutes",
+        "Etape 4 - Ajouter presure diluee et attendre 45 minutes",
+        "Etape 5 - Decouper caille en cubes de 2cm et brasser",
+        "Etape 6 - Mouler et egoutter 12 heures"
     ],
     "duree_totale": "24-48h",
     "difficulte": "Moyenne",
-    "temperature_affinage": "12-14°C",
-    "materiel_necessaire": ["thermomètre", "casserole", "moule"],
-    "conseils": "Conseils pratiques",
+    "temperature_affinage": "12-14 degres avec 85% humidite",
+    "conseils": "Conseils pratiques en une ou deux phrases courtes",
     "aromates": {json.dumps(aromates, ensure_ascii=False)},
-    "technique_aromatisation": "Technique d'ajout des aromates",
+    "technique_aromatisation": "Technique incorporation aromates",
     "score": 8.0,
     "seed": {seed},
-    "profile": "{profile}",
-    "exemples_fromages": "Exemples similaires"
+    "profile": "{profile}"
 }}
+
+REGLES ULTRA-STRICTES:
+- PAS d'accents dans le JSON (utilise e au lieu de é, a au lieu de à)
+- PAS de caracteres speciaux (* _ # etc)
+- PAS d'apostrophes (utilise espaces)
+- Texte simple sans formatage
+- Maximum 150 caracteres par etape
+- Virgules ENTRE elements, JAMAIS avant ] ou }}
 
 ⚠️ INSTRUCTIONS FINALES CRITIQUES:
 - COMMENCE DIRECTEMENT PAR LA PREMIÈRE ACCOLADE {{
@@ -1603,77 +1613,87 @@ GÉNÈRE MAINTENANT LE JSON COMPLET ET ULTRA-DÉTAILLÉ:"""
                 
                 try:
                     import re
+                    from unicodedata import normalize
                     
                     json_repaired = json_str
                     
-                    # 1. Remplacer les astérisques par rien (pas de suppression de contexte)
+                    # 1. Supprimer tous les caractères de formatage
                     json_repaired = json_repaired.replace('*', '')
+                    json_repaired = json_repaired.replace('_', '')
+                    json_repaired = json_repaired.replace('#', '')
+                    json_repaired = json_repaired.replace('`', '')
                     
-                    # 2. Supprimer les virgules avant ] ou }
+                    # 2. Remplacer les apostrophes typographiques par des apostrophes simples
+                    json_repaired = json_repaired.replace(''', "'")
+                    json_repaired = json_repaired.replace(''', "'")
+                    json_repaired = json_repaired.replace('"', '"')
+                    json_repaired = json_repaired.replace('"', '"')
+                    
+                    # 3. Supprimer les virgules avant ] ou }
                     json_repaired = re.sub(r',(\s*[\]}])', r'\1', json_repaired)
                     
-                    # 3. Supprimer les doubles virgules
+                    # 4. Supprimer les doubles virgules
                     json_repaired = re.sub(r',,+', ',', json_repaired)
                     
-                    # 4. Supprimer les underscores markdown
-                    json_repaired = json_repaired.replace('__', '')
-                    json_repaired = json_repaired.replace('_', '')
-                    
-                    # 5. Nettoyer les espaces multiples (mais garder les \n)
+                    # 5. Corriger les espaces multiples
                     json_repaired = re.sub(r'  +', ' ', json_repaired)
                     
-                    print(f"🔧 Réparations appliquées")
+                    # 6. S'assurer que toutes les chaînes utilisent des guillemets doubles
+                    # (pas de guillemets simples en JSON)
                     
-                    # Afficher un extrait de ce qui a été réparé autour de l'erreur
-                    if e.pos and e.pos < len(json_str):
-                        start = max(0, e.pos - 100)
-                        end = min(len(json_str), e.pos + 100)
-                        print(f"🔧 Avant réparation (pos {e.pos}):")
-                        print(json_str[start:end])
-                        if e.pos < len(json_repaired):
-                            print(f"🔧 Après réparation:")
-                            print(json_repaired[start:end])
+                    print(f"🔧 Réparations appliquées ({len(json_str) - len(json_repaired)} caractères modifiés)")
+                    
+                    # Debug : afficher autour de l'erreur
+                    if e.pos and e.pos < len(json_repaired):
+                        start = max(0, e.pos - 200)
+                        end = min(len(json_repaired), e.pos + 200)
+                        print(f"🔧 Extrait réparé (pos {e.pos}):")
+                        print(json_repaired[start:end])
                     
                     recipe_data = json.loads(json_repaired)
                     print("✅ JSON réparé avec succès !")
                     
-                    # Validation après réparation
+                    # Validation
                     required_fields = ['title', 'etapes', 'ingredients']
                     for field in required_fields:
                         if not recipe_data.get(field):
                             print(f"⚠️ Champ manquant: {field}")
                     
-                    print(f"   ✅ Recette générée: {recipe_data.get('title', 'Sans titre')}")
+                    print(f"   ✅ Recette: {recipe_data.get('title', 'Sans titre')}")
                     print(f"   🔢 {len(recipe_data.get('etapes', []))} étapes")
                     
                     return recipe_data
                     
                 except json.JSONDecodeError as repair_error:
-                    print(f"❌ Impossible de réparer le JSON: {repair_error}")
-                    print(f"❌ Nouvelle position d'erreur: ligne {repair_error.lineno}, col {repair_error.colno}")
+                    print(f"❌ JSON toujours invalide après réparation")
+                    print(f"❌ Erreur: {repair_error}")
+                    print(f"❌ Position: ligne {repair_error.lineno}, col {repair_error.colno}, pos {repair_error.pos}")
                     
-                    # Afficher le contexte de l'erreur après réparation
-                    if repair_error.pos and repair_error.pos < len(json_repaired):
-                        start = max(0, repair_error.pos - 300)
-                        end = min(len(json_repaired), repair_error.pos + 300)
-                        print(f"❌ Contexte après tentative de réparation (pos {repair_error.pos}):")
-                        print("=" * 80)
-                        print(json_repaired[start:end])
-                        print("=" * 80)
+                    # Sauvegarder pour analyse
+                    try:
+                        with open('/tmp/json_original.json', 'w', encoding='utf-8') as f:
+                            f.write(json_str)
+                        with open('/tmp/json_repaired.json', 'w', encoding='utf-8') as f:
+                            f.write(json_repaired)
+                        print("💾 Fichiers sauvegardés:")
+                        print("   - /tmp/json_original.json")
+                        print("   - /tmp/json_repaired.json")
+                        
+                        # Afficher l'erreur exacte
+                        if repair_error.pos and repair_error.pos < len(json_repaired):
+                            print(f"\n❌ Caractère problématique à la position {repair_error.pos}:")
+                            print(f"   '{json_repaired[repair_error.pos]}'")
+                            print(f"\n❌ Contexte:")
+                            start = max(0, repair_error.pos - 100)
+                            end = min(len(json_repaired), repair_error.pos + 100)
+                            context = json_repaired[start:end]
+                            # Marquer la position de l'erreur
+                            marker_pos = repair_error.pos - start
+                            print(context[:marker_pos] + " <<<ICI>>> " + context[marker_pos:])
+                    except:
+                        pass
                     
-                    # Sauvegarder les deux versions
-                    with open('/tmp/json_error_original.txt', 'w', encoding='utf-8') as f:
-                        f.write(json_str)
-                    with open('/tmp/json_error_repaired.txt', 'w', encoding='utf-8') as f:
-                        f.write(json_repaired)
-                    print("💾 JSON original: /tmp/json_error_original.txt")
-                    print("💾 JSON réparé: /tmp/json_error_repaired.txt")
-                    
-                    raise ValueError(f"JSON invalide et irréparable: {e}")
-                    
-                except Exception as other_error:
-                    print(f"❌ Erreur inattendue lors de la réparation: {other_error}")
-                    raise ValueError(f"JSON invalide: {e}")
+                    raise ValueError(f"JSON invalide et irréparable: {e}")    
             # # Validation des champs essentiels
             # required_fields = ['title', 'etapes', 'ingredients']
             # for field in required_fields:
