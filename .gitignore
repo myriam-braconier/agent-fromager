@@ -14,3 +14,4 @@ env/
 dist/
 build/complete_knowledge_base.json
 recipes_history.json
+agent-fromager/
