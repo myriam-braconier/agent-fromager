@@ -1838,251 +1838,252 @@ class AgentFromagerHF:
         except Exception as e:
             print(f"❌ Erreur get_history: {e}")
             return []
-
-    def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-        """Sauvegarde dans l'historique LOCAL ET HF - VERSION AVEC DIAGNOSTICS"""
         
-        print("\n" + "="*80)
-        print("🔍 DÉBUT _save_to_history - VERSION DEBUG")
-        print("="*80)
+    # DOUBLON A RECONFIRMER
+    # def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
+    #     """Sauvegarde dans l'historique LOCAL ET HF - VERSION AVEC DIAGNOSTICS"""
         
-        # ===== DIAGNOSTIC 1 : INFORMATIONS D'ENTRÉE =====
-        print(f"📥 PARAMÈTRES REÇUS:")
-        print(f"   - Type ingredients: {type(ingredients)}")
-        print(f"   - Ingredients: {ingredients}")
-        print(f"   - Type cheese_type: {type(cheese_type)}")
-        print(f"   - Cheese_type: {cheese_type}")
-        print(f"   - Constraints: {constraints}")
-        print(f"   - Longueur recipe: {len(recipe)} caractères")
+    #     print("\n" + "="*80)
+    #     print("🔍 DÉBUT _save_to_history - VERSION DEBUG")
+    #     print("="*80)
         
-        # ===== DIAGNOSTIC 2 : CHEMIN DU FICHIER =====
+    #     # ===== DIAGNOSTIC 1 : INFORMATIONS D'ENTRÉE =====
+    #     print(f"📥 PARAMÈTRES REÇUS:")
+    #     print(f"   - Type ingredients: {type(ingredients)}")
+    #     print(f"   - Ingredients: {ingredients}")
+    #     print(f"   - Type cheese_type: {type(cheese_type)}")
+    #     print(f"   - Cheese_type: {cheese_type}")
+    #     print(f"   - Constraints: {constraints}")
+    #     print(f"   - Longueur recipe: {len(recipe)} caractères")
         
-        print(f"\n📁 FICHIER:")
-        print(f"   - Nom: {self.recipes_file}")
-        print(f"   - Chemin absolu: {os.path.abspath(self.recipes_file)}")
-        print(f"   - Existe: {os.path.exists(self.recipes_file)}")
-        print(f"   - Répertoire courant: {os.getcwd()}")
+    #     # ===== DIAGNOSTIC 2 : CHEMIN DU FICHIER =====
         
-        if os.path.exists(self.recipes_file):
-            file_size = os.path.getsize(self.recipes_file)
-            print(f"   - Taille actuelle: {file_size} octets")
-            
-            # Lire le contenu actuel
-            try:
-                with open(self.recipes_file, 'r', encoding='utf-8') as f:
-                    current_content = f.read()
-                    print(f"   - Contenu actuel (100 premiers char): {current_content[:100]}")
-            except Exception as e:
-                print(f"   ⚠️ Impossible de lire: {e}")
+    #     print(f"\n📁 FICHIER:")
+    #     print(f"   - Nom: {self.recipes_file}")
+    #     print(f"   - Chemin absolu: {os.path.abspath(self.recipes_file)}")
+    #     print(f"   - Existe: {os.path.exists(self.recipes_file)}")
+    #     print(f"   - Répertoire courant: {os.getcwd()}")
         
-        try:
-            # ===== ÉTAPE 1 : CHARGER L'HISTORIQUE =====
-            print(f"\n📖 ÉTAPE 1 : Chargement de l'historique...")
+    #     if os.path.exists(self.recipes_file):
+    #         file_size = os.path.getsize(self.recipes_file)
+    #         print(f"   - Taille actuelle: {file_size} octets")
             
-            history = self._load_history()
-            print(f"   ✅ Historique chargé: {len(history)} entrées existantes")
+    #         # Lire le contenu actuel
+    #         try:
+    #             with open(self.recipes_file, 'r', encoding='utf-8') as f:
+    #                 current_content = f.read()
+    #                 print(f"   - Contenu actuel (100 premiers char): {current_content[:100]}")
+    #         except Exception as e:
+    #             print(f"   ⚠️ Impossible de lire: {e}")
+        
+    #     try:
+    #         # ===== ÉTAPE 1 : CHARGER L'HISTORIQUE =====
+    #         print(f"\n📖 ÉTAPE 1 : Chargement de l'historique...")
             
-            if history:
-                print(f"   📋 Dernière entrée existante:")
-                last_existing = history[-1]
-                print(f"      - ID: {last_existing.get('id')}")
-                print(f"      - Nom: {last_existing.get('cheese_name')}")
+    #         history = self._load_history()
+    #         print(f"   ✅ Historique chargé: {len(history)} entrées existantes")
             
-            # ===== ÉTAPE 2 : EXTRAIRE LE NOM DU FROMAGE =====
-            print(f"\n🧀 ÉTAPE 2 : Extraction du nom...")
+    #         if history:
+    #             print(f"   📋 Dernière entrée existante:")
+    #             last_existing = history[-1]
+    #             print(f"      - ID: {last_existing.get('id')}")
+    #             print(f"      - Nom: {last_existing.get('cheese_name')}")
             
-            cheese_name = self._extract_cheese_name(recipe)
-            print(f"   ✅ Nom extrait: '{cheese_name}'")
+    #         # ===== ÉTAPE 2 : EXTRAIRE LE NOM DU FROMAGE =====
+    #         print(f"\n🧀 ÉTAPE 2 : Extraction du nom...")
             
-            # ===== ÉTAPE 3 : VÉRIFIER LES DOUBLONS =====
-            print(f"\n🔍 ÉTAPE 3 : Vérification des doublons...")
+    #         cheese_name = self._extract_cheese_name(recipe)
+    #         print(f"   ✅ Nom extrait: '{cheese_name}'")
             
-            existing_names = [entry.get('cheese_name') for entry in history]
-            print(f"   Noms existants: {existing_names}")
+    #         # ===== ÉTAPE 3 : VÉRIFIER LES DOUBLONS =====
+    #         print(f"\n🔍 ÉTAPE 3 : Vérification des doublons...")
             
-            if cheese_name in existing_names:
-                print(f"   ⚠️ '{cheese_name}' existe déjà → Remplacement")
-                history = [entry for entry in history if entry.get('cheese_name') != cheese_name]
-                print(f"   ✅ Ancienne version supprimée")
-            else:
-                print(f"   ✅ Nom unique, pas de doublon")
+    #         existing_names = [entry.get('cheese_name') for entry in history]
+    #         print(f"   Noms existants: {existing_names}")
             
-            # ===== ÉTAPE 4 : CRÉER LA NOUVELLE ENTRÉE =====
-            print(f"\n➕ ÉTAPE 4 : Création de la nouvelle entrée...")
+    #         if cheese_name in existing_names:
+    #             print(f"   ⚠️ '{cheese_name}' existe déjà → Remplacement")
+    #             history = [entry for entry in history if entry.get('cheese_name') != cheese_name]
+    #             print(f"   ✅ Ancienne version supprimée")
+    #         else:
+    #             print(f"   ✅ Nom unique, pas de doublon")
+            
+    #         # ===== ÉTAPE 4 : CRÉER LA NOUVELLE ENTRÉE =====
+    #         print(f"\n➕ ÉTAPE 4 : Création de la nouvelle entrée...")
             
             
-            new_id = int(time.time() * 1000)
-            print(f"   🆔 Nouvel ID généré: {new_id}")
+    #         new_id = int(time.time() * 1000)
+    #         print(f"   🆔 Nouvel ID généré: {new_id}")
             
-            # Convertir ingredients en liste si ce n'est pas déjà le cas
-            if isinstance(ingredients, str):
-                ingredients_list = [ing.strip() for ing in ingredients.split(',')]
-                print(f"   🔄 Ingredients converti en liste: {ingredients_list}")
-            elif isinstance(ingredients, list):
-                ingredients_list = ingredients
-                print(f"   ✅ Ingredients déjà en liste: {ingredients_list}")
-            else:
-                print(f"   ⚠️ Type inattendu pour ingredients: {type(ingredients)}")
-                ingredients_list = [str(ingredients)]
+    #         # Convertir ingredients en liste si ce n'est pas déjà le cas
+    #         if isinstance(ingredients, str):
+    #             ingredients_list = [ing.strip() for ing in ingredients.split(',')]
+    #             print(f"   🔄 Ingredients converti en liste: {ingredients_list}")
+    #         elif isinstance(ingredients, list):
+    #             ingredients_list = ingredients
+    #             print(f"   ✅ Ingredients déjà en liste: {ingredients_list}")
+    #         else:
+    #             print(f"   ⚠️ Type inattendu pour ingredients: {type(ingredients)}")
+    #             ingredients_list = [str(ingredients)]
             
-            entry = {
-                "id": new_id,
-                "date": datetime.now().isoformat(),
-                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "cheese_name": cheese_name,
-                "ingredients": ingredients_list,
-                "type": cheese_type,
-                "constraints": constraints,
-                "recipe_complete": recipe,
-                "recipe_preview": recipe[:300] + "..." if len(recipe) > 300 else recipe
-            }
+    #         entry = {
+    #             "id": new_id,
+    #             "date": datetime.now().isoformat(),
+    #             "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    #             "cheese_name": cheese_name,
+    #             "ingredients": ingredients_list,
+    #             "type": cheese_type,
+    #             "constraints": constraints,
+    #             "recipe_complete": recipe,
+    #             "recipe_preview": recipe[:300] + "..." if len(recipe) > 300 else recipe
+    #         }
             
-            print(f"   ✅ Entrée créée:")
-            print(f"      - ID: {entry['id']}")
-            print(f"      - Nom: {entry['cheese_name']}")
-            print(f"      - Date: {entry['date']}")
-            print(f"      - Ingrédients: {entry['ingredients']}")
+    #         print(f"   ✅ Entrée créée:")
+    #         print(f"      - ID: {entry['id']}")
+    #         print(f"      - Nom: {entry['cheese_name']}")
+    #         print(f"      - Date: {entry['date']}")
+    #         print(f"      - Ingrédients: {entry['ingredients']}")
             
-            # ===== ÉTAPE 5 : AJOUTER À L'HISTORIQUE =====
-            print(f"\n💾 ÉTAPE 5 : Ajout à l'historique...")
+    #         # ===== ÉTAPE 5 : AJOUTER À L'HISTORIQUE =====
+    #         print(f"\n💾 ÉTAPE 5 : Ajout à l'historique...")
             
-            history.append(entry)
-            print(f"   ✅ Ajouté à la liste")
-            print(f"   📊 Taille historique avant limitation: {len(history)}")
+    #         history.append(entry)
+    #         print(f"   ✅ Ajouté à la liste")
+    #         print(f"   📊 Taille historique avant limitation: {len(history)}")
             
-            # Limiter à 100 entrées
-            history = history[-100:]
-            print(f"   📊 Taille historique après limitation: {len(history)}")
+    #         # Limiter à 100 entrées
+    #         history = history[-100:]
+    #         print(f"   📊 Taille historique après limitation: {len(history)}")
             
-            # ===== ÉTAPE 6 : SAUVEGARDER DANS LE FICHIER =====
-            print(f"\n💾 ÉTAPE 6 : Écriture dans {self.recipes_file}...")
+    #         # ===== ÉTAPE 6 : SAUVEGARDER DANS LE FICHIER =====
+    #         print(f"\n💾 ÉTAPE 6 : Écriture dans {self.recipes_file}...")
             
-            try:
+    #         try:
                 
-                # Créer une sauvegarde du fichier existant
-                if os.path.exists(self.recipes_file):
-                    import shutil
-                    backup_file = f"{self.recipes_file}.backup"
-                    shutil.copy2(self.recipes_file, backup_file)
-                    print(f"   📋 Sauvegarde créée: {backup_file}")
+    #             # Créer une sauvegarde du fichier existant
+    #             if os.path.exists(self.recipes_file):
+    #                 import shutil
+    #                 backup_file = f"{self.recipes_file}.backup"
+    #                 shutil.copy2(self.recipes_file, backup_file)
+    #                 print(f"   📋 Sauvegarde créée: {backup_file}")
                 
-                # Écrire le nouveau contenu
-                with open(self.recipes_file, "w", encoding="utf-8") as f:
-                    json_mosule.dump(history, f, indent=2, ensure_ascii=False)
+    #             # Écrire le nouveau contenu
+    #             with open(self.recipes_file, "w", encoding="utf-8") as f:
+    #                 json_mosule.dump(history, f, indent=2, ensure_ascii=False)
                 
-                print(f"   ✅ Fichier écrit avec succès")
+    #             print(f"   ✅ Fichier écrit avec succès")
                 
-                # Vérifier que l'écriture a bien fonctionné
-                with open(self.recipes_file, "r", encoding="utf-8") as f:
-                    verification = json_module.load(f)
+    #             # Vérifier que l'écriture a bien fonctionné
+    #             with open(self.recipes_file, "r", encoding="utf-8") as f:
+    #                 verification = json_module.load(f)
                 
-                print(f"   ✅ Vérification: {len(verification)} entrées dans le fichier")
+    #             print(f"   ✅ Vérification: {len(verification)} entrées dans le fichier")
                 
-                if len(verification) == len(history):
-                    print(f"   ✅ Nombre d'entrées correct")
-                else:
-                    print(f"   ⚠️ PROBLÈME: {len(verification)} dans fichier vs {len(history)} attendu")
+    #             if len(verification) == len(history):
+    #                 print(f"   ✅ Nombre d'entrées correct")
+    #             else:
+    #                 print(f"   ⚠️ PROBLÈME: {len(verification)} dans fichier vs {len(history)} attendu")
                 
-            except Exception as e:
-                print(f"   ❌ ERREUR lors de l'écriture du fichier:")
-                print(f"      Type: {type(e).__name__}")
-                print(f"      Message: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                return False
+    #         except Exception as e:
+    #             print(f"   ❌ ERREUR lors de l'écriture du fichier:")
+    #             print(f"      Type: {type(e).__name__}")
+    #             print(f"      Message: {str(e)}")
+    #             import traceback
+    #             traceback.print_exc()
+    #             return False
             
-            # ===== ÉTAPE 7 : METTRE À JOUR self.history =====
-            print(f"\n🔄 ÉTAPE 7 : Mise à jour de self.history...")
+    #         # ===== ÉTAPE 7 : METTRE À JOUR self.history =====
+    #         print(f"\n🔄 ÉTAPE 7 : Mise à jour de self.history...")
             
-            self.history = history
-            print(f"   ✅ self.history mis à jour: {len(self.history)} entrées")
+    #         self.history = history
+    #         print(f"   ✅ self.history mis à jour: {len(self.history)} entrées")
             
-            # ===== ÉTAPE 8 : SAUVEGARDER DANS complete_knowledge_base.json =====
-            print(f"\n📚 ÉTAPE 8 : Ajout à complete_knowledge_base.json...")
+    #         # ===== ÉTAPE 8 : SAUVEGARDER DANS complete_knowledge_base.json =====
+    #         print(f"\n📚 ÉTAPE 8 : Ajout à complete_knowledge_base.json...")
             
-            try:
-                kb_file = "complete_knowledge_base.json"
+    #         try:
+    #             kb_file = "complete_knowledge_base.json"
                 
-                # Charger KB existante
-                kb = []
-                if os.path.exists(kb_file):
-                    try:
-                        with open(kb_file, 'r', encoding='utf-8') as f:
-                            kb = json.load(f)
-                        print(f"   📖 KB existante chargée: {len(kb)} entrées")
-                    except Exception as e:
-                        print(f"   ⚠️ Erreur lecture KB: {e}")
-                        kb = []
-                else:
-                    print(f"   📝 KB n'existe pas, création...")
+    #             # Charger KB existante
+    #             kb = []
+    #             if os.path.exists(kb_file):
+    #                 try:
+    #                     with open(kb_file, 'r', encoding='utf-8') as f:
+    #                         kb = json.load(f)
+    #                     print(f"   📖 KB existante chargée: {len(kb)} entrées")
+    #                 except Exception as e:
+    #                     print(f"   ⚠️ Erreur lecture KB: {e}")
+    #                     kb = []
+    #             else:
+    #                 print(f"   📝 KB n'existe pas, création...")
                 
-                # Ajouter la nouvelle recette
-                kb.append({
-                    "title": cheese_name,
-                    "description": f"Recette {cheese_type}",
-                    "source_type": "user_generated",
-                    "lait": self._extract_lait_from_text(' '.join(ingredients_list)),
-                    "type_pate": cheese_type,
-                    "score": 10,
-                    "difficulte": "Personnalisée",
-                    "ingredients": ingredients_list,
-                    "etapes": self._extract_steps_from_recipe(recipe),
-                    "date_creation": entry["date"],
-                    "generated_at": entry["date"]
-                })
+    #             # Ajouter la nouvelle recette
+    #             kb.append({
+    #                 "title": cheese_name,
+    #                 "description": f"Recette {cheese_type}",
+    #                 "source_type": "user_generated",
+    #                 "lait": self._extract_lait_from_text(' '.join(ingredients_list)),
+    #                 "type_pate": cheese_type,
+    #                 "score": 10,
+    #                 "difficulte": "Personnalisée",
+    #                 "ingredients": ingredients_list,
+    #                 "etapes": self._extract_steps_from_recipe(recipe),
+    #                 "date_creation": entry["date"],
+    #                 "generated_at": entry["date"]
+    #             })
                 
-                # Sauvegarder
-                with open(kb_file, 'w', encoding='utf-8') as f:
-                    json.dump(kb, f, indent=2, ensure_ascii=False)
+    #             # Sauvegarder
+    #             with open(kb_file, 'w', encoding='utf-8') as f:
+    #                 json.dump(kb, f, indent=2, ensure_ascii=False)
                 
-                print(f"   ✅ Ajouté à KB: {len(kb)} entrées totales")
+    #             print(f"   ✅ Ajouté à KB: {len(kb)} entrées totales")
                 
-            except Exception as e:
-                print(f"   ⚠️ Erreur KB (non critique): {e}")
+    #         except Exception as e:
+    #             print(f"   ⚠️ Erreur KB (non critique): {e}")
             
-            # ===== ÉTAPE 9 : UPLOAD VERS HUGGINGFACE =====
-            print(f"\n☁️ ÉTAPE 9 : Upload vers Hugging Face...")
+    #         # ===== ÉTAPE 9 : UPLOAD VERS HUGGINGFACE =====
+    #         print(f"\n☁️ ÉTAPE 9 : Upload vers Hugging Face...")
             
-            for i in range(3):
-                try:
-                    sync_success = self._upload_history_to_hf()
-                    if sync_success:
-                        print(f"   ✅ Synchronisation HF réussie (tentative {i+1})")
-                        break
-                    else:
-                        print(f"   ⚠️ Échec HF tentative {i+1}/3")
-                        time.sleep(1)
-                except Exception as e:
-                    print(f"   ⚠️ Erreur HF tentative {i+1}/3: {e}")
-                    time.sleep(1)
-            else:
-                print(f"   ⚠️ Upload HF échoué (recette sauvegardée localement)")
+    #         for i in range(3):
+    #             try:
+    #                 sync_success = self._upload_history_to_hf()
+    #                 if sync_success:
+    #                     print(f"   ✅ Synchronisation HF réussie (tentative {i+1})")
+    #                     break
+    #                 else:
+    #                     print(f"   ⚠️ Échec HF tentative {i+1}/3")
+    #                     time.sleep(1)
+    #             except Exception as e:
+    #                 print(f"   ⚠️ Erreur HF tentative {i+1}/3: {e}")
+    #                 time.sleep(1)
+    #         else:
+    #             print(f"   ⚠️ Upload HF échoué (recette sauvegardée localement)")
             
-            # ===== RÉSUMÉ FINAL =====
-            print("\n" + "="*80)
-            print("✅ SAUVEGARDE TERMINÉE AVEC SUCCÈS")
-            print("="*80)
-            print(f"📊 RÉSUMÉ:")
-            print(f"   - Recette: {cheese_name}")
-            print(f"   - ID: {entry['id']}")
-            print(f"   - Fichier: {os.path.abspath(self.recipes_file)}")
-            print(f"   - Entrées totales: {len(history)}")
-            print(f"   - Taille fichier: {os.path.getsize(self.recipes_file)} octets")
-            print("="*80 + "\n")
+    #         # ===== RÉSUMÉ FINAL =====
+    #         print("\n" + "="*80)
+    #         print("✅ SAUVEGARDE TERMINÉE AVEC SUCCÈS")
+    #         print("="*80)
+    #         print(f"📊 RÉSUMÉ:")
+    #         print(f"   - Recette: {cheese_name}")
+    #         print(f"   - ID: {entry['id']}")
+    #         print(f"   - Fichier: {os.path.abspath(self.recipes_file)}")
+    #         print(f"   - Entrées totales: {len(history)}")
+    #         print(f"   - Taille fichier: {os.path.getsize(self.recipes_file)} octets")
+    #         print("="*80 + "\n")
             
-            return True
+    #         return True
             
-        except Exception as e:
-            print("\n" + "="*80)
-            print("❌❌❌ ERREUR FATALE DANS _save_to_history ❌❌❌")
-            print("="*80)
-            print(f"Type d'erreur: {type(e).__name__}")
-            print(f"Message: {str(e)}")
-            print(f"\nTraceback complet:")
-            import traceback
-            traceback.print_exc()
-            print("="*80 + "\n")
-            return False
+    #     except Exception as e:
+    #         print("\n" + "="*80)
+    #         print("❌❌❌ ERREUR FATALE DANS _save_to_history ❌❌❌")
+    #         print("="*80)
+    #         print(f"Type d'erreur: {type(e).__name__}")
+    #         print(f"Message: {str(e)}")
+    #         print(f"\nTraceback complet:")
+    #         import traceback
+    #         traceback.print_exc()
+    #         print("="*80 + "\n")
+    #         return False
     
     def clean_all_duplicates(self):
         """Nettoie les doublons - SANS REGEX UNICODE"""
@@ -3745,7 +3746,9 @@ class AgentFromagerHF:
                         kb = json.load(f)
                 except:
                     kb = []
-
+                    
+            kb = [entry for entry in kb if entry.get("title") != cheese_name]
+            
             # Ajouter la nouvelle recette
             kb.append({
                 "title": cheese_name,
@@ -7011,7 +7014,7 @@ def generate_all(
 
         if agent.history:
             # Afficher les 3 dernières recettes
-            for i, entry in enumerate(agent.history[-3:][::-1], 1):
+            for i, entry in enumerate(agent.history[-6:][::-1], 1):
                 cheese_name = entry.get("cheese_name", "Sans nom")
                 date_str = entry.get("timestamp", "")
                 if not date_str and "date" in entry:
@@ -7027,7 +7030,8 @@ def generate_all(
                 summary += (
                     f"    📅 {date_str} | 🏷️ {entry.get('type', 'Type inconnu')}\n\n"
                 )
-
+                # Récupérer le profil
+                profile = entry.get("profile", "Profil inconnu")
         # C. Préparer les choix du dropdown + REMPLIR recipe_map
         choices = []
         recipe_map = {}  # ✅ NOUVEAU : Réinitialiser le recipe_map
