@@ -9099,10 +9099,6 @@ def create_interface():
     return demo
 
 
-# ===== NE PAS OUBLIER EN DÉBUT DE FICHIER =====
-# AUTH_USERNAME = "admin"  # ou votre nom d'utilisateur
-# AUTH_PASSWORD = "votre_mot_de_passe_securise"
-
 def run_tests():
     """Lance des tests rapides"""
     print("\n" + "=" * 60)
