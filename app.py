@@ -7856,7 +7856,7 @@ def create_interface():
         """
     ) as demo:
     
-        gr.HTML(f"<style>{custom_html}</style>", visible=False)
+        # gr.HTML(f"<style>{custom_html}</style>", visible=False)
         
         # ===== EFFET À L'OUVERTURE =====
          # Animation bienvenue
