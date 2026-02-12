@@ -1,59 +1,87 @@
 [
   {
-    "title": "FROMAGE AUX FLEUR DE BASILIC",
-    "description": "Recette personnalisée - Pâte molle",
+    "title": "NOISETTE FRAICHE A LA BASILIQUE",
+    "description": "Recette Fromage frais",
     "source_type": "user_generated",
-    "url": "",
+    "url": null,
     "lait": "vache",
-    "type_pate": "Pâte molle",
+    "type_pate": "Fromage frais",
     "score": 10,
     "difficulte": "Personnalisée",
     "duree_totale": "Variable",
     "ingredients": [
       "vache",
-      "basilic"
+      "noix",
+      "bsilic"
     ],
     "etapes": [
-      "1 litre de lait vache",
-      "10g de sel",
-      "1 feuille de basilic frais",
-      "Lait échauffé à 30°C : Mélangez le lait échauffé avec le sel et le basilic frais.",
-      "Fermentation : Laissez la mélange fermenter pendant 45 minutes à 1 heure.",
-      "Égouttage : Égouttez le lait avec un chiffon pour éliminer l'excess de liquide.",
-      "Étirement : Étirez la pâte avec un moule ou un moule à fromage pendant 30 minutes.",
-      "Affinage : Placez la pâte dans une cave à fromage avec une température de 10-12°C et une humidité de 90-95% pendant 1 semaine.",
-      "Étiquetage et conservation : Étiquetez le fromage et conservez-le dans la cave à fromage pendant au moins 2 semaines."
+      "1L lait vache entier cru ou pasteurise a 20 degrés",
+      "5g noix entieres concassees en poudre très fine",
+      "3g feuilles basilic frais hachees menu",
+      "5ml présure liquide ou 1/4 comprimé dilué eau",
+      "2g ferments Lactococcus lactis en poudre",
+      "10g sel fin aux grains réguliers",
+      "70ml eau à 25 degrés pour dilution présure",
+      "Durée totale: Variable",
+      "Difficulté: Moyenne pour débutant mais accessible manipulation germe et présure pas à pas",
+      "Température d'affinage: N/A",
+      "Score: 9.2/10"
     ],
-    "date_creation": "2026-02-10T16:09:18.568555"
+    "date_creation": "2026-02-12T03:18:55.086675",
+    "generated_at": "2026-02-12T03:18:55.086675"
   },
   {
-    "title": "FROMAGE AUX FLEUR DE BASILIC",
-    "description": "Recette personnalisée - Pâte molle",
+    "title": "CROTTIN CHAUD PIMENTÉ AROMATIQUE",
+    "description": "Recette Pâte pressée non cuite",
     "source_type": "user_generated",
-    "url": "",
-    "lait": "vache",
-    "type_pate": "Pâte molle",
+    "lait": "chevre",
+    "type_pate": "Pâte pressée non cuite",
     "score": 10,
     "difficulte": "Personnalisée",
-    "duree_totale": "Variable",
     "ingredients": [
-      "vache",
-      "basilic"
+      "chèvre",
+      "piment"
     ],
     "etapes": [
-      "1 litre de lait vache",
-      "10g de sel",
-      "1 feuille de basilic frais",
-      "Lait échauffé à 30°C : Mélangez le lait échauffé avec le sel et le basilic frais.",
-      "Fermentation : Laissez la mélange fermenter pendant 45 minutes à 1 heure.",
-      "Égouttage : Égouttez le lait avec un chiffon pour éliminer l'excess de liquide.",
-      "Étirement : Étirez la pâte avec un moule ou un moule à fromage pendant 30 minutes.",
-      "Affinage : Placez la pâte dans une cave à fromage avec une température de 10-12°C et une humidité de 90-95% pendant 1 semaine.",
-      "Étiquetage et conservation : Étiquetez le fromage et conservez-le dans la cave à fromage pendant au moins 2 semaines.",
-      "Enrober de cendres végétales",
-      "Incorporer des noix concassées dans le caillé",
-      "Infuser le lait avec du thé Earl Grey"
+      "1000ml lait chèvre cru entier tempere 30 degres",
+      "5ml presure liquide steriilisee eau distillee dilution eau robinet chloree",
+      "5g ferments lactiques thermophiles Thermophiles 3021 ou 15001",
+      "2g piment douc rouge ou de Essex concasse finement teinture ou herbe",
+      "10g sel fin sans iode 22% poids fromage",
+      "1 bouton fleur romarin ou thym optionnel renforcat parfum",
+      "Durée totale: Variable",
+      "Difficulté: moyenne precision tempetature et temps caillage crucial elimination petit-lait sans casseur grains profil chèvre exigeant",
+      "Température d'affinage: N/A",
+      "Score: 7.8/10"
     ],
-    "date_creation": "2026-02-10T16:09:19.229905"
+    "date_creation": "2026-02-12T13:25:03.533311",
+    "generated_at": "2026-02-12T13:25:03.533311"
+  },
+  {
+    "title": "CROTTIN CHAUD PIMENTÉ AROMATIQUE",
+    "description": "Recette Pâte pressée non cuite",
+    "source_type": "user_generated",
+    "lait": "chevre",
+    "type_pate": "Pâte pressée non cuite",
+    "score": 10,
+    "difficulte": "Personnalisée",
+    "ingredients": [
+      "chèvre",
+      "piment"
+    ],
+    "etapes": [
+      "1000ml lait chèvre cru entier tempere 30 degres",
+      "5ml presure liquide steriilisee eau distillee dilution eau robinet chloree",
+      "5g ferments lactiques thermophiles Thermophiles 3021 ou 15001",
+      "2g piment douc rouge ou de Essex concasse finement teinture ou herbe",
+      "10g sel fin sans iode 22% poids fromage",
+      "1 bouton fleur romarin ou thym optionnel renforcat parfum",
+      "Durée totale: Variable",
+      "Difficulté: moyenne precision tempetature et temps caillage crucial elimination petit-lait sans casseur grains profil chèvre exigeant",
+      "Température d'affinage: N/A",
+      "Score: 7.8/10"
+    ],
+    "date_creation": "2026-02-12T13:25:05.169616",
+    "generated_at": "2026-02-12T13:25:05.169616"
   }
 ]
