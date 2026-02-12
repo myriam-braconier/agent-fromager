@@ -7807,50 +7807,63 @@ def create_interface():
     
     
     # Définir custom_css (TON CODE ORIGINAL)
-    custom_css = """
-    #date_str, #lait_emoji, #type_pate, #duree_affinage, #temperature {
-        color: black !important;
-        background: #FFFEF5 !important;  /* Fond crème pour contraste */
-    }
-    .no-recipes {
-        text-align: center;
-        padding: 40px;
-        color: #666;
-        font-size: 1.2em;
-    }
-    .recipe-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 10px 0;
-        background: #f9f9f9;
-    }
-    #recipe-scroll {
-        overflow-y: auto;
-        max-height: 800px;
-    }
-    #chat-display {
-        overflow-y: auto;
-        max-height: 500px;
-    }
-    .login-box {
-        max-width: 400px;
-        margin: 100px auto;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        background: white;
-    }
-    """
+    # custom_css = """
+    # #date_str, #lait_emoji, #type_pate, #duree_affinage, #temperature {
+    #     color: black !important;
+    #     background: #FFFEF5 !important;  /* Fond crème pour contraste */
+    # }
+    # .no-recipes {
+    #     text-align: center;
+    #     padding: 40px;
+    #     color: #666;
+    #     font-size: 1.2em;
+    # }
+    # .recipe-card {
+    #     border: 1px solid #e0e0e0;
+    #     border-radius: 8px;
+    #     padding: 15px;
+    #     margin: 10px 0;
+    #     background: #f9f9f9;
+    # }
+    # #recipe-scroll {
+    #     overflow-y: auto;
+    #     max-height: 800px;
+    # }
+    # #chat-display {
+    #     overflow-y: auto;
+    #     max-height: 500px;
+    # }
+    # .login-box {
+    #     max-width: 400px;
+    #     margin: 100px auto;
+    #     padding: 30px;
+    #     border-radius: 10px;
+    #     box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    #     background: white;
+    # }
+    # """
     
     # Créer le thème
     fromage_theme = create_fromage_theme()
+    
+    
+    
+    custom_html = """
+    <head>
+        <meta property="og:title" content="Mon App Python" />
+        <meta property="og:description" content="Description de mon app" />
+        <meta property="og:image" content="https://mon-domaine.com/ma-vignette.png" />
+        <meta property="og:url" content="https://mon-app.railway.app" />
+        <meta name="twitter:card" content="summary_large_image" />
+    </head>
+    """
+
     
     with gr.Blocks(
         title="🧀 Agent Fromager",
     ) as demo:
     
-        gr.HTML(f"<style>{custom_css}</style>", visible=False)
+        gr.HTML(f"<style>{custom_html}</style>", visible=False)
         
         # ===== EFFET À L'OUVERTURE =====
          # Animation bienvenue
