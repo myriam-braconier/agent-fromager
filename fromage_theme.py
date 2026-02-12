@@ -22,8 +22,8 @@ def create_fromage_theme():
     # Appliquer seulement les styles supportés par Gradio
     theme.set(
         # ===== FOND GÉNÉRAL =====
-        body_background_fill="url(https://unsplash.com/fr/photos/une-assiette-de-nourriture-rOdM3LQRd50) center/cover, linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%)",
-        body_background_fill_dark="url('https://unsplash.com/fr/photos/une-assiette-de-nourriture-rOdM3LQRd50') center/cover, linear-gradient(135deg, #2C1810 0%, #3E2723 100%)",
+        body_background_fill="linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%)",
+        body_background_fill_dark="linear-gradient(135deg, #2C1810 0%, #3E27)",
         
         # ===== TEXTE =====
         body_text_color="#3E2723",
@@ -62,9 +62,25 @@ def create_fromage_theme():
 # (Seulement ce qui ne peut pas être fait avec le thème)
 
 minimal_css = """
+/* ===== IMAGE DE FOND ===== */
 body, .gradio-container {
-    background: linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%) !important;
+    /* Option 1: Image de fromage d'Unsplash */
+    background: 
+        linear-gradient(rgba(255, 249, 230, 0.85), rgba(255, 229, 180, 0.85)),
+        url('https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920') center/cover fixed !important;
 }
+
+/* Alternative: Pattern de fromage subtil */
+/* Décommentez pour utiliser un pattern au lieu d'une photo */
+/*
+body, .gradio-container {
+    background: 
+        linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%),
+        repeating-radial-gradient(circle at 0 0, transparent 0, #FFFEF5 40px),
+        repeating-linear-gradient(#FFE5B455, #FFE5B4) !important;
+}
+*/
+
 /* FORCER ABSOLUMENT TOUT LE TEXTE EN NOIR */
 body, body *, 
 .gradio-container, .gradio-container *,
@@ -225,6 +241,46 @@ input, textarea, .gr-text-input, .gr-textbox {
 #chat-display::-webkit-scrollbar-thumb:hover {
     background: #FFDAB9;
 }
+"""
+
+
+# ===== IMAGES DE FOND ALTERNATIVES =====
+
+# Voici quelques URLs d'images de fromage que vous pouvez utiliser :
+
+BACKGROUND_IMAGES = {
+    "cheese_platter": "https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920",  # Plateau de fromages
+    "cheese_board": "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=1920",     # Planche à fromage
+    "cheese_texture": "https://images.unsplash.com/photo-1618164436241-4473940d1f5c?w=1920",   # Texture fromage
+    "cheese_making": "https://images.unsplash.com/photo-1559561853-08451507cbe7?w=1920",      # Fabrication
+    "cheese_cave": "https://images.unsplash.com/photo-1626200032322-e6cd831ec2e8?w=1920",     # Cave d'affinage
+}
+
+# Pour changer l'image de fond, remplacez l'URL dans minimal_css par une des URLs ci-dessus
+
+
+# ===== CSS AVEC DIFFÉRENTES OPTIONS D'IMAGE =====
+
+def get_css_with_image(image_key="cheese_platter", opacity=0.85):
+    """
+    Génère le CSS avec l'image de fond choisie
+    
+    Args:
+        image_key: Clé du dictionnaire BACKGROUND_IMAGES
+        opacity: Opacité du gradient overlay (0.0 à 1.0)
+    """
+    
+    image_url = BACKGROUND_IMAGES.get(image_key, BACKGROUND_IMAGES["cheese_platter"])
+    
+    return f"""
+/* ===== IMAGE DE FOND ===== */
+body, .gradio-container {{
+    background: 
+        linear-gradient(rgba(255, 249, 230, {opacity}), rgba(255, 229, 180, {opacity})),
+        url('{image_url}') center/cover fixed !important;
+}}
+
+{minimal_css.split('*/')[1]}  /* Reste du CSS */
 """
 
 # ===== EXEMPLE D'UTILISATION =====
