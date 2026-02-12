@@ -8012,7 +8012,7 @@ def create_interface():
                 # ONGLET 5 : Maintenance
                 with gr.Tab("⚙️ Maintenance"):
                 # Ajoute un bouton
-                    clean_kb_btn = gr.Button("🧹 Nettoyer complete_knowledge_base")
+                    clean_kb_btn = gr.Button("🧹 Nettoyer les recettes dynamiques")
                     clean_status = gr.Markdown("")
 
                     clean_kb_btn.click(
