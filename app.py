@@ -1839,7 +1839,7 @@ class AgentFromagerHF:
             return []
 
     def _save_to_history(self, ingredients, cheese_type, constraints, recipe):
-        """Sauvegarde dans l'historique LOCAL ET HF"""
+        """Sauvegarde dans l'historique LOCAL ET HF avec protection anti-doublon"""
         try:
             history = self._load_history()
             
@@ -1847,9 +1847,29 @@ class AgentFromagerHF:
             cheese_name = self._extract_cheese_name(recipe)
             print(f"📝 Nom final sauvegardé: '{cheese_name}'")
             
+            # ===== VÉRIFICATION ANTI-DOUBLON =====
+            # Vérifier les 10 dernières recettes pour éviter les doublons récents
+            now = datetime.now()
+            for existing in history[-10:]:
+                existing_name = existing.get('cheese_name', '')
+                existing_date = existing.get('date', '')
+                
+                try:
+                    existing_dt = datetime.fromisoformat(existing_date)
+                    time_diff = (now - existing_dt).total_seconds()
+                    
+                    # Si même nom ET moins de 60 secondes d'écart = doublon
+                    if existing_name == cheese_name and time_diff < 60:
+                        print(f"⚠️ DOUBLON DÉTECTÉ - Sauvegarde annulée")
+                        print(f"   Recette existante: {existing_name} ({existing_date})")
+                        print(f"   Écart de temps: {time_diff:.0f} secondes")
+                        return False
+                except Exception as e:
+                    # Si erreur de parsing de date, continuer
+                    pass
+            
             # ===== GÉNÉRATION D'ID UNIQUE AVEC TIMESTAMP =====
             new_id = int(time.time() * 1000)  # Millisecondes depuis epoch
-            
             print(f"🆔 Nouvel ID: {new_id}")
             
             # ===== CRÉATION DE L'ENTRÉE =====
@@ -1885,7 +1905,59 @@ class AgentFromagerHF:
             import traceback
             traceback.print_exc()
             return False
+
+    def clean_all_duplicates(self):
+        """Nettoie les doublons - SANS REGEX UNICODE"""
+        import os
+        import json
         
+        history_file = "unified_recipes_history.json"
+        
+        if not os.path.exists(history_file):
+            return "❌ Fichier manquant"
+        
+        with open(history_file, 'r', encoding='utf-8') as f:
+            all_recipes = json.load(f)
+        
+        # NORMALISATION SIMPLE (sans regex unicode)
+        def simple_clean(title):
+            # Enlève les emojis courants manuellement
+            emojis = "🤖🧪📅📋🥛🐄🧀✨🎉📊🔍🗑️✅❌"
+            for emoji in emojis:
+                title = title.replace(emoji, "")
+            # Nettoie espaces + casse
+            title = " ".join(title.split()).lower().strip()
+            return title
+        
+        seen = set()
+        cleaned = []
+        
+        for r in all_recipes:
+            title_raw = r.get('title', '')
+            title_clean = simple_clean(title_raw)
+            
+            # Date simple (16 premiers caractères)
+            date = r.get('generated_at') or r.get('date_creation') or r.get('date', '')
+            date_key = date[:16] if len(date) >= 16 else date
+            
+            key = f"{title_clean}|{date_key}"
+            
+            if key not in seen:
+                cleaned.append(r)
+                seen.add(key)
+        
+        # Sauvegarde
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(cleaned, f, ensure_ascii=False, indent=2)
+        
+        removed = len(all_recipes) - len(cleaned)
+        return f"""✅ **DOUBLONS SUPPRIMÉS !**
+
+    Avant: {len(all_recipes)} recettes
+    Après: {len(cleaned)} recettes
+    **Supprimés: {removed}** 🎉"""
+
+    
     def _extract_cheese_name(self, recipe):
         """Extrait le nom du fromage de la recette"""
         import re
@@ -3482,8 +3554,41 @@ class AgentFromagerHF:
             self.history = history
             
             # ===== SAUVEGARDE DANS complete_knowledge_base.json =====
-            self._save_to_complete_kb(entry, cheese_name, cheese_type, ingredients, recipe)
-            
+            # REMPLACER par ça (inline) :
+            import os
+            import json
+            kb_file = "complete_knowledge_base.json"
+
+            # Charger KB existante
+            kb = []
+            if os.path.exists(kb_file):
+                try:
+                    with open(kb_file, 'r', encoding='utf-8') as f:
+                        kb = json.load(f)
+                except:
+                    kb = []
+
+            # Ajouter la nouvelle recette
+            kb.append({
+                "title": cheese_name,
+                "description": f"Recette {cheese_type}",
+                "source_type": "user_generated",
+                "lait": self._extract_lait_from_text(' '.join(ingredients)),
+                "type_pate": cheese_type,
+                "score": 10,
+                "difficulte": "Personnalisée",
+                "ingredients": ingredients,
+                "etapes": self._extract_steps_from_recipe(recipe),
+                "date_creation": entry["date"],
+                "generated_at": entry["date"]
+            })
+
+            # Sauvegarder
+            with open(kb_file, 'w', encoding='utf-8') as f:
+                json.dump(kb, f, indent=2, ensure_ascii=False)
+
+            print(f"✅ Ajouté à complete_knowledge_base.json")
+                        
             # ===== UPLOAD VERS HUGGINGFACE (avec retry) =====
             for i in range(3):
                 sync_success = self._upload_history_to_hf()
@@ -3503,49 +3608,96 @@ class AgentFromagerHF:
             import traceback
             traceback.print_exc()
             return False
-     
-    def _save_to_complete_kb(self, entry, cheese_name, cheese_type, ingredients, recipe, source_type="user_generated", url=None):
-        """Sauvegarde aussi dans complete_knowledge_base.json pour l'affichage"""
-        try:
-            import os
-            import json
+    
+    def clean_complete_kb_duplicates(self):
+        """Nettoie les doublons dans complete_knowledge_base.json"""
+        import os
+        import json
+        
+        kb_file = "complete_knowledge_base.json"
+        
+        if not os.path.exists(kb_file):
+            return "❌ Fichier complete_knowledge_base.json introuvable"
+        
+        # Charger
+        with open(kb_file, 'r', encoding='utf-8') as f:
+            all_recipes = json.load(f)
+        
+        print(f"🔍 {len(all_recipes)} recettes chargées")
+        
+        # CLÉ UNIQUE = titre + date (normalisée)
+        seen = set()
+        cleaned = []
+        duplicates = 0
+        
+        for r in all_recipes:
+            title = r.get('title', '').strip().lower()
+            date_raw = r.get('generated_at') or r.get('date_creation') or r.get('date', '')
+            date_clean = date_raw[:16] if len(date_raw) >= 16 else date_raw
             
-            kb_file = "complete_knowledge_base.json"
+            key = f"{title}|{date_clean}"
             
-            # Charger la base existante
-            if os.path.exists(kb_file):
-                with open(kb_file, 'r', encoding='utf-8') as f:
-                    kb = json.load(f)
+            if key not in seen:
+                cleaned.append(r)
+                seen.add(key)
             else:
-                kb = []
+                duplicates += 1
+                print(f"🗑️ SUPPRIMÉ: {title} ({date_clean})")
+        
+        # SAUVEGARDER
+        with open(kb_file, 'w', encoding='utf-8') as f:
+            json.dump(cleaned, f, indent=2, ensure_ascii=False)
+        
+        return f"""✅ **NETTOYAGE TERMINÉ !**
+
+    Avant: {len(all_recipes)} recettes
+    Après: {len(cleaned)} recettes
+    **{duplicates} DOUBLONS SUPPRIMÉS** 🎉"""
+
+    
+     
+    # def _save_to_complete_kb(self, entry, cheese_name, cheese_type, ingredients, recipe, source_type="user_generated", url=None):
+    #     """Sauvegarde aussi dans complete_knowledge_base.json pour l'affichage"""
+    #     try:
+    #         import os
+    #         import json
             
-            # Créer l'entrée pour complete_knowledge_base
-            kb_entry = {
-                "title": cheese_name,
-                "description": f"Recette {cheese_type}",
-                "source_type": source_type,  # ← Utiliser le vrai type
-                "url": url,  # ← Utiliser la vraie URL
-                "lait": self._extract_lait_from_text(' '.join(ingredients)),
-                "type_pate": cheese_type,
-                "score": 10,
-                "difficulte": "Personnalisée",
-                "duree_totale": "Variable",
-                "ingredients": ingredients,
-                "etapes": self._extract_steps_from_recipe(recipe),
-                "date_creation": entry["date"],
-                "generated_at": entry["date"]
-            }
+    #         kb_file = "complete_knowledge_base.json"
             
-            kb.append(kb_entry)
+    #         # Charger la base existante
+    #         if os.path.exists(kb_file):
+    #             with open(kb_file, 'r', encoding='utf-8') as f:
+    #                 kb = json.load(f)
+    #         else:
+    #             kb = []
             
-            # Sauvegarder
-            with open(kb_file, 'w', encoding='utf-8') as f:
-                json.dump(kb, f, indent=2, ensure_ascii=False)
+    #         # Créer l'entrée pour complete_knowledge_base
+    #         kb_entry = {
+    #             "title": cheese_name,
+    #             "description": f"Recette {cheese_type}",
+    #             "source_type": source_type,  # ← Utiliser le vrai type
+    #             "url": url,  # ← Utiliser la vraie URL
+    #             "lait": self._extract_lait_from_text(' '.join(ingredients)),
+    #             "type_pate": cheese_type,
+    #             "score": 10,
+    #             "difficulte": "Personnalisée",
+    #             "duree_totale": "Variable",
+    #             "ingredients": ingredients,
+    #             "etapes": self._extract_steps_from_recipe(recipe),
+    #             "date_creation": entry["date"],
+    #             "generated_at": entry["date"]
+    #         }
             
-            print(f"✅ Recette ajoutée à complete_knowledge_base.json (source: {source_type})")
+    #         kb.append(kb_entry)
             
-        except Exception as e:
-            print(f"⚠️ Erreur sauvegarde complete_kb: {e}")     
+    #         # Sauvegarder
+    #         with open(kb_file, 'w', encoding='utf-8') as f:
+    #             json.dump(kb, f, indent=2, ensure_ascii=False)
+            
+    #         print(f"✅ Recette ajoutée à complete_knowledge_base.json (source: {source_type})")
+            
+    #     except Exception as e:
+    #         print(f"⚠️ Erreur sauvegarde complete_kb: {e}")     
        
     def _extract_steps_from_recipe(self, recipe):
         """Extrait les étapes de la recette pour l'affichage"""
@@ -7107,18 +7259,54 @@ def view_knowledge_base():
         </div>
         """ 
 
+
 def view_dynamic_recipes(filter_lait=None):
     """Affiche TOUTES les recettes : statiques + dynamiques"""
     import os
     import json
     from datetime import datetime
     
-    all_recipes = []
-    history_file = "unified_recipes_history.json"
     
-    # Vérifier si au moins un fichier existe
-    has_static = os.path.exists("complete_knowledge_base.json")
-    has_dynamic = os.path.exists(history_file)
+    # 1. DÉFINIR LES FICHIERS
+    history_file = "unified_recipes_history.json"
+    static_file = "complete_knowledge_base.json"
+    
+    # ✅ 2. VÉRIFIER SI FICHIERS EXISTENT ← AJOUTÉ ICI
+    has_static = os.path.exists(static_file)      # ← AJOUTÉ
+    has_dynamic = os.path.exists(history_file)    # ← AJOUTÉ
+    
+    # ✅ NETTOYAGE AUTOMATIQUE AU CHARGEMENT - VERSION ULTRA-STRICTE
+    if os.path.exists(history_file):
+        with open(history_file, 'r', encoding='utf-8') as f:
+            all_recipes_raw = json.load(f)
+        
+        # Dédupliquer avec clé basée sur date + titre
+        seen = set()
+        cleaned = []
+        duplicates_count = 0
+        
+        for r in all_recipes_raw:
+            # Récupérer la date et le titre
+            date = r.get('generated_at') or r.get('date_creation') or r.get('date', '')
+            title = r.get('title', '').strip()
+            
+            # Clé unique : date (jusqu'à la minute) + titre
+            date_minute = date[:16] if len(date) >= 16 else date  # Format: 2026-02-12T18:44
+            recipe_key = f"{date_minute}|{title}"
+            
+            if recipe_key not in seen:
+                cleaned.append(r)
+                seen.add(recipe_key)
+            else:
+                duplicates_count += 1
+                print(f"🗑️ Doublon supprimé: {title} - {date}")
+        
+        # Réécrire si des doublons détectés
+        if duplicates_count > 0:
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(cleaned, f, ensure_ascii=False, indent=2)
+            print(f"🧹 {duplicates_count} doublons supprimés automatiquement")
+            print(f"✅ {len(cleaned)} recettes conservées")
     
     if not has_static and not has_dynamic:
         return """
@@ -7131,46 +7319,34 @@ def view_dynamic_recipes(filter_lait=None):
             </p>
         </div>
         """
+    all_recipes = []
     
     try:
-        # 1. Charger la base statique (si elle existe)
+        # 3. CHARGER STATIQUES (si existe)
         if has_static:
-            with open("complete_knowledge_base.json", 'r', encoding='utf-8') as f:
-                static_recipes = json.load(f)
-                # Marquer comme statiques
-                for r in static_recipes:
-                    r['is_static'] = True
-                all_recipes.extend(static_recipes)
-                print(f"✅ {len(static_recipes)} recettes statiques chargées")
+            try:
+                with open(static_file, 'r', encoding='utf-8') as f:
+                    static_recipes = json.load(f)
+                    for r in static_recipes:
+                        r['is_static'] = True
+                    all_recipes.extend(static_recipes)
+            except:
+                pass  # Ignore erreurs statiques
         
-        # 2. Charger l'historique dynamique UNIFIÉ (nouveau système V2)
+        # 4. CHARGER DYNAMIQUES (priorité)
         if has_dynamic:
-            with open(history_file, 'r', encoding='utf-8') as f:
-                dynamic_recipes = json.load(f)
-                print(f"📥 {len(dynamic_recipes)} recettes dynamiques trouvées")
-                
-                # ✅ FILTRE : Ignorer les recettes incomplètes
-                valid_count = 0
-                for r in dynamic_recipes:
-                    # Vérifier que la recette a au minimum un titre ET des ingrédients/étapes
-                    has_content = (
-                        r.get('title') and (
-                            # Soit c'est une recette scrapée avec URL
-                            (r.get('source_type') == 'scraped' and r.get('url')) or
-                            # Soit c'est une recette complète avec ingrédients et étapes
-                            (r.get('ingredients') and r.get('etapes') and 
-                            len(r.get('ingredients', [])) > 0 and len(r.get('etapes', [])) > 0)
-                    )
-                )
-                    
-                    if has_content:
-                        r['is_static'] = False
-                        all_recipes.append(r)
-                        valid_count += 1
-                    else:
-                        print(f"⚠️ Recette incomplète ignorée: {r.get('title', 'Sans titre')}")
-                
-                print(f"✅ {valid_count} recettes dynamiques valides ajoutées")
+            try:
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    dynamic_recipes = json.load(f)
+                    for r in dynamic_recipes:
+                        if r.get('title'):  # Juste un titre = OK
+                            r['is_static'] = False
+                            all_recipes.append(r)
+            except:
+                pass
+        
+        if not all_recipes:
+            return "<h3>❌ Erreur chargement</h3>"
         
         # Si aucune recette valide
         if len(all_recipes) == 0:
@@ -7221,7 +7397,7 @@ def view_dynamic_recipes(filter_lait=None):
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
         """
         
         # Stats par type de lait
@@ -7291,29 +7467,21 @@ def view_dynamic_recipes(filter_lait=None):
             colors = color_map.get(emoji, color_map['❓'])
             
             html += f"""
-                        <div style="background: {colors['bg']}; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid {colors['border']};">
-                            <div style="font-size: 36px;">{emoji}</div>
-                            <div style="font-size: 24px; font-weight: bold; color: {colors['text']};">{count}</div>
-                            <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
-                        </div>
-                    """
-        for lait, count in sorted(by_lait.items(), key=lambda x: x[1], reverse=True):
-            emoji = emoji_map.get(lait, '❓')
-            html += f"""
-                <div style="background: #FFF3E0; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #FFE0B2;">
+                <div style="background: {colors['bg']}; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid {colors['border']};">
                     <div style="font-size: 36px;">{emoji}</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #E65100;">{count}</div>
+                    <div style="font-size: 24px; font-weight: bold; color: {colors['text']};">{count}</div>
                     <div style="color: #666; font-size: 14px; text-transform: capitalize;">{lait}</div>
                 </div>
             """
-        
+
+        # FERMER LA SECTION STATS ET OUVRIR LA SECTION RECETTES
         html += """
                 </div>
             </div>
             
             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <h3 style="color: #1976D2; margin-top: 0;">📖 Recettes générées</h3>
-                <div style="max-height: 600px; overflow-y: auto;">
+                <div style="max-height: 600px; overflow-y: auto; width: 100%;">
         """
 
         # Afficher les recettes (les plus récentes en premier)
@@ -7367,7 +7535,7 @@ def view_dynamic_recipes(filter_lait=None):
             
             # ===== DÉBUT CARTE RECETTE =====
             html += f"""
-                <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="background: {bg_color}; padding: 20px; margin-bottom: 20px; border-radius: 12px; border-left: 5px solid #1976D2; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
                     <div style="margin-bottom: 15px;">
                         <div style="font-weight: bold; font-size: 18px; color: #1565C0; margin-bottom: 8px;">
                             {icon} {title}
@@ -7377,15 +7545,14 @@ def view_dynamic_recipes(filter_lait=None):
                             {description}
                         </div>
                     </div>
-                    
-                    <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 8px; margin-bottom: 12px; width: 100%; box-sizing: border-box;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; width: 100%;">
                             <div><strong>📅 Généré le:</strong> {date_str}</div>
                             <div><strong>Type de lait:</strong> {lait_emoji} {lait}</div>
                             <div><strong>Type de pâte:</strong> {type_pate}</div>
                             <div><strong>Source:</strong> {source_type}</div>
                         </div>
-                        <div style="margin-top: 10px; padding: 10px; background: rgba(255,235,59,0.2); border-radius: 6px;">
+                        <div style="margin-top: 10px; padding: 10px; background: rgba(255,235,59,0.2); border-radius: 6px; width: 100%; box-sizing: border-box;">
                             <strong>🧪 Ingrédients demandés:</strong> {requested_ingredients}
                         </div>
                     </div>
@@ -7426,7 +7593,13 @@ def view_dynamic_recipes(filter_lait=None):
             html += """
                 </div>
             """
-      
+        
+        # Fermer les divs finales
+        html += """
+                </div>
+            </div>
+        </div>
+        """
         
         return html
         
@@ -7436,18 +7609,19 @@ def view_dynamic_recipes(filter_lait=None):
         <div style="padding: 20px; background: #FFEBEE; border-radius: 8px;">
             <h3 style="color: #C62828;">❌ Erreur de lecture</h3>
             <pre style="background: white; padding: 10px; border-radius: 4px; overflow: auto;">
-
 {str(e)}
 
 {traceback.format_exc()}
             </pre>
         </div>
-        """        
+        """       
 
 # CREATE INTERFACE GRADIO
 # ===== create_interface AVEC AUTHENTIFICATION =====
 
 def create_interface():
+    agent = AgentFromagerHF()
+    
     import gradio as gr
     import json
     import os
@@ -7835,6 +8009,19 @@ def create_interface():
                     btn_wine.click(fn=lambda: get_quick_question("🍷 Accord vin"), outputs=[user_input])
                     btn_clear_chat.click(fn=clear_conversation, outputs=[chat_history, chat_display, user_input])
 
+                # ONGLET 5 : Maintenance
+                with gr.Tab("⚙️ Maintenance"):
+                # Ajoute un bouton
+                    clean_kb_btn = gr.Button("🧹 Nettoyer complete_knowledge_base")
+                    clean_status = gr.Markdown("")
+
+                    clean_kb_btn.click(
+                        fn=agent.clean_complete_kb_duplicates,  # ta nouvelle fonction
+                        inputs=[],
+                        outputs=clean_status,
+                    )
+
+
                 # ONGLET 5 : enrichissement de la base de connaissances
                 # with gr.Tab("🤖 Base de connaissances enrichie"):
                 #     gr.Markdown("""
@@ -7890,7 +8077,7 @@ def create_interface():
                 #     outputs=knowledge_output
                 # )
 
-            # ONGLET 5 : Recettes dynamiques
+            # ONGLET 6 : Recettes dynamiques
             with gr.Tab("🎯 Recettes dynamiques"):
                 gr.Markdown("""
                 ### 🎯 Historique des recettes générées dynamiquement
