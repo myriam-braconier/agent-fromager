@@ -7845,22 +7845,15 @@ def create_interface():
     
     # Créer le thème
     fromage_theme = create_fromage_theme()
-    
-    
-    
-    custom_html = """
-    <head>
-        <meta property="og:title" content="Mon App Python" />
-        <meta property="og:description" content="Description de mon app" />
-        <meta property="og:image" content="https://mon-domaine.com/ma-vignette.png" />
-        <meta property="og:url" content="https://mon-app.railway.app" />
-        <meta name="twitter:card" content="summary_large_image" />
-    </head>
-    """
-
-    
+     
     with gr.Blocks(
         title="🧀 Agent Fromager",
+        head="""
+        <meta property="og:title" content="🧀 Agent Fromager">
+        <meta property="og:description" content="Générateur intelligent de recettes fromagères">
+        <meta property="og:image" content="https://unsplash.com/fr/photos/un-plateau-de-fromages-avec-un-morceau-de-fromage-dessus-XM4i9fEHqCg">
+        <meta property="og:type" content="website">
+        """
     ) as demo:
     
         gr.HTML(f"<style>{custom_html}</style>", visible=False)
