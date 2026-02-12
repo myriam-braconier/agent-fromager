@@ -7951,7 +7951,7 @@ def create_interface():
                     )
 
                     gr.Markdown(
-                        "⏳ *La génération + recherche web prend 10-15 secondes...*"
+                        "⏳ *La génération + recherche web prend 30-60 secondes...*"
                     )
 
                 with gr.Column(scale=1):
