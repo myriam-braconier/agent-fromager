@@ -26,6 +26,8 @@ from typing import List, Dict, Optional
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
 
+# Récupère le port dynamique selon l'environnement
+port = int(os.environ.get("PORT", 7860))  # 7860 par défaut pour local
 
 # AJOUTER CES IMPORTS PERSONNALISES
 from unified_recipe_generator_v2_with_batch import UnifiedRecipeGeneratorV2, RecipeFormatter
@@ -7849,6 +7851,34 @@ def create_interface():
     ) as demo:
     
         gr.HTML(f"<style>{custom_css}</style>", visible=False)
+        
+        # ===== EFFET À L'OUVERTURE =====
+         # Animation bienvenue
+        gr.HTML("""
+        <div id="welcome" style="
+            font-size:28px; 
+            font-weight:bold; 
+            text-align:center; 
+            margin-bottom:20px;
+            opacity:0; 
+            transition: opacity 2s, transform 1s;
+            transform: translateY(-20px);
+        ">
+            🧀 Bienvenue sur Agent Fromager !
+        </div>
+        <script>
+        // Vérifier toutes les 50ms si l'élément est dans le DOM
+        const interval = setInterval(() => {
+            const welcome = document.getElementById('welcome');
+            if (welcome) {
+                welcome.style.opacity = 1;
+                welcome.style.transform = 'translateY(0)';
+                clearInterval(interval); // on arrête le check
+            }
+        }, 50);
+        </script>
+    """)
+        
         
         # État d'authentification
         is_authenticated = gr.State(value=False)
