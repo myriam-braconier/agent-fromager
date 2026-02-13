@@ -8246,7 +8246,7 @@ def create_interface():
                         )
 
                     generate_all_btn = gr.Button(
-                        "✨ Générer la recette + Recherche web",
+                        "✨ Générer la recette",
                         variant="primary",
                         size="lg",
                     )
@@ -8765,7 +8765,7 @@ def create_interface():
                                 entry_name = entry.get('cheese_name') or entry.get('name') or entry.get('titre') or f"Recette #{entry_id}"
                                 date = entry.get('date', '')[:10] if entry.get('date') else 'sans date'
 
-                                display_text = f"{entry_name} ({date})"
+                                display_text = f"{entry_id}. {entry_name} ({date})"
 
                                 if display_text not in recipe_map:
                                     choices.append(display_text)
