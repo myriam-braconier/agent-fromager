@@ -3566,6 +3566,7 @@ class AgentFromagerHF:
             import traceback
             traceback.print_exc()
             return []
+    
     def _search_ecosia(self, query, max_results):
         """Recherche Ecosia ULTRA simple"""
         try:
@@ -3807,7 +3808,7 @@ class AgentFromagerHF:
         Valide une combinaison lait/pâte/aromates
         Returns: (bool, str) - (est_valide, raison)
         """
-        rules = self.knowledge["regles_compatibilite"]
+        rules = self.knowledge_base["regles_compatibilite"]
 
         # Vérifier les exclusions absolues
         for exclusion in rules["exclusions_absolues"]:
@@ -4197,35 +4198,72 @@ class AgentFromagerHF:
 
         return True, "✅ Ingrédients parfaits pour faire du fromage !"
 
+
     def _extract_lait_from_text(self, text: str) -> str:
-        """Extrait le type de lait d'un texte"""
+        """Extrait le type de lait d'un texte - VERSION AMÉLIORÉE"""
         if not text:
             return None
 
         text_lower = text.lower()
+        
+        # ✅ Nettoyer les tirets, apostrophes, espaces multiples
+        text_clean = text_lower.replace('-', ' ').replace("'", ' ').strip()
+        text_clean = ' '.join(text_clean.split())  # Normaliser espaces
+        
+        print(f"🔍 _extract_lait_from_text() input: '{text}'")
+        print(f"🔍 _extract_lait_from_text() cleaned: '{text_clean}'")
 
         lait_patterns = {
-            "vache": ["vache", "bovin", "cow", "lait de vache"],
-            "chevre": [
+            "brebis": [
+                "brebis", 
+                "mouton", 
+                "ovin", 
+                "sheep", 
+                "lait de brebis",
+                "laitdebrebis",  # Sans espaces
+                "lait brebis",
+            ],
+            "chevre": [  # ✅ ATTENTION: clé sans accent pour cohérence
                 "chèvre",
                 "chevre",
                 "caprin",
                 "goat",
                 "lait de chèvre",
                 "lait de chevre",
+                "laitdechevre",
+                "lait chevre",
+                "lait chèvre",
             ],
-            "brebis": ["brebis", "mouton", "ovin", "sheep", "lait de brebis"],
-            "bufflonne": ["bufflonne", "buffle", "buffalo", "lait de bufflonne"],
+            "vache": [
+                "vache", 
+                "bovin", 
+                "cow", 
+                "lait de vache",
+                "laitdevache",
+                "lait vache",
+            ],
+            "bufflonne": [
+                "bufflonne", 
+                "buffle", 
+                "buffalo", 
+                "lait de bufflonne",
+                "laitdebufflonne",
+                "lait bufflonne",
+            ],
         }
 
-        # Priorité aux patterns les plus spécifiques
-        for lait_type, patterns in lait_patterns.items():
+        # ✅ Priorité aux patterns les plus spécifiques EN PREMIER
+        # Ordre important : brebis > chèvre > bufflonne > vache
+        for lait_type in ["brebis", "chevre", "bufflonne", "vache"]:
+            patterns = lait_patterns[lait_type]
             for pattern in patterns:
-                if pattern in text_lower:
+                if pattern in text_clean:
+                    print(f"✅ MATCH TROUVÉ: '{pattern}' → {lait_type}")
                     return lait_type
 
+        print(f"❌ Aucun type de lait détecté dans: '{text}'")
         return None
-
+    
     def _validate_combination(self, lait: str, type_pate: str) -> tuple:
         """
         Valide une combinaison lait/pâte selon les règles fromagères traditionnelles
@@ -4923,13 +4961,21 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         
         # Si pas de lait détecté, utiliser vache par défaut
         if not lait:
-            lait = 'vache'
-            print(f"⚠️ Aucun type de lait détecté dans les ingrédients, utilisation par défaut: vache")
+            # ✅ Vérifier ENCORE une fois avec la fonction spécialisée
+            lait = self._extract_lait_from_text(' '.join(ingredients_list))
+            
+            if not lait:
+                # ⚠️ Vraiment aucun lait trouvé, demander à l'utilisateur
+                print(f"⚠️ ATTENTION: Aucun type de lait détecté dans '{', '.join(ingredients_list)}'")
+                print(f"   Types attendus: 'lait de vache', 'lait de chèvre', 'lait de brebis', 'lait de bufflonne'")
+                print(f"   Utilisation par défaut: vache")
+                lait = 'vache'
+            else:
+                print(f"✅ Type de lait détecté via _extract_lait_from_text: {lait}")
+
+        print(f"🔍 DEBUG: Type de lait final utilisé: {lait}")
         
-        print(f"🔍 DEBUG: Type de lait détecté/défini: {lait}")
-        
-    
-        
+
         # ✅ CORRECT - Passer les deux paramètres
         generator = UnifiedRecipeGeneratorV2(knowledge_base=self.knowledge_base, agent=self)
     
@@ -5327,7 +5373,7 @@ en molécules aromatiques. Plus long = goût plus prononcé.
         steps += local_rng.choice(conseils)
         
         return steps
-    
+
     def _generate_unique_advice(self, ingredients, cheese_type, seed_value):
         """Génère des conseils personnalisés"""
         import random
