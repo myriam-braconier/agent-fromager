@@ -2286,103 +2286,103 @@ class AgentFromagerHF:
         #         print("="*80 + "\n")
         #         return False
         
-        def clean_all_duplicates(self):
-            """Nettoie les doublons - SANS REGEX UNICODE"""
-            import os
+    def clean_all_duplicates(self):
+        """Nettoie les doublons - SANS REGEX UNICODE"""
+        import os
+    
         
+        history_file = "unified_recipes_history.json"
+        
+        if not os.path.exists(history_file):
+            return "❌ Fichier manquant"
+        
+        with open(history_file, 'r', encoding='utf-8') as f:
+            all_recipes = json.load(f)
+        
+        # NORMALISATION SIMPLE (sans regex unicode)
+        def simple_clean(title):
+            # Enlève les emojis courants manuellement
+            emojis = "🤖🧪📅📋🥛🐄🧀✨🎉📊🔍🗑️✅❌"
+            for emoji in emojis:
+                title = title.replace(emoji, "")
+            # Nettoie espaces + casse
+            title = " ".join(title.split()).lower().strip()
+            return title
+        
+        seen = set()
+        cleaned = []
+        
+        for r in all_recipes:
+            title_raw = r.get('title', '')
+            title_clean = simple_clean(title_raw)
             
-            history_file = "unified_recipes_history.json"
+            # Date simple (16 premiers caractères)
+            date = r.get('generated_at') or r.get('date_creation') or r.get('date', '')
+            date_key = date[:16] if len(date) >= 16 else date
             
-            if not os.path.exists(history_file):
-                return "❌ Fichier manquant"
+            key = f"{title_clean}|{date_key}"
             
-            with open(history_file, 'r', encoding='utf-8') as f:
-                all_recipes = json.load(f)
-            
-            # NORMALISATION SIMPLE (sans regex unicode)
-            def simple_clean(title):
-                # Enlève les emojis courants manuellement
-                emojis = "🤖🧪📅📋🥛🐄🧀✨🎉📊🔍🗑️✅❌"
-                for emoji in emojis:
-                    title = title.replace(emoji, "")
-                # Nettoie espaces + casse
-                title = " ".join(title.split()).lower().strip()
-                return title
-            
-            seen = set()
-            cleaned = []
-            
-            for r in all_recipes:
-                title_raw = r.get('title', '')
-                title_clean = simple_clean(title_raw)
-                
-                # Date simple (16 premiers caractères)
-                date = r.get('generated_at') or r.get('date_creation') or r.get('date', '')
-                date_key = date[:16] if len(date) >= 16 else date
-                
-                key = f"{title_clean}|{date_key}"
-                
-                if key not in seen:
-                    cleaned.append(r)
-                    seen.add(key)
-            
-            # Sauvegarde
-            with open(history_file, 'w', encoding='utf-8') as f:
-                json.dump(cleaned, f, ensure_ascii=False, indent=2)
-            
-            removed = len(all_recipes) - len(cleaned)
-            return f"""✅ **DOUBLONS SUPPRIMÉS !**
+            if key not in seen:
+                cleaned.append(r)
+                seen.add(key)
+        
+        # Sauvegarde
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(cleaned, f, ensure_ascii=False, indent=2)
+        
+        removed = len(all_recipes) - len(cleaned)
+        return f"""✅ **DOUBLONS SUPPRIMÉS !**
 
-        Avant: {len(all_recipes)} recettes
-        Après: {len(cleaned)} recettes
-        **Supprimés: {removed}** 🎉"""
+    Avant: {len(all_recipes)} recettes
+    Après: {len(cleaned)} recettes
+    **Supprimés: {removed}** 🎉"""
 
         
-        def _extract_cheese_name(self, recipe):
-            """Extrait le nom du fromage de la recette"""
-            import re
-            print("🆕 NOUVELLE VERSION _extract_cheese_name appelée")
+    def _extract_cheese_name(self, recipe):
+        """Extrait le nom du fromage de la recette"""
+        import re
+        print("🆕 NOUVELLE VERSION _extract_cheese_name appelée")
+        
+        recipe_lines = recipe.split("\n")
+        print(f"📊 Nombre de lignes: {len(recipe_lines)}")
+        
+        # Le titre est TOUJOURS à la ligne 2
+        if len(recipe_lines) > 2:
+            title_line = recipe_lines[2]
+            print(f"🔍 Ligne [2]: {repr(title_line)}")
             
-            recipe_lines = recipe.split("\n")
-            print(f"📊 Nombre de lignes: {len(recipe_lines)}")
-            
-            # Le titre est TOUJOURS à la ligne 2
-            if len(recipe_lines) > 2:
-                title_line = recipe_lines[2]
-                print(f"🔍 Ligne [2]: {repr(title_line)}")
+            if "║" in title_line:
+                # Nettoyer : enlever ║
+                name = title_line.replace("║", "").strip()
+                print(f"  Après suppression ║: {repr(name)}")
                 
-                if "║" in title_line:
-                    # Nettoyer : enlever ║
-                    name = title_line.replace("║", "").strip()
-                    print(f"  Après suppression ║: {repr(name)}")
-                    
-                    # Enlever TOUS les emojis (y compris 📋)
-                    name = re.sub(r'[\U0001F300-\U0001F9FF]', '', name).strip()
-                    print(f"  Après suppression emojis: {repr(name)}")
-                    
-                    # ===== MODIFICATION ICI : Enlever le code (#...) =====
-                    name = re.sub(r'\s*\(#\d+\)\s*$', '', name).strip()
-                    print(f"  Après suppression code: {repr(name)}")
-                    # ===== FIN MODIFICATION =====
-                    
-                    print(f"  Longueur: {len(name)}")
-                    print(f"  Contient '(' dans name nettoyé: {('(' in name)}")
-                    print(f"  Contient 'Profil:': {('Profil:' in name)}")
-                    
-                    # ===== CHANGEMENT : vérifier dans 'name' au lieu de 'title_line' =====
-                    if name and len(name) > 3 and "(" not in name and "Profil:" not in name:
-                        print(f"✅ Titre extrait ligne [2]: '{name}'")
-                        return name
-                    else:
-                        print(f"❌ Conditions non remplies")
+                # Enlever TOUS les emojis (y compris 📋)
+                name = re.sub(r'[\U0001F300-\U0001F9FF]', '', name).strip()
+                print(f"  Après suppression emojis: {repr(name)}")
+                
+                # ===== MODIFICATION ICI : Enlever le code (#...) =====
+                name = re.sub(r'\s*\(#\d+\)\s*$', '', name).strip()
+                print(f"  Après suppression code: {repr(name)}")
+                # ===== FIN MODIFICATION =====
+                
+                print(f"  Longueur: {len(name)}")
+                print(f"  Contient '(' dans name nettoyé: {('(' in name)}")
+                print(f"  Contient 'Profil:': {('Profil:' in name)}")
+                
+                # ===== CHANGEMENT : vérifier dans 'name' au lieu de 'title_line' =====
+                if name and len(name) > 3 and "(" not in name and "Profil:" not in name:
+                    print(f"✅ Titre extrait ligne [2]: '{name}'")
+                    return name
                 else:
-                    print(f"❌ Pas de ║ dans la ligne")
+                    print(f"❌ Conditions non remplies")
             else:
-                print(f"❌ Pas assez de lignes")
-            
-            print("⚠️ Titre par défaut utilisé")
-            return "Fromage personnalisé"
+                print(f"❌ Pas de ║ dans la ligne")
+        else:
+            print(f"❌ Pas assez de lignes")
         
+        print("⚠️ Titre par défaut utilisé")
+        return "Fromage personnalisé"
+    
     def get_knowledge_summary(self):
         """Retourne un résumé complet de la base de connaissances"""
         summary = "📚 BASE DE CONNAISSANCES FROMAGE COMPLÈTE\n\n"
@@ -8645,7 +8645,10 @@ def create_interface():
                     def update_interface():
                         """Actualise TOUTE l'interface - COMPTE RÉEL"""
                         global stats_visible
+                        
+                         # Reset complet
                         stats_visible = False
+                        recipe_map = {}  # 🔥 IMPORTANT : Reset du mapping
 
                         try:
                             print("🔄 Début update_interface")
@@ -8678,7 +8681,7 @@ def create_interface():
                                 </div>
                             </div>
                             """
-
+                            # résumé texte
                             if not history:
                                 summary = "📭 **Votre historique est vide**\n\n"
                                 summary += "💡 Créez votre première recette !\n\n"
@@ -8692,8 +8695,21 @@ def create_interface():
                                     summary += f"   📅 {date}\n"
                                     summary += "-" * 30 + "\n"
 
+                            
+                            #  Construction du dropdow avec mapping
                             choices = []
-                            global recipe_map
+                            # global recipe_map
+                            print("\n" + "="*60)
+                            print("🔍 DEBUG UPDATE_INTERFACE")
+                            print("="*60)
+                            print(f"Historique brut: {type(history)}, longueur: {len(history) if history else 0}")
+                            
+                            if history:
+                                print("\n5 premières entrées:")
+                                for i, entry in enumerate(history[:5]):
+                                    print(f"  [{i}] ID: {entry.get('id')}, Nom: {entry.get('cheese_name')}")
+                            
+                            print(f"\nrecipe_map avant: {len(recipe_map)} entrées")
                             recipe_map = {}
 
                             print(f"🎯 Création dropdown à partir de {len(history)} entrées")
@@ -8717,6 +8733,8 @@ def create_interface():
                             choices_with_placeholder = ["→ Sélectionner parmi les recettes"] + choices
 
                             print(f"✅ Interface: {len(history)} perso + {fallback_count} réf = {total} total")
+                            print(f"recipe_map après: {len(recipe_map)} entrées")
+                            print("="*60 + "\n")
 
                             return [
                                 counter_html,
@@ -8734,13 +8752,13 @@ def create_interface():
                             traceback.print_exc()
 
                             return [
-                                f"<div style='color: red;'>Erreur: {str(e)[:50]}</div>",
-                                f"Erreur: {str(e)}",
+                                f"<div style='color: red;'>Erreur: {str(e)[:100]}</div>",
+                                f"❌ Erreur: {str(e)}",
                                 gr.update(
                                     choices=["→ Sélectionner parmi les recettes"],
                                     value="→ Sélectionner parmi les recettes"
                                 ),
-                                f"Erreur: {str(e)}",
+                                f"❌ Erreur lors du chargement",
                             ]
 
                     def show_stats():
@@ -8916,175 +8934,98 @@ def create_interface():
                             return f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>"
 
                     def clear_all():
-                        """Efface l'historique"""
-                        global stats_visible
+                        """Efface l'historique - VERSION CORRIGÉE"""
+                        global stats_visible, recipe_map
+                        
                         stats_visible = False
-
+                        recipe_map = {}
+                        
                         try:
                             print("🗑️ Début clear_all")
                             result = agent.clear_history()
-                            print(f"✅ clear_all réussi: {result}")
-
-                            global STATS_CACHE
-                            STATS_CACHE['visible'] = False
-                            STATS_CACHE['html'] = None
-
-                            choices_with_placeholder = ["→ Sélectionner parmi les recettes"]
-
+                            print(f"✅ Historique effacé: {result}")
+                            
+                            # Retourner les bonnes valeurs pour les 3 outputs
                             return [
-                                "✅ Historique effacé !",
-                                [],
-                                "✅ Historique effacé",
+                                "✅ Historique effacé !",  # history_summary
+                                gr.update(
+                                    choices=["→ Sélectionner parmi les recettes"],
+                                    value="→ Sélectionner parmi les recettes"
+                                ),  # recipe_dropdown
+                                "",  # recipe_display
                             ]
-
+                            
                         except Exception as e:
                             print(f"❌ Erreur clear_all: {e}")
                             return [
                                 f"❌ Erreur: {str(e)}",
-                                [],
+                                gr.update(
+                                    choices=["→ Sélectionner parmi les recettes"],
+                                    value="→ Sélectionner parmi les recettes"
+                                ),
                                 f"Erreur: {str(e)}",
-                                f"<div style='color: red; padding: 20px;'>❌ Erreur: {str(e)}</div>",
-                                "🔢 Statistiques",
-                                "secondary"
                             ]
-
+                            
                     def on_recipe_select(selected):
-                        """Quand une recette est sélectionnée"""
-                        if not selected or selected == "Sélectionner parmi les recettes 👉" or selected.startswith("→"):
+                        """Quand une recette est sélectionnée - VERSION CORRIGÉE"""
+                        
+                        # Gestion du placeholder
+                        if not selected or selected == "→ Sélectionner parmi les recettes":
                             return "Sélectionnez une recette dans la liste..."
-
-                        print(f"🔍 recipe_display type: {type(recipe_display)}")
-                        print(f"🔍 recipe_display: {recipe_display}")
-
-                        global recipe_map
-
-                        print(f"🔍 Sélection reçue (type: {type(selected)}): {selected}")
-
-                        print("\n" + "=" * 60)
-                        print("=== DEBUG COMPLET ===")
-                        print("=" * 60)
-                        print(f"Selected: {selected}")
-                        print(f"Type: {type(selected)}")
-
+                        
+                        # Gestion du cas liste (Gradio peut renvoyer une liste)
                         if isinstance(selected, list):
-                            print(f"⚠️ C'est une liste! Longueur: {len(selected)}")
                             if not selected:
-                                print("❌ Liste vide")
-                                return "Actualisez puis sélectionnez une recette..."
+                                return "Sélectionnez une recette dans la liste..."
                             selected = selected[0]
-                            print(f"✅ Premier élément extrait: {selected}")
-
-                        print(f"\n=== RECIPE_MAP (taille: {len(recipe_map)}) ===")
-                        if recipe_map:
-                            print("5 premières entrées:")
-                            for i, (key, value) in enumerate(list(recipe_map.items())[:5]):
-                                print(f"  [{i}] '{key}' -> {value}")
-                        else:
-                            print("⚠️ recipe_map est VIDE!")
-
-                        history = agent.get_history()
-                        print(f"\n=== HISTORIQUE ({len(history)} entrées) ===")
-                        for i, entry in enumerate(history[:5]):
-                            print(f"[{i}] ID: {entry.get('id')} (type: {type(entry.get('id'))})")
-                            print(f"    Clés disponibles: {list(entry.keys())}")
-
-                            if 'recipe_complete' in entry:
-                                content = entry['recipe_complete']
-                                preview = content[:50].replace('\n', ' ') + "..." if len(content) > 50 else content
-                                print(f"    Preview: {preview}")
-                            print()
-
-                        if len(history) > 5:
-                            print(f"... et {len(history) - 5} autres entrées")
-
-                        print("=" * 60 + "\n")
-
-                        if not selected:
-                            return "Actualisez puis sélectionnez une recette..."
-
+                        
                         try:
+                            global recipe_map
                             recipe_id = None
-
-                            print(f"\n🔎 Recherche de '{selected}'...")
-
+                            
+                            # Méthode 1 : Via recipe_map (prioritaire)
                             if selected in recipe_map:
                                 recipe_id = recipe_map[selected]
-                                print(f"✅ Trouvé via recipe_map: {selected} -> ID {recipe_id}")
+                                print(f"✅ Trouvé via recipe_map: ID {recipe_id}")
                             else:
+                                # Méthode 2 : Extraction depuis le texte "1. Nom (date)"
                                 import re
                                 match = re.match(r'^(\d+)\.', str(selected))
                                 if match:
                                     recipe_id = int(match.group(1))
-                                    print(f"✅ ID extrait par regex: '{selected}' -> ID {recipe_id}")
+                                    print(f"✅ ID extrait: {recipe_id}")
                                 else:
-                                    print(f"⚠️ Regex échouée, tentative alternative...")
-                                    numbers = re.findall(r'\d+', str(selected))
-                                    if numbers:
-                                        recipe_id = int(numbers[0])
-                                        print(f"✅ Nombre extrait: ID {recipe_id}")
-                                    else:
-                                        return f"❌ Format invalide: '{selected}'"
-
-                            if recipe_id is None:
-                                return "❌ Impossible de déterminer l'ID de la recette"
-
-                            print(f"\n🔬 RECHERCHE DÉTAILLÉE:")
-                            print(f"   ID cherché: {recipe_id} (type: {type(recipe_id)})")
-                            print(f"   ID comme string: '{str(recipe_id)}'")
-
+                                    return f"❌ Format invalide: {selected}"
+                            
+                            # Recherche dans l'historique
                             history = agent.get_history()
-
-                            print(f"\n   Parcours des {len(history)} entrées...")
-
-                            found = False
-                            for i, entry in enumerate(history):
+                            
+                            # Normalisation de l'ID pour comparaison
+                            recipe_id_str = str(recipe_id)
+                            
+                            for entry in history:
                                 entry_id = entry.get('id')
                                 entry_id_str = str(entry_id)
-
-                                matches = []
-                                if entry_id == recipe_id:
-                                    matches.append("MATCH EXACT (entry_id == recipe_id)")
-                                if entry_id_str == str(recipe_id):
-                                    matches.append("MATCH STRING (str(entry_id) == str(recipe_id))")
-                                if str(entry_id) == str(recipe_id):
-                                    matches.append("MATCH DOUBLE STRING (str(entry_id) == str(recipe_id))")
-
-                                if matches:
-                                    print(f"\n   ✅ TROUVÉ à l'index {i}!")
-                                    print(f"      Entry ID: {entry_id} (type: {type(entry_id)})")
-                                    print(f"      Type(s) de match: {', '.join(matches)}")
-                                    print(f"      Clés de l'entrée: {list(entry.keys())}")
-
-                                    content_keys = ['recipe_complete', 'recipe', 'content', 'text', 'response']
-                                    for key in content_keys:
-                                        if key in entry:
-                                            content = entry[key]
-                                            print(f"      📄 Contenu trouvé dans clé '{key}' ({len(content)} caractères)")
-                                            found = True
-
-                                            preview = content[:100].replace('\n', ' ') + "..." if len(content) > 100 else content
-                                            print(f"      Preview: {preview}")
-                                            return content
-
-                                    if not found:
-                                        print(f"      ⚠️ Aucune clé de contenu trouvée!")
-                                        return "⚠️ Recette sans contenu"
-                                else:
-                                    if i < 3:
-                                        print(f"   [{i}] Entry ID: {entry_id} (vs {recipe_id}) - PAS DE MATCH")
-
-                            if not found:
-                                print(f"\n❌ Aucune correspondance trouvée pour ID {recipe_id}")
-                                print(f"📋 IDs présents dans l'historique: {[entry.get('id') for entry in history]}")
-                                return f"❌ Recette ID {recipe_id} non trouvée"
-
+                                
+                                # Comparaison flexible (int ou string)
+                                if entry_id_str == recipe_id_str:
+                                    # Recherche du contenu dans l'ordre de priorité
+                                    for key in ['recipe_complete', 'recipe', 'content', 'response']:
+                                        if key in entry and entry[key]:
+                                            print(f"✅ Contenu trouvé dans '{key}'")
+                                            return entry[key]
+                                    
+                                    # Si aucune clé trouvée
+                                    return f"⚠️ Recette #{recipe_id} sans contenu\n\nClés disponibles: {list(entry.keys())}"
+                            
+                            # Aucune correspondance
+                            return f"❌ Recette #{recipe_id} introuvable\n\nIDs disponibles: {[e.get('id') for e in history[:10]]}"
+                        
                         except Exception as e:
-                            print(f"\n❌ ERREUR DÉTAILLÉE:")
-                            print(f"   Message: {e}")
                             import traceback
-                            traceback.print_exc()
-                            return f"❌ Erreur: {str(e)}\nSélection: '{selected}'"
-
+                            error_details = traceback.format_exc()
+                            print(f"❌ ERREUR: {error_details}")
+                            return f"❌ Erreur: {str(e)}"
                     # ===== CONNEXIONS HISTORIQUE =====
                     history_btn.click(
                         fn=update_interface,
@@ -9094,7 +9035,8 @@ def create_interface():
                             history_summary,
                             recipe_dropdown,
                             recipe_display,
-                        ]
+                        ],
+                        queue=False  # 🔥 IMPORTANT : Exécution immédiate
                     )
 
                     count_btn.click(
@@ -9103,7 +9045,8 @@ def create_interface():
                         outputs=[
                             stats_display,
                             count_btn,
-                        ]
+                        ],
+                        queue=False
                     )
 
                     clear_btn.click(
@@ -9120,18 +9063,20 @@ def create_interface():
                     show_fallback_btn.click(
                         fn=show_fallback,
                         inputs=[],
-                        outputs=[stats_display]
+                        outputs=[stats_display],
+                        queue=False
                     )
 
                     recipe_dropdown.change(
                         fn=on_recipe_select,
                         inputs=[recipe_dropdown],
-                        outputs=[recipe_display]
+                        outputs=[recipe_display],
+                        queue=False
                     )
 
                     # ===== INITIALISATION =====
                     def init_on_load():
-                        """Initialise avec les vrais chiffres"""
+                        """Initialise l'interface au chargement"""
                         global stats_visible
                         stats_visible = False
                         print("⚡ Initialisation Historique")
