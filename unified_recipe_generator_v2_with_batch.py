@@ -1383,6 +1383,33 @@ class UnifiedRecipeGeneratorV2:
             for item in materiel[:5]:  # Limiter à 5 pour ne pas surcharger
                 knowledge_context += f"- {item}\n"
         
+        
+        # ✅ VALIDATION CRITIQUE DU LAIT
+        if not lait or lait == "vache":
+            # Extraire à nouveau depuis ingredients
+            print("⚠️ Tentative de ré-extraction du type de lait depuis les ingrédients...")
+            
+            ingredients_str = ' '.join([str(ing) for ing in ingredients]).lower()
+            
+            if 'brebis' in ingredients_str:
+                lait = 'brebis'
+                print(f"✅ Lait corrigé: brebis (trouvé dans '{ingredients_str}')")
+            elif 'chèvre' in ingredients_str or 'chevre' in ingredients_str:
+                lait = 'chèvre'
+                print(f"✅ Lait corrigé: chèvre (trouvé dans '{ingredients_str}')")
+            elif 'bufflonne' in ingredients_str or 'buffle' in ingredients_str:
+                lait = 'bufflonne'
+                print(f"✅ Lait corrigé: bufflonne (trouvé dans '{ingredients_str}')")
+            elif 'vache' in ingredients_str:
+                lait = 'vache'
+                print(f"✅ Lait confirmé: vache (trouvé dans '{ingredients_str}')")
+            else:
+                print(f"⚠️ Vraiment aucun lait trouvé, utilisation 'vache' par défaut")
+                lait = 'vache'
+
+        print(f"🎯 Type de lait FINAL utilisé dans le prompt: {lait}")
+        
+    
         # ========== CONSTRUIRE LE PROMPT ==========
         prompt = f"""Tu es un maitre fromager expert. Genere UNE recette JSON VALIDE et detaillee.
 
@@ -1393,7 +1420,7 @@ INTERDICTIONS ABSOLUES:
 ✅ COMMENCE PAR {{ et TERMINE PAR }}
 
 INGREDIENTS: {', '.join(ingredients)}
-LAIT: {lait or "vache"}
+LAIT: {lait}
 TYPE: {cheese_type}
 AROMATES: {', '.join(aromates) if aromates else "AUCUN"}
 PROFIL: {profile}
@@ -1419,11 +1446,11 @@ FORMAT JSON (COPIE EXACTEMENT):
 
 {{
     "title": "Nom creatif du fromage",
-    "description": "Description appetissante en 2 phrases courtes avec texture onctueus, aromes subtils et aspect visuel",
-    "lait": "{lait or 'vache'} cru ou pasteurise a temperature ambiante pour meilleure fermentation",
+    "description": "Description appetissante en 2 phrases courtes avec texture, aromes subtils et aspect visuel",
+    "lait": "{lait} cru ou pasteurise a temperature ambiante pour meilleure fermentation",
     "type_pate": "{cheese_type} avec caracteristiques texture et fermetee",
     "ingredients": [
-        "1L lait {lait or 'vache'} entier temperature ambiante",
+        "1L lait {lait} entier temperature ambiante",
         "5ml presure liquide ou 1/4 comprime",
         "2g ferments lactiques mesophiles Lactococcus lactis",
         "10g sel fin non iode"{', "aromates doses precises"' if aromates else ''}
@@ -1477,6 +1504,8 @@ VERIFICATION FINALE AVANT ENVOI:
 ✅ 8 etapes minimum 180-280 caracteres chacune
 
 GENERE MAINTENANT JSON VALIDE:"""
+
+
         # ========== APPEL AU LLM ==========
         try:
             print("🔍 DEBUG: Envoi du prompt au LLM...")
@@ -1485,7 +1514,7 @@ GENERE MAINTENANT JSON VALIDE:"""
             
             response = self.agent.chat_with_llm(
                 prompt,
-                max_tokens=8192,  # Augmentez cette valeur si nécessaire
+                max_tokens=16384,  # Augmentez cette valeur si nécessaire
                 temperature=0.8
             )
             print(f"🔍 DEBUG: Réponse LLM reçue ({len(response)} caractères)")
